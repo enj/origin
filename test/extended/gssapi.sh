@@ -10,7 +10,7 @@ OS_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${OS_ROOT}/hack/lib/init.sh"
 os::log::stacktrace::install
 trap os::test::junit::reconcile_output EXIT
-os::test::junit::declare_suite_start "test-extended/gssapi"
+os::test::junit::declare_suite_start "test-extended/gssapiproxy"
 os::util::environment::setup_time_vars
 
 cd "${OS_ROOT}"
@@ -75,7 +75,6 @@ oc create -f test/extended/testdata/gssapi/proxy
 oc create -f test/extended/testdata/gssapi/fedora/base
 oc create -f test/extended/testdata/gssapi/fedora/kerberos
 oc create -f test/extended/testdata/gssapi/fedora/kerberos_configured
-oc create -f test/extended/testdata/gssapi/fedora/kerberos_ticket
 
 # kick off a build and wait for it to finish
 oc start-build --from-file=test/extended/testdata/gssapi/proxy --follow gssapiproxy
@@ -111,7 +110,13 @@ os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o j
 oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --follow fedora-gssapi-base
 oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --follow fedora-gssapi-kerberos
 oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos_configured --follow fedora-gssapi-kerberos-configured
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos_ticket --follow fedora-gssapi-kerberos-ticket
+
+REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
+oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-base" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-kerberos" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+
 
 os::test::junit::declare_suite_end
 
