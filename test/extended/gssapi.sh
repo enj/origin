@@ -2,6 +2,10 @@
 #
 # TODO
 
+# set -x
+
+set -e
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -16,6 +20,10 @@ os::util::environment::setup_time_vars
 cd "${OS_ROOT}"
 
 os::build::setup_env
+
+hack/build-go.sh cmd/oc -tags=gssapi
+os::cmd::expect_success_and_text 'oc version' 'GSSAPI Kerberos SPNEGO'
+export OC_CMD=`which oc`
 
 function cleanup()
 {
@@ -108,14 +116,14 @@ os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o j
 # echo $KERBEROS_SERVICE_IP
 
 oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --follow fedora-gssapi-base
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --follow fedora-gssapi-kerberos
+oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --loglevel=5 --follow fedora-gssapi-kerberos
 oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos_configured --follow fedora-gssapi-kerberos-configured
 
 REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
-oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-base" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
-oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-kerberos" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
-oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
-oc run test --image="$REGISTRY_IP/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-base" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
 
 
 os::test::junit::declare_suite_end

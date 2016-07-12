@@ -2,3 +2,4 @@
 FROM fedora:23
 
 ADD gssapi-tests.sh /gssapi-tests.sh
+ADD $OC_CMD /bin/oc
