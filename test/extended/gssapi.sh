@@ -66,6 +66,7 @@ patch='
 '
 cp ${SERVER_CONFIG_DIR}/master/master-config.yaml ${SERVER_CONFIG_DIR}/master/master-config.tmp.yaml
 openshift ex config patch ${SERVER_CONFIG_DIR}/master/master-config.tmp.yaml --patch="${patch}" > ${SERVER_CONFIG_DIR}/master/master-config.yaml
+export USE_LATEST_IMAGES=true
 start_os_server
 
 export KUBECONFIG="${ADMIN_KUBECONFIG}"

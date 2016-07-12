@@ -10,7 +10,7 @@ cd /
 export host='gssapiproxy-server.gssapiproxy.svc.cluster.local'
 export realm=`echo ${host} | tr [a-z] [A-Z]`
 export user=`whoami`
-export BACKEND='http://openshift.gssapiproxy.svc.cluster.local'
+export BACKEND='http://openshift.default.svc.cluster.local'
 
 
 # Create server cert/key
