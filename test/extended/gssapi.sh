@@ -116,8 +116,8 @@ os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o j
 # KERBEROS_SERVICE_IP=$(oc get --output-version=v1beta3 --template="{{ .spec.portalIP }}" service gssapiproxy-server)
 # echo $KERBEROS_SERVICE_IP
 
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --follow fedora-gssapi-base
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --loglevel=5 --follow fedora-gssapi-kerberos
+oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --loglevel=10 --follow fedora-gssapi-base
+oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --loglevel=10 --follow fedora-gssapi-kerberos
 oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos_configured --follow fedora-gssapi-kerberos-configured
 
 REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
