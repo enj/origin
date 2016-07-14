@@ -5,27 +5,33 @@ set -x
 
 echo "I ran this on `uname -a`"
 
+os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
+
 CLIENT_HAS_GSSAPI=true
 SERVER_HAS_BASIC=true
 users=(user1 user2 user3 user4 user5)
 
+function attempt_kdestroy() {
+    if which kdestroy > /dev/null 2>&1; then
+        os::cmd::expect_success 'kdestroy'
+    fi
+}
+
 # Client has no GSSAPI and server is GSSAPI only
 # Everything fails
 
-if [[ !CLIENT_HAS_GSSAPI && !SERVER_HAS_BASIC ]]
-then
-    for u in ${users[@]}
-    do
+if [[ -z CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
+    for u in "${users[@]}"; do
         u+=$realm
-        os::cmd::expect_failure "echo wrongpassword | kinit $u"
+        os::cmd::expect_failure "kinit $u <<< wrongpassword"
         os::cmd::expect_failure_and_text 'oc login' "Can't find client principal $u in cache collection"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
-        os::cmd::expect_failure 'kdestroy && exit 1'
+        attempt_kdestroy
 
-        os::cmd::expect_failure "echo password | kinit $u"
+        os::cmd::expect_failure "kinit $u <<< password"
         os::cmd::expect_failure_and_text 'oc login' "Can't find client principal $u in cache collection"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
-        os::cmd::expect_failure 'kdestroy && exit 1'
+        attempt_kdestroy
 
         os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "Can't find client principal $u in cache collection"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
@@ -38,20 +44,18 @@ fi
 # Client has no GSSAPI and server is GSSAPI with Basic fallback
 # Only BASIC works
 
-if [[ !CLIENT_HAS_GSSAPI && SERVER_HAS_BASIC ]]
-then
-    for u in ${users[@]}
-    do
+if [[ -z CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
+    for u in "${users[@]}"; do
         u+=$realm
-        os::cmd::expect_failure "echo wrongpassword | kinit $u"
+        os::cmd::expect_failure "kinit $u <<< wrongpassword"
         os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
-        os::cmd::expect_failure 'kdestroy && exit 1'
+        attempt_kdestroy
 
-        os::cmd::expect_failure "echo password | kinit $u"
+        os::cmd::expect_failure "kinit $u <<< password"
         os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
-        os::cmd::expect_failure 'kdestroy && exit 1'
+        attempt_kdestroy
 
         os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed (401 Unauthorized)'
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
@@ -65,16 +69,14 @@ fi
 # Client has GSSAPI and server is GSSAPI only
 # Only GSSAPI works
 
-if [[ CLIENT_HAS_GSSAPI && !SERVER_HAS_BASIC ]]
-then
-    for u in ${users[@]}
-    do
-        os::cmd::expect_failure "echo wrongpassword | kinit $u"
-        os::cmd::expect_failure_and_not_text 'oc login' 'panic'
+if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
+    for u in "${users[@]}"; do
+        os::cmd::expect_failure "kinit $u <<< wrongpassword"
+        os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
         os::cmd::expect_success 'kdestroy'
 
-        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success "kinit $u <<< password"
         os::cmd::expect_success_and_text 'oc login' 'Login successful.'
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
@@ -87,7 +89,7 @@ then
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
         # Password is ignored if you have the ticket for the user
-        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success "kinit $u <<< password"
         os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
@@ -95,9 +97,9 @@ then
     done
 
     # Having multiple tickets
-    os::cmd::expect_success 'echo password | kinit user1'
-    os::cmd::expect_success 'echo password | kinit user2'
-    os::cmd::expect_success 'echo password | kinit user3'
+    os::cmd::expect_success 'kinit user1 <<< password'
+    os::cmd::expect_success 'kinit user2 <<< password'
+    os::cmd::expect_success 'kinit user3 <<< password'
 
     os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
     os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
@@ -119,16 +121,14 @@ fi
 # Client has GSSAPI and server is GSSAPI with Basic fallback
 # Everything works
 
-if [[ CLIENT_HAS_GSSAPI && SERVER_HAS_BASIC ]]
-then
-    for u in ${users[@]}
-    do
-        os::cmd::expect_failure "echo wrongpassword | kinit $u"
-        os::cmd::expect_failure_and_not_text 'oc login' 'panic'
+if [[ -n CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
+    for u in "${users[@]}"; do
+        os::cmd::expect_failure "kinit $u <<< wrongpassword"
+        os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
         os::cmd::expect_success 'kdestroy'
 
-        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success "kinit $u <<< password"
         os::cmd::expect_success_and_text 'oc login' 'Login successful.'
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
@@ -142,7 +142,7 @@ then
         os::cmd::expect_success_and_text 'oc logout' $u
 
         # Password is ignored if you have the ticket for the user
-        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success "kinit $u <<< password"
         os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
@@ -150,9 +150,9 @@ then
     done
 
     # Having multiple tickets
-    os::cmd::expect_success 'echo password | kinit user1'
-    os::cmd::expect_success 'echo password | kinit user2'
-    os::cmd::expect_success 'echo password | kinit user3'
+    os::cmd::expect_success 'kinit user1 <<< password'
+    os::cmd::expect_success 'kinit user2 <<< password'
+    os::cmd::expect_success 'kinit user3 <<< password'
 
     os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
     os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
@@ -170,5 +170,7 @@ then
     os::cmd::expect_success 'oc login -u user4 -p password'
     os::cmd::expect_success 'oc login -u user5 -p password'
 fi
+
+os::test::junit::declare_suite_end
 
 # os::cmd::expect_success_and_not_text
