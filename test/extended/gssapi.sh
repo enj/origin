@@ -77,9 +77,9 @@ oadm policy add-scc-to-user anyuid -z default -n gssapiproxy
 # create all the resources we need
 oc create -f test/extended/testdata/gssapi/proxy
 
-oc create -f test/extended/testdata/gssapi/fedora/base
-oc create -f test/extended/testdata/gssapi/fedora/kerberos
-oc create -f test/extended/testdata/gssapi/fedora/kerberos_configured
+# oc create -f test/extended/testdata/gssapi/fedora/base
+# oc create -f test/extended/testdata/gssapi/fedora/kerberos
+# oc create -f test/extended/testdata/gssapi/fedora/kerberos_configured
 
 # kick off a build and wait for it to finish
 oc start-build --from-file=test/extended/testdata/gssapi/proxy --follow gssapiproxy
@@ -112,17 +112,21 @@ os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o j
 # KERBEROS_SERVICE_IP=$(oc get --output-version=v1beta3 --template="{{ .spec.portalIP }}" service gssapiproxy-server)
 # echo $KERBEROS_SERVICE_IP
 
-exit 0
+# exit 0
 
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --loglevel=10 --follow fedora-gssapi-base
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --loglevel=10 --follow fedora-gssapi-kerberos
-oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos_configured --follow fedora-gssapi-kerberos-configured
+oc new-build -D=- --to=fedora-gssapi-base --context-dir=test/extended/testdata/gssapi/fedora/base < test/extended/testdata/gssapi/fedora/base/Dockerfile
+oc new-build -D=- --to=fedora-gssapi-kerberos --context-dir=test/extended/testdata/gssapi/fedora/kerberos --image-stream=gssapiproxy/fedora-gssapi-base --allow-missing-imagestream-tags < test/extended/testdata/gssapi/fedora/kerberos/Dockerfile
+oc new-build -D=- --to=fedora-gssapi-kerberos-configured --context-dir=test/extended/testdata/gssapi/fedora/kerberos_configured --image-stream=gssapiproxy/fedora-gssapi-kerberos --allow-missing-imagestream-tags < test/extended/testdata/gssapi/fedora/kerberos_configured/Dockerfile
 
-REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
-oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-base" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
-oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
-oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
-oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+# oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --loglevel=10 --follow fedora-gssapi-base
+# oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --loglevel=10 --follow fedora-gssapi-kerberos
+# oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos_configured --follow fedora-gssapi-kerberos-configured
+
+# REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
+# oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-base" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+# oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+# oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
+# oc run test --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-kerberos-configured" --generator=run-pod/v1 --env=TODO=true -- bash /gssapi-tests.sh
 
 
 os::test::junit::declare_suite_end
