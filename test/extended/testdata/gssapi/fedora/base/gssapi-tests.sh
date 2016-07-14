@@ -5,92 +5,170 @@ set -x
 
 echo "I ran this on `uname -a`"
 
-LOGIN=''
-LOGIN_USER_1='-u user1'
-LOGIN_USER_2='-u user2'
-LOGIN_USER_1_PASS='-u user1 -p password'
-LOGIN_USER_2_PASS='-u user2 -p password'
-LOGIN_USER_INCORRECT_PASS='-u user1 -p incorrect'
+CLIENT_HAS_GSSAPI=true
+SERVER_HAS_BASIC=true
+users=(user1 user2 user3 user4 user5)
 
-NONE='NONE'
-UNCONFIGURED='UNCONFIGURED'
-CONFIGURED='CONFIGURED'
-TICKET='TICKET'
+# Client has no GSSAPI and server is GSSAPI only
+# Everything fails
 
-GSSAPI_ONLY='GSSAPI_ONLY'
-GSSAPI_BASIC='GSSAPI_BASIC'
+if [[ !CLIENT_HAS_GSSAPI && !SERVER_HAS_BASIC ]]
+then
+    for u in ${users[@]}
+    do
+        u+=$realm
+        os::cmd::expect_failure "echo wrongpassword | kinit $u"
+        os::cmd::expect_failure_and_text 'oc login' "Can't find client principal $u in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+        os::cmd::expect_failure 'kdestroy && exit 1'
 
-function os::cmd::et::gssapi_login() {
-	if [[ $# -ne 4 ]]; then echo "os::cmd::et::gssapi_login expects four arguments, got $#"; exit 1; fi
-	local testname=$1
-    local args=$2
-	local expected_user=$3
-    local expected_code=$4
+        os::cmd::expect_failure "echo password | kinit $u"
+        os::cmd::expect_failure_and_text 'oc login' "Can't find client principal $u in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+        os::cmd::expect_failure 'kdestroy && exit 1'
 
-    oc login ${args}
-    out_code=$?
-    actual_user=`oc whoami`
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "Can't find client principal $u in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-    if [[ out_code -ne expected_code]]
-    then
-        echo "${testname} failed: exit code ${out_code} does not match expected code ${expected_code}."
-        exit 1
-    fi
+        os::cmd::expect_failure_and_text "oc login -u $u -p password" "Can't find client principal $u in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    done
+fi
 
-    if [[ expected_code -e "0" ]]
-    then
-        if [[expected_user -ne actual_user]]
-        then
-            echo "${testname} failed: expected user ${expected_user} but got ${actual_user}."
-            exit 1
-        fi
-    fi
+# Client has no GSSAPI and server is GSSAPI with Basic fallback
+# Only BASIC works
 
-}
-readonly -f os::cmd::et::gssapi_login
+if [[ !CLIENT_HAS_GSSAPI && SERVER_HAS_BASIC ]]
+then
+    for u in ${users[@]}
+    do
+        u+=$realm
+        os::cmd::expect_failure "echo wrongpassword | kinit $u"
+        os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+        os::cmd::expect_failure 'kdestroy && exit 1'
 
-function os::cmd::et::determine_user() {
-	if [[ $# -ne 4 ]]; then echo "os::cmd::et::determine_user expects two arguments, got $#"; exit 1; fi
-	local testname=$1
-    local args=$2
-	local expected_user=$3
-    local expected_code=$4
+        os::cmd::expect_failure "echo password | kinit $u"
+        os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+        os::cmd::expect_failure 'kdestroy && exit 1'
 
-}
-readonly -f os::cmd::et::determine_user
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-function os::cmd::et::determine_code() {
-	if [[ $# -ne 4 ]]; then echo "os::cmd::et::determine_code expects two arguments, got $#"; exit 1; fi
-	local testname=$1
-    local args=$2
-	local expected_user=$3
-    local expected_code=$4
+        os::cmd::expect_success "oc login -u $u -p password"
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+    done
+fi
 
-}
-readonly -f os::cmd::et::determine_code
+# Client has GSSAPI and server is GSSAPI only
+# Only GSSAPI works
 
-CLIENT='T'
-SERVER='G'
-TEST_NAME_BASE="${CLIENT} ${SERVER} "
+if [[ CLIENT_HAS_GSSAPI && !SERVER_HAS_BASIC ]]
+then
+    for u in ${users[@]}
+    do
+        os::cmd::expect_failure "echo wrongpassword | kinit $u"
+        os::cmd::expect_failure_and_not_text 'oc login' 'panic'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+        os::cmd::expect_success 'kdestroy'
 
+        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+        os::cmd::expect_success 'kdestroy'
 
-OVERALL_RETURN=0
-test_args=($LOGIN LOGIN_USER_1 LOGIN_USER_2 LOGIN_USER_1_PASS LOGIN_USER_2_PASS LOGIN_USER_INCORRECT_PASS)
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "Can't find client principal $u in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-for args in ${test_args[@]}; do
+        os::cmd::expect_failure_and_text "oc login -u $u -p password" "Can't find client principal $u in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-    user=os::cmd::et::determine_user $args $CLIENT $SERVER
-    code=os::cmd::et::determine_code $args $CLIENT $SERVER
-    set +e
-    # use a subshell to prevent `exit` calls from killing this script
-    os::cmd::et::gssapi_login "${TEST_NAME_BASE} ${args}" ${args} ${user} ${code}
-    CURR_RETURN=$?
-    set -e
+        # Password is ignored if you have the ticket for the user
+        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+        os::cmd::expect_success 'kdestroy'
+    done
 
-	if [ "${CURR_RETURN}" -ne "0" ]; then
-		OVERALL_RETURN=${CURR_RETURN}
-	fi
+    # Having multiple tickets
+    os::cmd::expect_success 'echo password | kinit user1'
+    os::cmd::expect_success 'echo password | kinit user2'
+    os::cmd::expect_success 'echo password | kinit user3'
 
-done
+    os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3' 'Login successful.'
 
-exit ${OVERALL_RETURN}
+    # Ignore password
+    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
+
+    # Using BASIC
+    os::cmd::expect_failure_and_text 'oc login -u user4 -p wrongpassword' "Can't find client principal user4$realm in cache collection"
+    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' "Can't find client principal user5$realm in cache collection"
+
+    os::cmd::expect_failure_and_text 'oc login -u user4 -p password' "Can't find client principal user4$realm in cache collection"
+    os::cmd::expect_failure_and_text 'oc login -u user5 -p password' "Can't find client principal user5$realm in cache collection"
+fi
+
+# Client has GSSAPI and server is GSSAPI with Basic fallback
+# Everything works
+
+if [[ CLIENT_HAS_GSSAPI && SERVER_HAS_BASIC ]]
+then
+    for u in ${users[@]}
+    do
+        os::cmd::expect_failure "echo wrongpassword | kinit $u"
+        os::cmd::expect_failure_and_not_text 'oc login' 'panic'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+        os::cmd::expect_success 'kdestroy'
+
+        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+        os::cmd::expect_success 'kdestroy'
+
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_success "oc login -u $u -p password"
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+
+        # Password is ignored if you have the ticket for the user
+        os::cmd::expect_success "echo password | kinit $u"
+        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+        os::cmd::expect_success 'kdestroy'
+    done
+
+    # Having multiple tickets
+    os::cmd::expect_success 'echo password | kinit user1'
+    os::cmd::expect_success 'echo password | kinit user2'
+    os::cmd::expect_success 'echo password | kinit user3'
+
+    os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3' 'Login successful.'
+
+    # Ignore password
+    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
+
+    # Using BASIC
+    os::cmd::expect_failure_and_text 'oc login -u user4 -p wrongpassword' 'Login failed (401 Unauthorized)'
+    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' 'Login failed (401 Unauthorized)'
+
+    os::cmd::expect_success 'oc login -u user4 -p password'
+    os::cmd::expect_success 'oc login -u user5 -p password'
+fi
+
+# os::cmd::expect_success_and_not_text
