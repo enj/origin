@@ -13,17 +13,27 @@ export PATH="${OS_ROOT}/_output/local/bin/linux/amd64:${PATH}"
 
 os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
 
-CLIENT='MISSING_LIBS'
-SERVER='GSSAPI_ONLY'
-# CLIENT_HAS_GSSAPI=false
-# SERVER_HAS_BASIC=false
+SUCCESS='Login successful.'
+UNAUTHORIZED='Login failed \(401 Unauthorized\)'
+
+CLIENT_MISSING_LIBS='CLIENT_MISSING_LIBS'
+CLIENT_HAS_LIBS='CLIENT_HAS_LIBS'
+CLIENT_HAS_LIBS_IS_CONFIGURED='CLIENT_HAS_LIBS_IS_CONFIGURED'
+
+SERVER_GSSAPI_ONLY='SERVER_GSSAPI_ONLY'
+SERVER_GSSAPI_BASIC_FALLBACK='SERVER_GSSAPI_BASIC_FALLBACK'
+
+CLIENT=$CLIENT_HAS_LIBS
+SERVER=$SERVER_GSSAPI_BASIC_FALLBACK
+
 users=(user1 user2 user3 user4 user5)
 realm='@GSSAPIPROXY-SERVER.GSSAPIPROXY.SVC.CLUSTER.LOCAL'
 
-# Client has no GSSAPI and server is GSSAPI only
+# Client has no GSSAPI libs and server is GSSAPI only
 # Everything fails
+# Errors do NOT mention Kerberos
 
-if [[ $CLIENT -eq 'MISSING_LIBS' && $SERVER -eq 'GSSAPI_ONLY' ]]; then
+if [[ $CLIENT == $CLIENT_MISSING_LIBS && $SERVER == $SERVER_GSSAPI_ONLY ]]; then
     for u in "${users[@]}"; do
         full="$u$realm"
         os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
@@ -46,37 +56,97 @@ if [[ $CLIENT -eq 'MISSING_LIBS' && $SERVER -eq 'GSSAPI_ONLY' ]]; then
     done
 fi
 
-# Client has no GSSAPI and server is GSSAPI with Basic fallback
+# Client has no GSSAPI libs and server is GSSAPI with Basic fallback
 # Only BASIC works
+# Errors do NOT mention Kerberos
 
-if [[ -z CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
+if [[ $CLIENT == $CLIENT_MISSING_LIBS && $SERVER == $SERVER_GSSAPI_BASIC_FALLBACK ]]; then
     for u in "${users[@]}"; do
         full="$u$realm"
-        os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_text 'oc login' "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_text 'oc login' "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_failure_and_text "oc login -u $full -p wrongpassword" 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_text "oc login -u $full -p wrongpassword" "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_success_and_text "oc login -u $full -p password" 'Login successful.'
+        os::cmd::expect_success_and_text "oc login -u $full -p password" "${SUCCESS}"
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
 
-        os::cmd::expect_success_and_text "oc login -u $u -p password" 'Login failed (401 Unauthorized)'
+        os::cmd::expect_success_and_text "oc login -u $u -p password" "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
     done
 fi
 
-# Client has GSSAPI and server is GSSAPI only
-# Only GSSAPI works
+# Client has uncofigured GSSAPI libs and server is GSSAPI only
+# Everything fails
+# Errors mention Kerberos
 
-if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
+if [[ $CLIENT == $CLIENT_HAS_LIBS && $SERVER == $SERVER_GSSAPI_ONLY ]]; then
+    for u in "${users[@]}"; do
+        full="$u$realm"
+        os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text "oc login -u $full -p wrongpassword" "Can't find client principal $full in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text "oc login -u $full -p password" "Can't find client principal $full in cache collection"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'An invalid name was supplied'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text "oc login -u $u -p password" 'An invalid name was supplied'
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    done
+fi
+
+# Client has unconfigured GSSAPI libs and server is GSSAPI with Basic fallback
+# Only BASIC works
+# Errors do NOT mention Kerberos
+
+if [[ $CLIENT == $CLIENT_HAS_LIBS && $SERVER == $SERVER_GSSAPI_BASIC_FALLBACK ]]; then
+    for u in "${users[@]}"; do
+        full="$u$realm"
+        os::cmd::expect_failure_and_text 'oc login <<< \n' "${UNAUTHORIZED}"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text 'oc login <<< \n' "${UNAUTHORIZED}"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text "oc login -u $full -p wrongpassword" "${UNAUTHORIZED}"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "${UNAUTHORIZED}"
+        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+
+        os::cmd::expect_success_and_text "oc login -u $full -p password" "${SUCCESS}"
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+
+        os::cmd::expect_success_and_text "oc login -u $u -p password" "${SUCCESS}"
+        os::cmd::expect_success_and_text 'oc whoami' $u
+        os::cmd::expect_success_and_text 'oc logout' $u
+
+        os::cmd::try_until_text 'oc whoami' 'system:anonymous'
+    done
+fi
+
+# Client has GSSAPI configured and server is GSSAPI only
+# Only GSSAPI works
+# Errors mention Kerberos
+
+if [[ $CLIENT == $CLIENT_HAS_LIBS_IS_CONFIGURED && $SERVER == $SERVER_GSSAPI_ONLY ]]; then
     for u in "${users[@]}"; do
         os::cmd::expect_failure "kinit $u <<< wrongpassword"
         os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
@@ -84,7 +154,7 @@ if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
         os::cmd::expect_success 'kdestroy'
 
         os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+        os::cmd::expect_success_and_text 'oc login' "${SUCCESS}"
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
         os::cmd::expect_success 'kdestroy'
@@ -97,7 +167,7 @@ if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
 
         # Password is ignored if you have the ticket for the user
         os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
+        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" "${SUCCESS}"
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
         os::cmd::expect_success 'kdestroy'
@@ -108,19 +178,19 @@ if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
     os::cmd::expect_success 'kinit user2 <<< password'
     os::cmd::expect_success 'kinit user3 <<< password'
 
-    os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user1' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user3'
 
     # Ignore password
-    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user3'
 
     # Using BASIC
@@ -136,17 +206,17 @@ if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
 
     # Make sure things work if realm is or is not given
     os::cmd::expect_success 'kinit user4 <<< password'
-    os::cmd::expect_success_and_text 'oc login -u user4' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user4' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user4'
     os::cmd::expect_success_and_text 'oc logout' 'user4'
-    os::cmd::expect_success_and_text "oc login -u user4$realm" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user4$realm" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user4'
 
     os::cmd::expect_success "kinit user5$realm <<< password"
-    os::cmd::expect_success_and_text 'oc login -u user5' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user5' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user5'
     os::cmd::expect_success_and_text 'oc logout' 'user5'
-    os::cmd::expect_success_and_text "oc login -u user5$realm" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user5$realm" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user5'
     os::cmd::expect_success_and_text 'oc logout' 'user5'
     os::cmd::expect_success 'kdestroy'
@@ -161,11 +231,11 @@ if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
     os::cmd::expect_failure_and_text "oc login -u user4$realm -p password" "Can't find client principal user4$realm in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
 
-    os::cmd::expect_success_and_text "oc login -u user1$realm" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user1$realm" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user1'
     os::cmd::expect_success_and_text 'oc logout' 'user1'
 
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user2'
     os::cmd::expect_success_and_text 'oc logout' 'user2'
 
@@ -176,32 +246,33 @@ if [[ -n CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
 fi
 
-# Client has GSSAPI and server is GSSAPI with Basic fallback
+# Client has GSSAPI configured and server is GSSAPI with Basic fallback
 # Everything works
+# Errors do NOT mention Kerberos
 
-if [[ -n CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
+if [[ $CLIENT == $CLIENT_HAS_LIBS_IS_CONFIGURED && $SERVER == $SERVER_GSSAPI_BASIC_FALLBACK ]]; then
     for u in "${users[@]}"; do
         os::cmd::expect_failure "kinit $u <<< wrongpassword"
-        os::cmd::expect_failure_and_text 'oc login' 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_text 'oc login' "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
         os::cmd::expect_success 'kdestroy'
 
         os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+        os::cmd::expect_success_and_text 'oc login' "${SUCCESS}"
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
         os::cmd::expect_success 'kdestroy'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed (401 Unauthorized)'
+        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "${UNAUTHORIZED}"
         os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_success_and_text "oc login -u $u -p password" 'Login successful.'
+        os::cmd::expect_success_and_text "oc login -u $u -p password" "${SUCCESS}"
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
 
         # Password is ignored if you have the ticket for the user
         os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
+        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" "${SUCCESS}"
         os::cmd::expect_success_and_text 'oc whoami' $u
         os::cmd::expect_success_and_text 'oc logout' $u
         os::cmd::expect_success 'kdestroy'
@@ -212,28 +283,28 @@ if [[ -n CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
     os::cmd::expect_success 'kinit user2 <<< password'
     os::cmd::expect_success 'kinit user3 <<< password'
 
-    os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user1' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user3'
 
     # Ignore password
-    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user3'
 
     # Using BASIC
-    os::cmd::expect_failure_and_text 'oc login -u user4 -p wrongpassword' 'Login failed (401 Unauthorized)'
-    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' 'Login failed (401 Unauthorized)'
+    os::cmd::expect_failure_and_text 'oc login -u user4 -p wrongpassword' "${UNAUTHORIZED}"
+    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' "${UNAUTHORIZED}"
 
-    os::cmd::expect_success_and_text 'oc login -u user4 -p password' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user4 -p password' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc login -u user5 -p password' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user5 -p password' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user5'
 
     # Cleanup
@@ -242,17 +313,17 @@ if [[ -n CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
 
     # Make sure things work if realm is or is not given
     os::cmd::expect_success 'kinit user4 <<< password'
-    os::cmd::expect_success_and_text 'oc login -u user4' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user4' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user4'
     os::cmd::expect_success_and_text 'oc logout' 'user4'
-    os::cmd::expect_success_and_text "oc login -u user4$realm" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user4$realm" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user4'
 
     os::cmd::expect_success "kinit user5$realm <<< password"
-    os::cmd::expect_success_and_text 'oc login -u user5' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user5' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user5'
     os::cmd::expect_success_and_text 'oc logout' 'user5'
-    os::cmd::expect_success_and_text "oc login -u user5$realm" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user5$realm" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user5'
     os::cmd::expect_success_and_text 'oc logout' 'user5'
     os::cmd::expect_success 'kdestroy'
@@ -261,26 +332,26 @@ if [[ -n CLIENT_HAS_GSSAPI && -n SERVER_HAS_BASIC ]]; then
     os::cmd::expect_success 'kinit user1 <<< password'
     os::cmd::expect_success "kinit user2$realm <<< password"
 
-    os::cmd::expect_success_and_text 'oc login -u user3 -p password' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user3 -p password' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user3'
     os::cmd::expect_success_and_text 'oc logout' 'user3'
 
-    os::cmd::expect_success_and_text "oc login -u user4$realm -p password" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user4$realm -p password" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user4'
     os::cmd::expect_success_and_text 'oc logout' 'user4'
 
-    os::cmd::expect_success_and_text "oc login -u user1$realm" 'Login successful.'
+    os::cmd::expect_success_and_text "oc login -u user1$realm" "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user1'
     os::cmd::expect_success_and_text 'oc logout' 'user1'
 
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc login -u user2' "${SUCCESS}"
     os::cmd::expect_success_and_text 'oc whoami' 'user2'
     os::cmd::expect_success_and_text 'oc logout' 'user2'
 
-    os::cmd::expect_failure_and_text 'oc login -u user5' 'Login failed (401 Unauthorized)'
+    os::cmd::expect_failure_and_text 'oc login -u user5' "${UNAUTHORIZED}"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
 
-    os::cmd::expect_failure_and_text "oc login -u user5$realm" 'Login failed (401 Unauthorized)'
+    os::cmd::expect_failure_and_text "oc login -u user5$realm" "${UNAUTHORIZED}"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
 fi
 

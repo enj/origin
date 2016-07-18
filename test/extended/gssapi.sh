@@ -87,7 +87,7 @@ oc start-build --from-file=test/extended/testdata/gssapi/proxy --follow gssapipr
 
 # oc set env dc/gssapiproxy-server host='gssapiproxy-server.gssapi.svc.cluster.local' realm='MYDOMAIN.COM' BACKEND='http://openshift.gssapi.svc.cluster.local'
 
-oc set env dc/gssapiproxy-server AUTH=GSSAPI_ONLY
+oc set env dc/gssapiproxy-server AUTH=GSSAPI_AND_BASIC
 
 oc deploy gssapiproxy-server
 
