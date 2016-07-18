@@ -1,20 +1,29 @@
 #!/usr/bin/bash
 
 set -e
-set -x
+# set -x
 
 echo "I ran this on `uname -a`"
 
+export KUBECONFIG=/config.yaml
+export OS_ROOT='/var/run/os'
+source "${OS_ROOT}/hack/lib/init.sh"
+# os::util::environment::update_path_var
+export PATH="${OS_ROOT}/_output/local/bin/linux/amd64:${PATH}"
+
 os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
 
-CLIENT_HAS_GSSAPI=true
-SERVER_HAS_BASIC=true
+CLIENT='MISSING_LIBS'
+SERVER='GSSAPI_ONLY'
+# CLIENT_HAS_GSSAPI=false
+# SERVER_HAS_BASIC=false
 users=(user1 user2 user3 user4 user5)
+realm='@GSSAPIPROXY-SERVER.GSSAPIPROXY.SVC.CLUSTER.LOCAL'
 
 # Client has no GSSAPI and server is GSSAPI only
 # Everything fails
 
-if [[ -z CLIENT_HAS_GSSAPI && -z SERVER_HAS_BASIC ]]; then
+if [[ CLIENT -eq 'MISSING_LIBS' && SERVER -eq 'GSSAPI_ONLY' ]]; then
     for u in "${users[@]}"; do
         full="$u$realm"
         os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'

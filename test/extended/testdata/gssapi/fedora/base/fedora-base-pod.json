@@ -1,0 +1,38 @@
+{
+    "kind": "Pod",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "fedora-gssapi-base",
+        "namespace": "gssapiproxy"
+    },
+    "spec": {
+        "volumes": [
+            {
+                "name": "os",
+                "hostPath" : {
+                    "path": "OS_ROOT"
+                }
+            }
+        ],
+        "containers": [
+            {
+                "name": "fedora-gssapi-base",
+                "image": "REGISTRY_IP/gssapiproxy/fedora-gssapi-base",
+                "volumeMounts": [
+                    {
+                        "name": "os",
+                        "mountPath": "/var/run/os"
+                    }
+                ],
+                "args": [
+                    "/bin/bash"
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "IfNotPresent",
+                "stdin": true,
+                "stdinOnce": true,
+                "tty": true
+            }
+        ]
+    }
+}

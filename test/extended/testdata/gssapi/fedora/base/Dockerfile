@@ -2,4 +2,8 @@
 FROM fedora:23
 
 ADD gssapi-tests.sh /gssapi-tests.sh
-ADD $OC_CMD /bin/oc
+ADD config.yaml /config.yaml
+
+RUN dnf install -y findutils bc
+
+VOLUME /var/run/os

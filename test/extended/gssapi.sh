@@ -26,6 +26,7 @@ function cleanup()
 	out=$?
 	cleanup_openshift
 	echo "[INFO] Exiting"
+    oc project gssapiproxy
 	return $out
 }
 
@@ -77,9 +78,9 @@ oadm policy add-scc-to-user anyuid -z default -n gssapiproxy
 # create all the resources we need
 oc create -f test/extended/testdata/gssapi/proxy
 
-# oc create -f test/extended/testdata/gssapi/fedora/base
-# oc create -f test/extended/testdata/gssapi/fedora/kerberos
-# oc create -f test/extended/testdata/gssapi/fedora/kerberos_configured
+oc create -f test/extended/testdata/gssapi/fedora/base
+oc create -f test/extended/testdata/gssapi/fedora/kerberos
+oc create -f test/extended/testdata/gssapi/fedora/kerberos_configured
 
 # kick off a build and wait for it to finish
 oc start-build --from-file=test/extended/testdata/gssapi/proxy --follow gssapiproxy
@@ -88,7 +89,7 @@ oc start-build --from-file=test/extended/testdata/gssapi/proxy --follow gssapipr
 
 oc set env dc/gssapiproxy-server AUTH=GSSAPI_ONLY
 
-# oc deploy gssapiproxy-server
+oc deploy gssapiproxy-server
 
 # server_ready_template=(                                  \
 # "{{with \$items := .items}}"                             \
@@ -114,9 +115,18 @@ os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o j
 
 # exit 0
 
-oc new-build -D=- --to=fedora-gssapi-base --context-dir=test/extended/testdata/gssapi/fedora/base < test/extended/testdata/gssapi/fedora/base/Dockerfile
-oc new-build -D=- --to=fedora-gssapi-kerberos --context-dir=test/extended/testdata/gssapi/fedora/kerberos --image-stream=gssapiproxy/fedora-gssapi-base --allow-missing-imagestream-tags < test/extended/testdata/gssapi/fedora/kerberos/Dockerfile
-oc new-build -D=- --to=fedora-gssapi-kerberos-configured --context-dir=test/extended/testdata/gssapi/fedora/kerberos_configured --image-stream=gssapiproxy/fedora-gssapi-kerberos --allow-missing-imagestream-tags < test/extended/testdata/gssapi/fedora/kerberos_configured/Dockerfile
+# root_patch="{\"spec\":{\"volumes\":[{\"name\":\"os\",\"hostPath\":{\"path\":\"${OS_ROOT}\"}}]}}"
+
+REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
+pushd test/extended/testdata/gssapi/fedora
+    oc start-build --from-dir=base --follow fedora-gssapi-base
+    oc delete pods/fedora-gssapi-base
+    sed "s:OS_ROOT:${OS_ROOT}:g" base/fedora-base-pod.json | \
+    sed "s#REGISTRY_IP#${REGISTRY_IP}#g" > ${SERVER_CONFIG_DIR}/fedora-base-pod.yaml
+    oc create -f ${SERVER_CONFIG_DIR}/fedora-base-pod.yaml
+    # oc start-build --from-dir=kerberos --follow fedora-gssapi-kerberos
+    # oc start-build --from-dir=kerberos_configured --follow fedora-gssapi-kerberos-configured
+popd
 
 # oc start-build --from-file=test/extended/testdata/gssapi/fedora/base --loglevel=10 --follow fedora-gssapi-base
 # oc start-build --from-file=test/extended/testdata/gssapi/fedora/kerberos --loglevel=10 --follow fedora-gssapi-kerberos
