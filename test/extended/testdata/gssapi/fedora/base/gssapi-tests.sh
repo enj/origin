@@ -23,7 +23,7 @@ realm='@GSSAPIPROXY-SERVER.GSSAPIPROXY.SVC.CLUSTER.LOCAL'
 # Client has no GSSAPI and server is GSSAPI only
 # Everything fails
 
-if [[ CLIENT -eq 'MISSING_LIBS' && SERVER -eq 'GSSAPI_ONLY' ]]; then
+if [[ $CLIENT -eq 'MISSING_LIBS' && $SERVER -eq 'GSSAPI_ONLY' ]]; then
     for u in "${users[@]}"; do
         full="$u$realm"
         os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
