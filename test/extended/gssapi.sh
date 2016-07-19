@@ -108,7 +108,7 @@ oc deploy gssapiproxy-server
 # server_ready_template=$(IFS=$""; echo "${server_ready_template[*]}") # re-formats template for use
 
 # wait for auth proxy to be ready
-os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='{.items[*].status.conditions[?(@.type==\"Ready\")].status}'" 'True'
+os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='{.items[*].status.conditions[?(@.type==\"Ready\")].status}'" '^True\n$'
 
 # KERBEROS_SERVICE_IP=$(oc get --output-version=v1beta3 --template="{{ .spec.portalIP }}" service gssapiproxy-server)
 # echo $KERBEROS_SERVICE_IP
@@ -120,10 +120,9 @@ os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o j
 REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
 pushd test/extended/testdata/gssapi/fedora
     oc start-build --from-dir=base --follow fedora-gssapi-base
-    oc delete pods/fedora-gssapi-base
-    sed "s:OS_ROOT:${OS_ROOT}:g" base/fedora-base-pod.json | \
-    sed "s#REGISTRY_IP#${REGISTRY_IP}#g" > ${SERVER_CONFIG_DIR}/fedora-base-pod.yaml
-    oc create -f ${SERVER_CONFIG_DIR}/fedora-base-pod.yaml
+    sed "s:OS_ROOT:${OS_ROOT}:" base/fedora-base-pod | \
+    sed "s#REGISTRY_IP#${REGISTRY_IP}#" > ${SERVER_CONFIG_DIR}/fedora-base-pod.json
+    oc create -f ${SERVER_CONFIG_DIR}/fedora-base-pod.json
     # oc start-build --from-dir=kerberos --follow fedora-gssapi-kerberos
     # oc start-build --from-dir=kerberos_configured --follow fedora-gssapi-kerberos-configured
 popd
