@@ -108,7 +108,7 @@ oc deploy gssapiproxy-server
 # server_ready_template=$(IFS=$""; echo "${server_ready_template[*]}") # re-formats template for use
 
 # wait for auth proxy to be ready
-os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='{.items[*].status.conditions[?(@.type==\"Ready\")].status}'" '^True\n$'
+os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='{.items[*].status.conditions[?(@.type==\"Ready\")].status}'" '^True$'
 
 # KERBEROS_SERVICE_IP=$(oc get --output-version=v1beta3 --template="{{ .spec.portalIP }}" service gssapiproxy-server)
 # echo $KERBEROS_SERVICE_IP
