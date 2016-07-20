@@ -1,18 +1,16 @@
 #!/usr/bin/bash
 
-set -e
-# set -x
+set -o errexit
+set -o nounset
+set -o pipefail
 
-echo "I ran this on `uname -a`"
+echo "I ran this on `uname -n`"
 
 # KEYRING does not work inside of a container since it is part of the kernel
 sed -i.bak1 's#KEYRING:persistent:#DIR:/tmp/krb5cc_#' /etc/krb5.conf
 
-export KUBECONFIG=/tmp/config
-export OS_ROOT='/var/run/os'
-source "${OS_ROOT}/hack/lib/init.sh"
-# os::util::environment::update_path_var
-export PATH="${OS_ROOT}/_output/local/bin/linux/amd64:${PATH}"
+cd ${OS_ROOT}
+source hack/lib/init.sh
 
 os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
 
@@ -22,9 +20,6 @@ CLIENT_HAS_LIBS_IS_CONFIGURED='CLIENT_HAS_LIBS_IS_CONFIGURED'
 
 SERVER_GSSAPI_ONLY='SERVER_GSSAPI_ONLY'
 SERVER_GSSAPI_BASIC_FALLBACK='SERVER_GSSAPI_BASIC_FALLBACK'
-
-CLIENT=$CLIENT_HAS_LIBS_IS_CONFIGURED
-SERVER=$SERVER_GSSAPI_ONLY
 
 users=(user1 user2 user3 user4 user5)
 realm='@GSSAPIPROXY-SERVER.GSSAPIPROXY.SVC.CLUSTER.LOCAL'
