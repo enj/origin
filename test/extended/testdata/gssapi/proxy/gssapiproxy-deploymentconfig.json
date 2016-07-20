@@ -74,12 +74,12 @@
             },
             "readinessProbe": {
               "httpGet": {
-                "path": "/login.html",
+                "path": "/healthz",
                 "port": 80
               },
-              "initialDelaySeconds": 5,
+              "initialDelaySeconds": 15,
               "timeoutSeconds": 1
-            }            
+            }
           }
         ],
         "restartPolicy": "Always",

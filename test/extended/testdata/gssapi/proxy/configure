@@ -23,7 +23,7 @@ popd
 
 # Create mod_auth_mellon service provider config
 pushd /etc/httpd/conf.d
-  /usr/sbin/mellon_create_metadata.sh https://${host} https://${host}/mellon
+  # /usr/sbin/mellon_create_metadata.sh https://${host} https://${host}/mellon
   # Create a dummy saml idp file
   touch saml_idp.xml
 popd
@@ -135,7 +135,7 @@ Kerberos:
 Basic auth:
     Log in:
     user1@${realm} (password = 'password')
-    
+
 To integrate SAML auth:
 
 1. Download your IDP's metadata XML to /etc/httpd/conf.d/saml_idp.xml

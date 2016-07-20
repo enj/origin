@@ -22,7 +22,7 @@ SERVER_GSSAPI_ONLY='SERVER_GSSAPI_ONLY'
 SERVER_GSSAPI_BASIC_FALLBACK='SERVER_GSSAPI_BASIC_FALLBACK'
 
 users=(user1 user2 user3 user4 user5)
-realm='@GSSAPIPROXY-SERVER.GSSAPIPROXY.SVC.CLUSTER.LOCAL'
+realm="@${REALM}"
 
 # Client has no GSSAPI libs and server is GSSAPI only
 # Everything fails

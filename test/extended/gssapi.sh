@@ -95,9 +95,13 @@ pushd ${TEST_DATA}
     popd
 popd
 
+export HOST='gssapiproxy-server.gssapiproxy.svc.cluster.local'
+export REALM=`echo ${HOST} | tr [a-z] [A-Z]`
+export BACKEND='https://openshift.default.svc.cluster.local'
+
 # kick off a build and wait for it to finish
+oc set env dc/gssapiproxy-server HOST=${HOST} REALM=${REALM} BACKEND=${BACKEND}
 oc start-build --from-dir=${TEST_DATA}/proxy --follow gssapiproxy
-# oc set env dc/gssapiproxy-server host='gssapiproxy-server.gssapi.svc.cluster.local' realm='MYDOMAIN.COM' BACKEND='http://openshift.gssapi.svc.cluster.local'
 
 pushd ${TEST_DATA}/fedora
     oc start-build --from-dir=base --follow fedora-gssapi-base
@@ -119,7 +123,7 @@ for server_config in "${SERVER_CONFIGS[@]}"; do
     oc run fedora-gssapi-base \
         --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-base" \
         --generator=run-pod/v1 --restart=Never --attach \
-        --env=CLIENT=${CLIENT_HAS_LIBS} --env=SERVER=${server_config} \
+        --env=CLIENT=${CLIENT_HAS_LIBS} --env=SERVER=${server_config} --env=REALM=${REALM} \
         -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-${server_config}.log" 2>&1
     os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-${server_config}.log'" 'SUCCESS'
     os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-${server_config}.log'" 'FAILURE'

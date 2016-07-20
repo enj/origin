@@ -3,7 +3,7 @@ FROM fedora:23
 
 MAINTAINER Jordan Liggitt <jliggitt@redhat.com>
 
-# Install Kerberos, mod_auth_kerb
+# Install GSSAPI
 RUN dnf install -y \
   apr-util-openssl \
   authconfig \
@@ -26,14 +26,11 @@ ADD kdc.conf  /var/kerberos/krb5kdc/kdc.conf
 ADD kadm5.acl /var/kerberos/krb5kdc/kadm5.acl
 ADD httpd-pam /etc/pam.d/httpd-pam
 
-# Add mod_auth_mellon setup script
-ADD mellon_create_metadata.sh /usr/sbin/mellon_create_metadata.sh
-
 # Add conf file for Apache
 ADD proxy.conf /etc/httpd/conf.d/proxy.conf
 
-# Add form login files
-ADD login.html /var/www/html/login.html
+# Add health check file
+ADD healthz /var/www/html/healthz
 
 # 80  = http
 # 443 = https
