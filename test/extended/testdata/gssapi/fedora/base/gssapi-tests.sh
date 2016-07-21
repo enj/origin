@@ -84,26 +84,28 @@ fi
 # Errors mention Kerberos
 
 if [[ $CLIENT == $CLIENT_HAS_LIBS && $SERVER == $SERVER_GSSAPI_ONLY ]]; then
-    for u in "${users[@]}"; do
-        full="$u$realm"
-        os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
+    os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
 
-        os::cmd::expect_failure_and_text "oc login -u $full -p wrongpassword" "Can't find client principal $full in cache collection"
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login -u user1' 'An invalid name was supplied'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user1'
 
-        os::cmd::expect_failure_and_text "oc login -u $full -p password" "Can't find client principal $full in cache collection"
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login -u user2 -p wrongpassword' 'An invalid name was supplied'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user2'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'An invalid name was supplied'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login -u user2 -p password' 'An invalid name was supplied'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user2'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p password" 'An invalid name was supplied'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
-    done
+    os::cmd::expect_failure_and_text "oc login -u user3@${REALM}" "Can't find client principal user3@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user3'
+
+    os::cmd::expect_failure_and_text "oc login -u user4@${REALM} -p wrongpassword" "Can't find client principal user4@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
+
+    os::cmd::expect_failure_and_text "oc login -u user5@${REALM} -p password" "Can't find client principal user5@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
+
 fi
 
 # Client has unconfigured GSSAPI libs and server is GSSAPI with Basic fallback
@@ -111,30 +113,33 @@ fi
 # Errors do NOT mention Kerberos
 
 if [[ $CLIENT == $CLIENT_HAS_LIBS && $SERVER == $SERVER_GSSAPI_BASIC_FALLBACK ]]; then
-    for u in "${users[@]}"; do
-        full="$u$realm"
-        os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
 
-        os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
 
-        os::cmd::expect_failure_and_text "oc login -u $full -p wrongpassword" 'Login failed \(401 Unauthorized\)'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login -u user1 <<EOF
+    EOF' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user1'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed \(401 Unauthorized\)'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure_and_text 'oc login -u user2 -p wrongpassword' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user2'
 
-        os::cmd::expect_success_and_text "oc login -u $full -p password" 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
+    os::cmd::expect_success_and_text 'oc login -u user2 -p password' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user2@${REALM}"
+    os::cmd::try_until_text 'oc whoami' 'system:anonymous' # Make sure token is gone
 
-        os::cmd::expect_success_and_text "oc login -u $u -p password" 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
+    os::cmd::expect_failure_and_text "oc login -u user3@${REALM} <<EOF
+    EOF" 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user3'
 
-        os::cmd::try_until_text 'oc whoami' 'system:anonymous'
-    done
+    os::cmd::expect_failure_and_text "oc login -u user4@${REALM} -p wrongpassword" 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
+
+    os::cmd::expect_success_and_text "oc login -u user5@${REALM} -p password" 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user5@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user5@${REALM}"
+
 fi
 
 # Client has GSSAPI configured and server is GSSAPI only
