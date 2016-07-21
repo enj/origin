@@ -1,6 +1,14 @@
 # Clone from the Fedora 23 image
 FROM fedora:23
 
+ARG REALM
+ARG HOST
+
+ENV REALM ${REALM}
+ENV HOST ${HOST}
+
+ENV CLIENT CLIENT_HAS_LIBS
+
 ENV OS_ROOT /run/os
 ENV KUBECONFIG ${OS_ROOT}/config
 ENV PATH ${OS_ROOT}/bin:${PATH}

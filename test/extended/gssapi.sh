@@ -74,6 +74,7 @@ export KUBECONFIG="${ADMIN_KUBECONFIG}"
 install_registry
 wait_for_registry
 REGISTRY_IP=$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')
+# TODO REGISTRY_IP
 
 oc login -u system:admin
 oc new-project gssapiproxy
@@ -103,15 +104,24 @@ export BACKEND='https://openshift.default.svc.cluster.local'
 oc set env dc/gssapiproxy-server HOST=${HOST} REALM=${REALM} BACKEND=${BACKEND}
 oc start-build --from-dir=${TEST_DATA}/proxy --follow gssapiproxy
 
-pushd ${TEST_DATA}/fedora
-    oc start-build --from-dir=base --follow fedora-gssapi-base
-    # oc start-build --from-dir=kerberos --follow fedora-gssapi-kerberos
-    # oc start-build --from-dir=kerberos_configured --follow fedora-gssapi-kerberos-configured
-popd
+# TODO Figure out how to set environment variables with binary builds; needed for ${REALM} and ${HOST}
 
-CLIENT_MISSING_LIBS='CLIENT_MISSING_LIBS'
-CLIENT_HAS_LIBS='CLIENT_HAS_LIBS'
-CLIENT_HAS_LIBS_IS_CONFIGURED='CLIENT_HAS_LIBS_IS_CONFIGURED'
+pushd ${TEST_DATA}/fedora
+    # oc start-build --from-dir=base --follow fedora-gssapi-base
+    pushd base
+        docker build --build-arg REALM=${REALM} --build-arg HOST=${HOST} -t "gssapiproxy/fedora-gssapi-base:latest" .
+    popd
+
+    # oc start-build --from-dir=kerberos --follow fedora-gssapi-kerberos
+    pushd kerberos
+        docker build -t "gssapiproxy/fedora-gssapi-kerberos:latest" .
+    popd
+
+    # oc start-build --from-dir=kerberos_configured --follow fedora-gssapi-kerberos-configured
+    pushd kerberos_configured
+        docker build -t "gssapiproxy/fedora-gssapi-kerberos-configured:latest" .
+    popd
+popd
 
 SERVER_CONFIGS=(SERVER_GSSAPI_ONLY SERVER_GSSAPI_BASIC_FALLBACK)
 
@@ -121,13 +131,31 @@ for server_config in "${SERVER_CONFIGS[@]}"; do
     wait_for_auth_proxy ${server_config}
 
     oc run fedora-gssapi-base \
-        --image="${REGISTRY_IP}/gssapiproxy/fedora-gssapi-base" \
+        --image="gssapiproxy/fedora-gssapi-base" \
         --generator=run-pod/v1 --restart=Never --attach \
-        --env=CLIENT=${CLIENT_HAS_LIBS} --env=SERVER=${server_config} --env=REALM=${REALM} \
+        --env=SERVER=${server_config} \
         -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-${server_config}.log" 2>&1
     os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-${server_config}.log'" 'SUCCESS'
     os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-${server_config}.log'" 'FAILURE'
     os::cmd::expect_success 'oc delete pod fedora-gssapi-base'
+
+    oc run fedora-gssapi-base-kerberos \
+        --image="gssapiproxy/fedora-gssapi-kerberos" \
+        --generator=run-pod/v1 --restart=Never --attach \
+        --env=SERVER=${server_config} \
+        -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-kerberos-${server_config}.log" 2>&1
+    os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-${server_config}.log'" 'SUCCESS'
+    os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-${server_config}.log'" 'FAILURE'
+    os::cmd::expect_success 'oc delete pod fedora-gssapi-base-kerberos'
+
+    oc run fedora-gssapi-base-kerberos-configured \
+        --image="gssapiproxy/fedora-gssapi-kerberos-configured" \
+        --generator=run-pod/v1 --restart=Never --attach \
+        --env=SERVER=${server_config} \
+        -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-kerberos-configured-${server_config}.log" 2>&1
+    os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-configured-${server_config}.log'" 'SUCCESS'
+    os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-configured-${server_config}.log'" 'FAILURE'
+    os::cmd::expect_success 'oc delete pod fedora-gssapi-base-kerberos-configured'
 
 done
 

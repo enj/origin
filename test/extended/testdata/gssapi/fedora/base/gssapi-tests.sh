@@ -204,7 +204,6 @@ if [[ $CLIENT == $CLIENT_HAS_LIBS_IS_CONFIGURED && $SERVER == $SERVER_GSSAPI_ONL
 
     # Cleanup
     os::cmd::expect_success 'kdestroy -A'
-    os::cmd::expect_success_and_text 'oc logout' 'user3'
 
     # Make sure things work if realm is or is not given
     os::cmd::expect_success 'kinit user4 <<< password'
@@ -320,7 +319,6 @@ if [[ $CLIENT == $CLIENT_HAS_LIBS_IS_CONFIGURED && $SERVER == $SERVER_GSSAPI_BAS
 
     # Cleanup
     os::cmd::expect_success 'kdestroy -A'
-    os::cmd::expect_success_and_text 'oc logout' 'user5'
 
     # Make sure things work if realm is or is not given
     os::cmd::expect_success 'kinit user4 <<< password'
