@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "I ran this on `uname -n`"
+echo "GSSAPI tests ran on `uname -n` with ${CLIENT} and ${SERVER}"
 
 # KEYRING does not work inside of a container since it is part of the kernel
 sed -i.bak1 's#KEYRING:persistent:#DIR:/tmp/krb5cc_#' /etc/krb5.conf
@@ -14,13 +14,6 @@ source hack/lib/init.sh
 
 os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
 
-CLIENT_MISSING_LIBS='CLIENT_MISSING_LIBS'
-CLIENT_HAS_LIBS='CLIENT_HAS_LIBS'
-CLIENT_HAS_LIBS_IS_CONFIGURED='CLIENT_HAS_LIBS_IS_CONFIGURED'
-
-SERVER_GSSAPI_ONLY='SERVER_GSSAPI_ONLY'
-SERVER_GSSAPI_BASIC_FALLBACK='SERVER_GSSAPI_BASIC_FALLBACK'
-
 users=(user1 user2 user3 user4 user5)
 realm="@${REALM}"
 
@@ -28,7 +21,7 @@ realm="@${REALM}"
 # Everything fails
 # Errors do NOT mention Kerberos
 
-if [[ "${CLIENT}" = "${CLIENT_MISSING_LIBS}" && "${SERVER}" = "${SERVER_GSSAPI_ONLY}" ]]; then
+if [[ "${CLIENT}" = 'CLIENT_MISSING_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; then
 
     os::cmd::expect_failure_and_text 'oc login' 'Login failed \(401 Unauthorized\)'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
@@ -59,7 +52,7 @@ fi
 
 # Should be same as CLIENT_HAS_LIBS
 
-# if [[ "${CLIENT}" = "${CLIENT_MISSING_LIBS}" && "${SERVER} "= "${SERVER_GSSAPI_BASIC_FALLBACK}" ]]; then
+# if [[ "${CLIENT}" = 'CLIENT_MISSING_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
 #     for u in "${users[@]}"; do
 #         full="$u$realm"
 #         os::cmd::expect_failure_and_text 'oc login' 'Login failed \(401 Unauthorized\)'
@@ -87,7 +80,7 @@ fi
 # Everything fails
 # Errors mention Kerberos
 
-if [[ "${CLIENT}" = "${CLIENT_HAS_LIBS}" && "${SERVER}" = "${SERVER_GSSAPI_ONLY}" ]]; then
+if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; then
 
     os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
@@ -116,7 +109,7 @@ fi
 # Only BASIC works
 # Errors do NOT mention Kerberos
 
-if [[ ( "${CLIENT}" = "${CLIENT_MISSING_LIBS}" || "${CLIENT}" = "${CLIENT_HAS_LIBS}" ) && "${SERVER}" = "${SERVER_GSSAPI_BASIC_FALLBACK}" ]]; then
+if [[ ( "${CLIENT}" = 'CLIENT_MISSING_LIBS' || "${CLIENT}" = 'CLIENT_HAS_LIBS' ) && "${SERVER}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
 
     os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
@@ -150,7 +143,7 @@ fi
 # Only GSSAPI works
 # Errors mention Kerberos
 
-if [[ "${CLIENT}" = "${CLIENT_HAS_LIBS_IS_CONFIGURED}" && "${SERVER}" = "${SERVER_GSSAPI_ONLY}" ]]; then
+if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; then
 
     # No ticket
     os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
@@ -220,7 +213,7 @@ fi
 # Everything works
 # Errors do NOT mention Kerberos
 
-if [[ "${CLIENT}" = "${CLIENT_HAS_LIBS_IS_CONFIGURED}" && "${SERVER}" = "${SERVER_GSSAPI_BASIC_FALLBACK}" ]]; then
+if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
     for u in "${users[@]}"; do
         os::cmd::expect_failure "kinit $u <<< wrongpassword"
         os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
