@@ -151,110 +151,69 @@ fi
 # Errors mention Kerberos
 
 if [[ "${CLIENT}" = "${CLIENT_HAS_LIBS_IS_CONFIGURED}" && "${SERVER}" = "${SERVER_GSSAPI_ONLY}" ]]; then
-    for u in "${users[@]}"; do
-        full="$u$realm"
-        os::cmd::expect_failure "kinit $u <<< wrongpassword"
-        os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
-        os::cmd::expect_success 'kdestroy -A'
 
-        os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text 'oc login' 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
-        os::cmd::expect_success 'kdestroy -A'
+    # No ticket
+    os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
+    os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" "Can't find client principal $full in cache collection"
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure 'kinit user1 <<< wrongpassword'
+    os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user1'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p password" "Can't find client principal $full in cache collection"
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
-
-        # Password is ignored if you have the ticket for the user
-        os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
-        os::cmd::expect_success 'kdestroy -A'
-    done
+    # Single ticket
+    os::cmd::expect_success 'kinit user1 <<< password'
+    os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
 
     # Having multiple tickets
-    os::cmd::expect_success 'kinit user1 <<< password'
-    os::cmd::expect_success 'kinit user2 <<< password'
+    os::cmd::expect_success "kinit user2@${REALM} <<< password"
     os::cmd::expect_success 'kinit user3 <<< password'
+    os::cmd::expect_failure 'kinit user4 <<< wrongpassword'
+    os::cmd::expect_failure "kinit user5@${REALM} <<< wrongpassword"
 
+    # shortname, non-default ticket
     os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc logout' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc logout' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user3'
-    os::cmd::expect_success_and_text 'oc logout' 'user3'
+    os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
 
-    # Ignore password
-    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc logout' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc logout' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user3'
-    os::cmd::expect_success_and_text 'oc logout' 'user3'
+    # longname, non-default ticket
+    os::cmd::expect_success_and_text "oc login -u user2@${REALM}" 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user2@${REALM}"
 
-    # Using BASIC
-    os::cmd::expect_failure_and_text 'oc login -u user4 -p wrongpassword' "Can't find client principal user4$realm in cache collection"
-    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' "Can't find client principal user5$realm in cache collection"
+    # default ticket
+    os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
 
-    os::cmd::expect_failure_and_text 'oc login -u user4 -p password' "Can't find client principal user4$realm in cache collection"
-    os::cmd::expect_failure_and_text 'oc login -u user5 -p password' "Can't find client principal user5$realm in cache collection"
-
-    # Cleanup
-    os::cmd::expect_success 'kdestroy -A'
-
-    # Make sure things work if realm is or is not given
-    os::cmd::expect_success 'kinit user4 <<< password'
-    os::cmd::expect_success_and_text 'oc login -u user4' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc logout' 'user4'
-    os::cmd::expect_success_and_text "oc login -u user4$realm" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc logout' 'user4'
-
-    os::cmd::expect_success "kinit user5$realm <<< password"
-    os::cmd::expect_success_and_text 'oc login -u user5' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user5'
-    os::cmd::expect_success_and_text 'oc logout' 'user5'
-    os::cmd::expect_success_and_text "oc login -u user5$realm" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user5'
-    os::cmd::expect_success_and_text 'oc logout' 'user5'
-    os::cmd::expect_success 'kdestroy -A'
-
-    # Broad test with multiple users
-    os::cmd::expect_success 'kinit user1 <<< password'
-    os::cmd::expect_success "kinit user2$realm <<< password"
-
-    os::cmd::expect_failure_and_text 'oc login -u user3 -p password' "Can't find client principal user3$realm in cache collection"
-    os::cmd::expect_failure_and_not_text 'oc whoami' 'user3'
-
-    os::cmd::expect_failure_and_text "oc login -u user4$realm -p password" "Can't find client principal user4$realm in cache collection"
+    # non-ticket users
+    os::cmd::expect_failure_and_text 'oc login -u user4' "Can't find client principal user4@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
+    os::cmd::expect_failure_and_text "oc login -u user4@${REALM}" "Can't find client principal user4@${REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
 
-    os::cmd::expect_success_and_text "oc login -u user1$realm" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc logout' 'user1'
+    os::cmd::expect_failure_and_text 'oc login -u user4 -p password' "Can't find client principal user4@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
+    os::cmd::expect_failure_and_text "oc login -u user4@${REALM} -p password" "Can't find client principal user4@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
 
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc logout' 'user2'
-
-    os::cmd::expect_failure_and_text 'oc login -u user5' "Can't find client principal user5$realm in cache collection"
+    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' "Can't find client principal user5@${REALM} in cache collection"
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
+    os::cmd::expect_failure_and_text "oc login -u user5@${REALM} -p wrongpassword" "Can't find client principal user5@${REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
 
-    os::cmd::expect_failure_and_text "oc login -u user5$realm" "Can't find client principal user5$realm in cache collection"
-    os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
+    # Password is ignored if you have the ticket for the user
+    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
+
 fi
 
 # Client has GSSAPI configured and server is GSSAPI with Basic fallback
