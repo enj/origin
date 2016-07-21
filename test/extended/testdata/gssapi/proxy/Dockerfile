@@ -13,10 +13,8 @@ RUN dnf install -y \
   krb5-workstation \
   mod_auth_gssapi \
   mod_auth_kerb \
-  mod_auth_mellon \
-  mod_intercept_form_submit \
-  mod_session \
   mod_ssl \
+  mod_authnz_pam \
   pam_krb5 \
   && dnf clean all
 
