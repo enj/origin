@@ -14,9 +14,6 @@ source hack/lib/init.sh
 
 os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
 
-users=(user1 user2 user3 user4 user5)
-realm="@${REALM}"
-
 # Client has no GSSAPI libs and server is GSSAPI only
 # Everything fails
 # Errors do NOT mention Kerberos
@@ -165,22 +162,22 @@ if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSS
     os::cmd::expect_failure 'kinit user4 <<< wrongpassword'
     os::cmd::expect_failure "kinit user5@${REALM} <<< wrongpassword"
 
-    # shortname, non-default ticket
+    # Shortname, non-default ticket
     os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
     os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
     os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
 
-    # longname, non-default ticket
+    # Longname, non-default ticket
     os::cmd::expect_success_and_text "oc login -u user2@${REALM}" 'Login successful.'
     os::cmd::expect_success_and_text 'oc whoami' "user2@${REALM}"
     os::cmd::expect_success_and_text 'oc logout' "user2@${REALM}"
 
-    # default ticket
+    # Default ticket
     os::cmd::expect_success_and_text 'oc login' 'Login successful.'
     os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
     os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
 
-    # non-ticket users
+    # Non-ticket users
     os::cmd::expect_failure_and_text 'oc login -u user4' "Can't find client principal user4@${REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
     os::cmd::expect_failure_and_text "oc login -u user4@${REALM}" "Can't find client principal user4@${REALM} in cache collection"
@@ -214,118 +211,73 @@ fi
 # Errors do NOT mention Kerberos
 
 if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
-    for u in "${users[@]}"; do
-        os::cmd::expect_failure "kinit $u <<< wrongpassword"
-        os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
-        os::cmd::expect_success 'kdestroy -A'
 
-        os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text 'oc login' 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
-        os::cmd::expect_success 'kdestroy -A'
+    # No ticket
+    os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
 
-        os::cmd::expect_failure_and_text "oc login -u $u -p wrongpassword" 'Login failed \(401 Unauthorized\)'
-        os::cmd::expect_failure_and_not_text 'oc whoami' $u
+    os::cmd::expect_failure 'kinit user1 <<< wrongpassword'
+    os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user1'
 
-        os::cmd::expect_success_and_text "oc login -u $u -p password" 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
-
-        # Password is ignored if you have the ticket for the user
-        os::cmd::expect_success "kinit $u <<< password"
-        os::cmd::expect_success_and_text "oc login -u $u -p wrongpassword" 'Login successful.'
-        os::cmd::expect_success_and_text 'oc whoami' $u
-        os::cmd::expect_success_and_text 'oc logout' $u
-        os::cmd::expect_success 'kdestroy -A'
-    done
+    # Single ticket
+    os::cmd::expect_success 'kinit user1 <<< password'
+    os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
 
     # Having multiple tickets
-    os::cmd::expect_success 'kinit user1 <<< password'
-    os::cmd::expect_success 'kinit user2 <<< password'
+    os::cmd::expect_success "kinit user2@${REALM} <<< password"
     os::cmd::expect_success 'kinit user3 <<< password'
+    os::cmd::expect_failure 'kinit user4 <<< wrongpassword'
+    os::cmd::expect_failure "kinit user5@${REALM} <<< wrongpassword"
 
+    # Shortname, non-default ticket
     os::cmd::expect_success_and_text 'oc login -u user1' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc logout' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc logout' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user3'
-    os::cmd::expect_success_and_text 'oc logout' 'user3'
+    os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
 
-    # Ignore password
-    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc logout' 'user1'
-    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc logout' 'user2'
-    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user3'
-    os::cmd::expect_success_and_text 'oc logout' 'user3'
+    # Longname, non-default ticket
+    os::cmd::expect_success_and_text "oc login -u user2@${REALM}" 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user2@${REALM}"
 
-    # Using BASIC
-    os::cmd::expect_failure_and_text 'oc login -u user4 -p wrongpassword' 'Login failed \(401 Unauthorized\)'
-    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' 'Login failed \(401 Unauthorized\)'
+    # Default ticket
+    os::cmd::expect_success_and_text 'oc login' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
+
+    # Non-ticket users
+    os::cmd::expect_failure_and_text 'oc login -u user4 <<EOF
+    EOF' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
+    os::cmd::expect_failure_and_text "oc login -u user4@${REALM} <<EOF
+    EOF" 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user4'
 
     os::cmd::expect_success_and_text 'oc login -u user4 -p password' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc logout' 'user4'
-    os::cmd::expect_success_and_text 'oc login -u user5 -p password' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user5'
-    os::cmd::expect_success_and_text 'oc logout' 'user5'
+    os::cmd::expect_success_and_text 'oc whoami' "user4@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user4@${REALM}"
+    os::cmd::expect_success_and_text "oc login -u user4@${REALM} -p password" 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user4@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user4@${REALM}"
 
-    # Cleanup
-    os::cmd::expect_success 'kdestroy -A'
-
-    # Make sure things work if realm is or is not given
-    os::cmd::expect_success 'kinit user4 <<< password'
-    os::cmd::expect_success_and_text 'oc login -u user4' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc logout' 'user4'
-    os::cmd::expect_success_and_text "oc login -u user4$realm" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc logout' 'user4'
-
-    os::cmd::expect_success "kinit user5$realm <<< password"
-    os::cmd::expect_success_and_text 'oc login -u user5' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user5'
-    os::cmd::expect_success_and_text 'oc logout' 'user5'
-    os::cmd::expect_success_and_text "oc login -u user5$realm" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user5'
-    os::cmd::expect_success_and_text 'oc logout' 'user5'
-    os::cmd::expect_success 'kdestroy -A'
-
-    # Broad test with multiple users
-    os::cmd::expect_success 'kinit user1 <<< password'
-    os::cmd::expect_success "kinit user2$realm <<< password"
-
-    os::cmd::expect_success_and_text 'oc login -u user3 -p password' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user3'
-    os::cmd::expect_success_and_text 'oc logout' 'user3'
-
-    os::cmd::expect_success_and_text "oc login -u user4$realm -p password" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user4'
-    os::cmd::expect_success_and_text 'oc logout' 'user4'
-
-    os::cmd::expect_success_and_text "oc login -u user1$realm" 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user1'
-    os::cmd::expect_success_and_text 'oc logout' 'user1'
-
-    os::cmd::expect_success_and_text 'oc login -u user2' 'Login successful.'
-    os::cmd::expect_success_and_text 'oc whoami' 'user2'
-    os::cmd::expect_success_and_text 'oc logout' 'user2'
-
-    os::cmd::expect_failure_and_text 'oc login -u user5 <<EOF
-    EOF' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_text 'oc login -u user5 -p wrongpassword' 'Login failed \(401 Unauthorized\)'
+    os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
+    os::cmd::expect_failure_and_text "oc login -u user5@${REALM} -p wrongpassword" 'Login failed \(401 Unauthorized\)'
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
 
-    os::cmd::expect_failure_and_text "oc login -u user5$realm <<EOF
-    EOF" 'Login failed \(401 Unauthorized\)'
-    os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
+    # Password is ignored if you have the ticket for the user
+    os::cmd::expect_success_and_text 'oc login -u user1 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user1@${REALM}"
+    os::cmd::expect_success_and_text 'oc login -u user2 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user2@${REALM}"
+    os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
+    os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
+    os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
+
 fi
 
 os::test::junit::declare_suite_end
