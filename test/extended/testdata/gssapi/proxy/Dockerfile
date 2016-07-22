@@ -35,5 +35,5 @@ ADD healthz /var/www/html/healthz
 # 88  = kerberos
 EXPOSE 80 443 88 88/udp
 
-ADD configure /usr/sbin/configure
-ENTRYPOINT /usr/sbin/configure
+ADD configure.sh /usr/sbin/configure.sh
+ENTRYPOINT /usr/sbin/configure.sh

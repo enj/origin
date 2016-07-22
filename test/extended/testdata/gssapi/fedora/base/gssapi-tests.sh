@@ -12,13 +12,17 @@ sed -i.bak1 's#KEYRING:persistent:#DIR:/tmp/krb5cc_#' /etc/krb5.conf
 cd ${OS_ROOT}
 source hack/lib/init.sh
 
-os::test::junit::declare_suite_start "test-extended/gssapiproxy-tests"
+trap os::test::junit::reconcile_output EXIT
+TEST_NAME='test-extended/gssapiproxy-tests'
+os::test::junit::declare_suite_start "${TEST_NAME}"
 
 # Client has no GSSAPI libs and server is GSSAPI only
 # Everything fails
 # Errors do NOT mention Kerberos
 
 if [[ "${CLIENT}" = 'CLIENT_MISSING_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; then
+
+    os::test::junit::declare_suite_start "${TEST_NAME}/${CLIENT}-${SERVER}"
 
     os::cmd::expect_failure_and_text 'oc login' 'Login failed \(401 Unauthorized\)'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
@@ -40,6 +44,8 @@ if [[ "${CLIENT}" = 'CLIENT_MISSING_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' 
 
     os::cmd::expect_failure_and_text "oc login -u user5@${REALM} -p password" 'Login failed \(401 Unauthorized\)'
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
+
+    os::test::junit::declare_suite_end
 
 fi
 
@@ -79,6 +85,8 @@ fi
 
 if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; then
 
+    os::test::junit::declare_suite_start "${TEST_NAME}/${CLIENT}-${SERVER}"
+
     os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
 
@@ -100,6 +108,8 @@ if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; 
     os::cmd::expect_failure_and_text "oc login -u user5@${REALM} -p password" "Can't find client principal user5@${REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user5'
 
+    os::test::junit::declare_suite_end
+
 fi
 
 # Client has unconfigured GSSAPI libs and server is GSSAPI with Basic fallback
@@ -107,6 +117,8 @@ fi
 # Errors do NOT mention Kerberos
 
 if [[ ( "${CLIENT}" = 'CLIENT_MISSING_LIBS' || "${CLIENT}" = 'CLIENT_HAS_LIBS' ) && "${SERVER}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
+
+    os::test::junit::declare_suite_start "${TEST_NAME}/${CLIENT}-${SERVER}"
 
     os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
@@ -134,6 +146,8 @@ if [[ ( "${CLIENT}" = 'CLIENT_MISSING_LIBS' || "${CLIENT}" = 'CLIENT_HAS_LIBS' )
     os::cmd::expect_success_and_text 'oc whoami' "user5@${REALM}"
     os::cmd::expect_success_and_text 'oc logout' "user5@${REALM}"
 
+    os::test::junit::declare_suite_end
+
 fi
 
 # Client has GSSAPI configured and server is GSSAPI only
@@ -141,6 +155,8 @@ fi
 # Errors mention Kerberos
 
 if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; then
+
+    os::test::junit::declare_suite_start "${TEST_NAME}/${CLIENT}-${SERVER}"
 
     # No ticket
     os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
@@ -204,6 +220,8 @@ if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSS
     os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
     os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
 
+    os::test::junit::declare_suite_end
+
 fi
 
 # Client has GSSAPI configured and server is GSSAPI with Basic fallback
@@ -211,6 +229,8 @@ fi
 # Errors do NOT mention Kerberos
 
 if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
+
+    os::test::junit::declare_suite_start "${TEST_NAME}/${CLIENT}-${SERVER}"
 
     # No ticket
     os::cmd::expect_failure_and_text 'oc login <<< \n' 'Login failed \(401 Unauthorized\)'
@@ -277,6 +297,8 @@ if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS_IS_CONFIGURED' && "${SERVER}" = 'SERVER_GSS
     os::cmd::expect_success_and_text 'oc login -u user3 -p wrongpassword' 'Login successful.'
     os::cmd::expect_success_and_text 'oc whoami' "user3@${REALM}"
     os::cmd::expect_success_and_text 'oc logout' "user3@${REALM}"
+
+    os::test::junit::declare_suite_end
 
 fi
 
