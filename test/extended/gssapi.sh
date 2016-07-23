@@ -83,9 +83,21 @@ oadm policy add-scc-to-user anyuid -z default -n gssapiproxy
 cp -R test/extended/testdata/gssapi "${BASETMPDIR}"
 TEST_DATA="${BASETMPDIR}/gssapi"
 
-pushd "${TEST_DATA}"
-    oc create -f proxy
-    pushd fedora
+HOST='gssapiproxy-server.gssapiproxy.svc.cluster.local'
+REALM="$(echo ${HOST} | tr [[:lower:]] [[:upper:]])"
+BACKEND='https://openshift.default.svc.cluster.local'
+
+oc create -f "${TEST_DATA}/proxy"
+
+# kick off a build and wait for it to finish
+oc set env dc/gssapiproxy-server HOST="${HOST}" REALM="${REALM}" BACKEND="${BACKEND}"
+oc start-build --from-dir="${TEST_DATA}/proxy" --follow gssapiproxy
+
+OS_IMAGES=(fedora ubuntu)
+
+for os_image in "${OS_IMAGES[@]}"; do
+
+    pushd "${TEST_DATA}/${os_image}"
         cp "$(which oc)" base
         cp -R "${OS_ROOT}/hack" base
 
@@ -93,66 +105,63 @@ pushd "${TEST_DATA}"
         oc create -f kerberos
         oc create -f kerberos_configured
     popd
-popd
 
-HOST='gssapiproxy-server.gssapiproxy.svc.cluster.local'
-REALM="$(echo ${HOST} | tr [[:lower:]] [[:upper:]])"
-BACKEND='https://openshift.default.svc.cluster.local'
+    # TODO Figure out how to set environment variables with binary builds; needed for ${REALM} and ${HOST}
 
-# kick off a build and wait for it to finish
-oc set env dc/gssapiproxy-server HOST="${HOST}" REALM="${REALM}" BACKEND="${BACKEND}"
-oc start-build --from-dir="${TEST_DATA}/proxy" --follow gssapiproxy
+    pushd "${TEST_DATA}/${os_image}"
+        # oc start-build --from-dir=base --follow "${os_image}-gssapi-base"
+        pushd base
+            docker build --build-arg REALM="${REALM}" --build-arg HOST="${HOST}" -t "gssapiproxy/${os_image}-gssapi-base:latest" .
+        popd
 
-# TODO Figure out how to set environment variables with binary builds; needed for ${REALM} and ${HOST}
+        # oc start-build --from-dir=kerberos --follow "${os_image}-gssapi-kerberos"
+        pushd kerberos
+            docker build -t "gssapiproxy/${os_image}-gssapi-kerberos:latest" .
+        popd
 
-pushd "${TEST_DATA}/fedora"
-    # oc start-build --from-dir=base --follow fedora-gssapi-base
-    pushd base
-        docker build --build-arg REALM="${REALM}" --build-arg HOST="${HOST}" -t "gssapiproxy/fedora-gssapi-base:latest" .
+        # oc start-build --from-dir=kerberos_configured --follow "${os_image}-gssapi-kerberos-configured"
+        pushd kerberos_configured
+            docker build -t "gssapiproxy/${os_image}-gssapi-kerberos-configured:latest" .
+        popd
     popd
 
-    # oc start-build --from-dir=kerberos --follow fedora-gssapi-kerberos
-    pushd kerberos
-        docker build -t "gssapiproxy/fedora-gssapi-kerberos:latest" .
-    popd
-
-    # oc start-build --from-dir=kerberos_configured --follow fedora-gssapi-kerberos-configured
-    pushd kerberos_configured
-        docker build -t "gssapiproxy/fedora-gssapi-kerberos-configured:latest" .
-    popd
-popd
+done
 
 for server_config in SERVER_GSSAPI_ONLY SERVER_GSSAPI_BASIC_FALLBACK; do
 
     oc set env dc/gssapiproxy-server SERVER="${server_config}"
     wait_for_auth_proxy "${server_config}"
 
-    oc run fedora-gssapi-base \
-        --image="gssapiproxy/fedora-gssapi-base" \
-        --generator=run-pod/v1 --restart=Never --attach \
-        --env=SERVER="${server_config}" \
-        -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-${server_config}.log" 2>&1
-    os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-${server_config}.log'" 'SUCCESS'
-    os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-${server_config}.log'" 'FAILURE'
-    os::cmd::expect_success 'oc delete pod fedora-gssapi-base'
+    for os_image in "${OS_IMAGES[@]}"; do
 
-    oc run fedora-gssapi-base-kerberos \
-        --image="gssapiproxy/fedora-gssapi-kerberos" \
-        --generator=run-pod/v1 --restart=Never --attach \
-        --env=SERVER="${server_config}" \
-        -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-kerberos-${server_config}.log" 2>&1
-    os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-${server_config}.log'" 'SUCCESS'
-    os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-${server_config}.log'" 'FAILURE'
-    os::cmd::expect_success 'oc delete pod fedora-gssapi-base-kerberos'
+        oc run "${os_image}-gssapi-base" \
+            --image="gssapiproxy/${os_image}-gssapi-base" \
+            --generator=run-pod/v1 --restart=Never --attach \
+            --env=SERVER="${server_config}" \
+            -- bash gssapi-tests.sh > "${LOG_DIR}/${os_image}-gssapi-base-${server_config}.log" 2>&1
+        os::cmd::expect_success_and_text "cat '${LOG_DIR}/${os_image}-gssapi-base-${server_config}.log'" 'SUCCESS'
+        os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${os_image}-gssapi-base-${server_config}.log'" 'FAILURE'
+        os::cmd::expect_success "oc delete pod ${os_image}-gssapi-base"
 
-    oc run fedora-gssapi-base-kerberos-configured \
-        --image="gssapiproxy/fedora-gssapi-kerberos-configured" \
-        --generator=run-pod/v1 --restart=Never --attach \
-        --env=SERVER="${server_config}" \
-        -- bash gssapi-tests.sh > "${LOG_DIR}/fedora-gssapi-base-kerberos-configured-${server_config}.log" 2>&1
-    os::cmd::expect_success_and_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-configured-${server_config}.log'" 'SUCCESS'
-    os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/fedora-gssapi-base-kerberos-configured-${server_config}.log'" 'FAILURE'
-    os::cmd::expect_success 'oc delete pod fedora-gssapi-base-kerberos-configured'
+        oc run "${os_image}-gssapi-kerberos" \
+            --image="gssapiproxy/${os_image}-gssapi-kerberos" \
+            --generator=run-pod/v1 --restart=Never --attach \
+            --env=SERVER="${server_config}" \
+            -- bash gssapi-tests.sh > "${LOG_DIR}/${os_image}-gssapi-kerberos-${server_config}.log" 2>&1
+        os::cmd::expect_success_and_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-${server_config}.log'" 'SUCCESS'
+        os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-${server_config}.log'" 'FAILURE'
+        os::cmd::expect_success "oc delete pod ${os_image}-gssapi-kerberos"
+
+        oc run "${os_image}-gssapi-kerberos-configured" \
+            --image="gssapiproxy/${os_image}-gssapi-kerberos-configured" \
+            --generator=run-pod/v1 --restart=Never --attach \
+            --env=SERVER="${server_config}" \
+            -- bash gssapi-tests.sh > "${LOG_DIR}/${os_image}-gssapi-kerberos-configured-${server_config}.log" 2>&1
+        os::cmd::expect_success_and_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-configured-${server_config}.log'" 'SUCCESS'
+        os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-configured-${server_config}.log'" 'FAILURE'
+        os::cmd::expect_success "oc delete pod ${os_image}-gssapi-kerberos-configured"
+
+    done
 
 done
 
