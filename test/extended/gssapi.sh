@@ -23,7 +23,7 @@ function cleanup() {
     os::test::junit::reconcile_output
     cleanup_openshift
     echo "[INFO] Exiting"
-    oc project gssapiproxy ##TODO remove
+    [[ -n "${SKIP_TEARDOWN-}" ]] && oc project gssapiproxy ##TODO remove
     return $out
 }
 
