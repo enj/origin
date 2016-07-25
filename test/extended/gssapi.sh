@@ -10,10 +10,22 @@ OS_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 cd "${OS_ROOT}"
 source hack/lib/init.sh
 
-os::log::stacktrace::install
-os::test::junit::declare_suite_start "test-extended/gssapiproxy"
-os::util::environment::setup_time_vars
 os::build::setup_env
+
+os::util::environment::setup_time_vars
+os::util::environment::setup_all_server_vars "test-extended/gssapiproxy"
+os::util::environment::use_sudo
+
+os::log::stacktrace::install
+os::log::start_system_logger
+
+ensure_iptables_or_die ## TODO Is this needed?
+
+reset_tmp_dir
+JUNIT_REPORT_OUTPUT="${LOG_DIR}/raw_test_output.log"
+JUNIT_GSSAPI_OUTPUT="${LOG_DIR}/raw_test_output_gssapi.log"
+
+os::test::junit::declare_suite_start "test-extended/gssapiproxy"
 
 hack/build-go.sh cmd/oc -tags=gssapi
 os::cmd::expect_success_and_text 'oc version' 'GSSAPI Kerberos SPNEGO'
@@ -22,6 +34,18 @@ function cleanup() {
     out=$?
     os::test::junit::reconcile_output
     cleanup_openshift
+
+    # use the junitreport tool to generate us a report
+    "${OS_ROOT}/hack/build-go.sh" tools/junitreport
+    junitreport="$(os::build::find-binary junitreport)"
+
+    cat "${JUNIT_REPORT_OUTPUT}" "${JUNIT_GSSAPI_OUTPUT}"   \
+    | "${junitreport}"  --type oscmd                        \
+                        --suites nested                     \
+                        --roots github.com/openshift/origin \
+                        --output "${ARTIFACT_DIR}/report.xml"
+    cat "${ARTIFACT_DIR}/report.xml" | "${junitreport}" summarize
+
     echo "[INFO] Exiting"
     [[ -n "${SKIP_TEARDOWN-}" ]] && oc project gssapiproxy ##TODO remove
     return $out
@@ -33,16 +57,23 @@ function wait_for_auth_proxy() {
     os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='${spec}'" "^${server_config}_True$"
 }
 
+function run_gssapi_tests() {
+    local image_name="${1}"
+    local server_config="${2}"
+    oc run "${image_name}" \
+        --image="gssapiproxy/${image_name}" \
+        --generator=run-pod/v1 --restart=Never --attach \
+        --env=SERVER="${server_config}" \
+        1> "${LOG_DIR}/${image_name}-${server_config}.log" \
+        2>> "${JUNIT_GSSAPI_OUTPUT}"
+    os::cmd::expect_success_and_text "cat '${LOG_DIR}/${image_name}-${server_config}.log'" 'SUCCESS'
+    os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${image_name}-${server_config}.log'" 'FAILURE'
+    os::cmd::expect_success "oc delete pod ${image_name}"
+}
+
 trap "cleanup" EXIT
 
 echo "[INFO] Starting server"
-
-ensure_iptables_or_die ## Is this needed?
-os::util::environment::setup_all_server_vars "test-extended/gssapiproxy"
-os::util::environment::use_sudo
-reset_tmp_dir
-
-os::log::start_system_logger
 
 configure_os_server
 
@@ -84,7 +115,7 @@ cp -R test/extended/testdata/gssapi "${BASETMPDIR}"
 TEST_DATA="${BASETMPDIR}/gssapi"
 
 HOST='gssapiproxy-server.gssapiproxy.svc.cluster.local'
-REALM="$(echo ${HOST} | tr [[:lower:]] [[:upper:]])"
+REALM="${HOST^^}"
 BACKEND='https://openshift.default.svc.cluster.local'
 
 oc create -f "${TEST_DATA}/proxy"
@@ -100,6 +131,8 @@ for os_image in "${OS_IMAGES[@]}"; do
     pushd "${TEST_DATA}/${os_image}"
         cp "$(which oc)" base
         cp -R "${OS_ROOT}/hack" base
+        cp ../scripts/test-wrapper.sh base
+        cp ../scripts/gssapi-tests.sh base
 
         oc create -f base
         oc create -f kerberos
@@ -134,32 +167,11 @@ for server_config in SERVER_GSSAPI_ONLY SERVER_GSSAPI_BASIC_FALLBACK; do
 
     for os_image in "${OS_IMAGES[@]}"; do
 
-        oc run "${os_image}-gssapi-base" \
-            --image="gssapiproxy/${os_image}-gssapi-base" \
-            --generator=run-pod/v1 --restart=Never --attach \
-            --env=SERVER="${server_config}" \
-            -- bash gssapi-tests.sh > "${LOG_DIR}/${os_image}-gssapi-base-${server_config}.log" 2>&1
-        os::cmd::expect_success_and_text "cat '${LOG_DIR}/${os_image}-gssapi-base-${server_config}.log'" 'SUCCESS'
-        os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${os_image}-gssapi-base-${server_config}.log'" 'FAILURE'
-        os::cmd::expect_success "oc delete pod ${os_image}-gssapi-base"
+        run_gssapi_tests "${os_image}-gssapi-base" "${server_config}"
 
-        oc run "${os_image}-gssapi-kerberos" \
-            --image="gssapiproxy/${os_image}-gssapi-kerberos" \
-            --generator=run-pod/v1 --restart=Never --attach \
-            --env=SERVER="${server_config}" \
-            -- bash gssapi-tests.sh > "${LOG_DIR}/${os_image}-gssapi-kerberos-${server_config}.log" 2>&1
-        os::cmd::expect_success_and_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-${server_config}.log'" 'SUCCESS'
-        os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-${server_config}.log'" 'FAILURE'
-        os::cmd::expect_success "oc delete pod ${os_image}-gssapi-kerberos"
+        run_gssapi_tests "${os_image}-gssapi-kerberos" "${server_config}"
 
-        oc run "${os_image}-gssapi-kerberos-configured" \
-            --image="gssapiproxy/${os_image}-gssapi-kerberos-configured" \
-            --generator=run-pod/v1 --restart=Never --attach \
-            --env=SERVER="${server_config}" \
-            -- bash gssapi-tests.sh > "${LOG_DIR}/${os_image}-gssapi-kerberos-configured-${server_config}.log" 2>&1
-        os::cmd::expect_success_and_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-configured-${server_config}.log'" 'SUCCESS'
-        os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${os_image}-gssapi-kerberos-configured-${server_config}.log'" 'FAILURE'
-        os::cmd::expect_success "oc delete pod ${os_image}-gssapi-kerberos-configured"
+        run_gssapi_tests "${os_image}-gssapi-kerberos-configured" "${server_config}"
 
     done
 

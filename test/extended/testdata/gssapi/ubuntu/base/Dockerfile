@@ -15,9 +15,12 @@ ENV PATH ${OS_ROOT}/bin:${PATH}
 
 WORKDIR ${OS_ROOT}
 ADD gssapi-tests.sh gssapi-tests.sh
+ADD test-wrapper.sh test-wrapper.sh
 ADD config config
 ADD hack hack
 ADD oc bin/oc
 
-RUN apt-get update
-RUN apt-get install -y bc
+RUN chmod +x gssapi-tests.sh test-wrapper.sh
+RUN apt-get update && apt-get install -y bc
+
+ENTRYPOINT /run/os/test-wrapper.sh

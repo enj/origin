@@ -12,17 +12,13 @@ RUN dnf install -y \
   krb5-server \
   krb5-workstation \
   mod_auth_gssapi \
-  mod_auth_kerb \
   mod_ssl \
-  mod_authnz_pam \
-  pam_krb5 \
   && dnf clean all
 
 # Add conf files for Kerberos
 ADD krb5.conf /etc/krb5.conf
 ADD kdc.conf  /var/kerberos/krb5kdc/kdc.conf
 ADD kadm5.acl /var/kerberos/krb5kdc/kadm5.acl
-ADD httpd-pam /etc/pam.d/httpd-pam
 
 # Add conf file for Apache
 ADD proxy.conf /etc/httpd/conf.d/proxy.conf

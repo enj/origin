@@ -42,14 +42,6 @@ chown apache /etc/httpd.keytab
 sed -i.bak1 -e "s#proxy\.example\.com#${HOST}#g" /etc/httpd/conf.d/proxy.conf
 sed -i.bak2 -e "s#https://backend\.example\.com#${BACKEND}#g" /etc/httpd/conf.d/proxy.conf
 
-# Set up apache htpasswd file
-htpasswd -b -c /etc/httpd.htpasswd "${USER}@${REALM}" "password"
-
-for u in user1 user2 user3 user4 user5; do
-  htpasswd -b /etc/httpd.htpasswd "${u}@${REALM}" "password"
-done
-chown apache /etc/httpd.htpasswd
-
 # Start apache
 httpd -k start
 
