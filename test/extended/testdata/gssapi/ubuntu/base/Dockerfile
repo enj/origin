@@ -20,7 +20,7 @@ ADD config config
 ADD hack hack
 ADD oc bin/oc
 
-RUN chmod +x gssapi-tests.sh test-wrapper.sh
-RUN apt-get update && apt-get install -y bc
+RUN chmod +x gssapi-tests.sh test-wrapper.sh && \
+    apt-get update && apt-get install -y bc
 
 ENTRYPOINT /run/os/test-wrapper.sh

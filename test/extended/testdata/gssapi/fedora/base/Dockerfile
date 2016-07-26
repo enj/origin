@@ -20,11 +20,9 @@ ADD config config
 ADD hack hack
 ADD oc bin/oc
 
-RUN dnf install -y findutils bc
-
 # KEYRING does not work inside of a container since it is part of the kernel
-RUN sed -i.bak1 's#KEYRING:persistent:#DIR:/tmp/krb5cc_#' /etc/krb5.conf
-
-RUN chmod +x gssapi-tests.sh test-wrapper.sh
+RUN sed -i.bak1 's#KEYRING:persistent:#DIR:/tmp/krb5cc_#' /etc/krb5.conf && \
+    dnf install -y findutils bc && \
+    chmod +x gssapi-tests.sh test-wrapper.sh
 
 ENTRYPOINT /run/os/test-wrapper.sh
