@@ -82,18 +82,10 @@ function update_auth_proxy_config {
     local server_config="${1}"
     local spec='{.items[0].spec.containers[0].env[?(@.name=="SERVER")].value}'
     spec+='_'
-    spec+='{.items[0].spec.containers[0].env[?(@.name=="SERVER_GSSAPI_BASIC_AUTH")].value}'
-    spec+='_'
     spec+='{.items[0].status.conditions[?(@.type=="Ready")].status}'
 
-    if [[ "${server_config}" = 'SERVER_GSSAPI_BASIC_FALLBACK' ]]; then
-        local SERVER_GSSAPI_BASIC_AUTH=on
-    else
-        local SERVER_GSSAPI_BASIC_AUTH=off
-    fi
-
-    os::cmd::expect_success "oc set env dc/gssapiproxy-server SERVER='${server_config}' SERVER_GSSAPI_BASIC_AUTH='${SERVER_GSSAPI_BASIC_AUTH}'"
-    os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='${spec}'" "^${server_config}_${SERVER_GSSAPI_BASIC_AUTH}_True$"
+    os::cmd::expect_success "oc set env dc/gssapiproxy-server SERVER='${server_config}'"
+    os::cmd::try_until_text "oc get pods -l deploymentconfig=gssapiproxy-server -o jsonpath='${spec}'" "^${server_config}_True$"
 }
 
 function run_gssapi_tests() {
@@ -167,35 +159,36 @@ OS_IMAGES=(fedora ubuntu)
 
 for os_image in "${OS_IMAGES[@]}"; do
 
-    pushd "${TEST_DATA}/${os_image}"
-        cp "$(which oc)" base
-        cp -R "${OS_ROOT}/hack" base
-        cp ../scripts/test-wrapper.sh base
-        cp ../scripts/gssapi-tests.sh base
+    cp "$(which oc)" "${TEST_DATA}/${os_image}/base"
+    cp -R "${OS_ROOT}/hack" "${TEST_DATA}/${os_image}/base"
+    cp "${TEST_DATA}/scripts/test-wrapper.sh" "${TEST_DATA}/${os_image}/base"
+    cp "${TEST_DATA}/scripts/gssapi-tests.sh" "${TEST_DATA}/${os_image}/base"
 
-        os::cmd::expect_success 'oc create -f base'
-        os::cmd::expect_success 'oc create -f kerberos'
-        os::cmd::expect_success 'oc create -f kerberos_configured'
-    popd
+    os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/base"
+    os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos"
+    os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos_configured"
 
     # TODO Figure out how to set environment variables with binary builds; needed for ${REALM} and ${HOST}
 
-    pushd "${TEST_DATA}/${os_image}"
-        # os::cmd::expect_success "oc start-build --from-dir=base --follow '${os_image}-gssapi-base'"
-        pushd base
-            os::cmd::expect_success "docker build --build-arg REALM='${REALM}' --build-arg HOST='${HOST}' -t '${PROJECT}/${os_image}-gssapi-base:latest' ."
-        popd
+    # os::cmd::expect_success "oc start-build --from-dir='${TEST_DATA}/${os_image}/base' --follow '${os_image}-gssapi-base'"
+    # os::cmd::expect_success "oc start-build --from-dir='${TEST_DATA}/${os_image}/kerberos' --follow '${os_image}-gssapi-kerberos'"
+    # os::cmd::expect_success "oc start-build --from-dir='${TEST_DATA}/${os_image}/kerberos_configured' --follow '${os_image}-gssapi-kerberos-configured'"
 
-        # os::cmd::expect_success "oc start-build --from-dir=kerberos --follow '${os_image}-gssapi-kerberos'"
-        pushd kerberos
-            os::cmd::expect_success "docker build -t '${PROJECT}/${os_image}-gssapi-kerberos:latest' ."
-        popd
+    # TODO remove docker and use start-build above
 
-        # os::cmd::expect_success "oc start-build --from-dir=kerberos_configured --follow '${os_image}-gssapi-kerberos-configured'"
-        pushd kerberos_configured
-            os::cmd::expect_success "docker build -t '${PROJECT}/${os_image}-gssapi-kerberos-configured:latest' ."
-        popd
-    popd
+    pushd "${TEST_DATA}/${os_image}" > /dev/null
+        pushd base > /dev/null
+            docker build --build-arg REALM="${REALM}" --build-arg HOST="${HOST}" -t "${PROJECT}/${os_image}-gssapi-base:latest" .
+        popd > /dev/null
+
+        pushd kerberos > /dev/null
+            docker build -t "${PROJECT}/${os_image}-gssapi-kerberos:latest" .
+        popd > /dev/null
+
+        pushd kerberos_configured > /dev/null
+            docker build -t "${PROJECT}/${os_image}-gssapi-kerberos-configured:latest" .
+        popd > /dev/null
+    popd > /dev/null
 
 done
 
