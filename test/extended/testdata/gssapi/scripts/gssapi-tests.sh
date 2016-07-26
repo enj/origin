@@ -9,7 +9,16 @@ echo "Running ${TEST_NAME}"
 cd "${OS_ROOT}"
 source hack/lib/init.sh
 
-trap os::test::junit::reconcile_output EXIT
+function cleanup() {
+    out=$?
+    # get the jUnit output file into a workable state in case we crashed in the middle of testing something
+    os::test::junit::reconcile_output
+    # check that we didn't mangle jUnit output
+    os::test::junit::check_test_counters
+    exit $out
+}
+
+trap "cleanup" EXIT
 os::test::junit::declare_suite_start "${TEST_NAME}"
 
 # Client has no GSSAPI libs and server is GSSAPI only
@@ -52,13 +61,13 @@ if [[ "${CLIENT}" = 'CLIENT_HAS_LIBS' && "${SERVER}" = 'SERVER_GSSAPI_ONLY' ]]; 
     os::cmd::expect_failure_and_text 'oc login' 'No Kerberos credentials available'
     os::cmd::expect_failure_and_text 'oc whoami' 'system:anonymous'
 
-    os::cmd::expect_failure_and_text 'oc login -u user1' "(An invalid name was supplied)|(Can't find client principal user1@${DEFAULT_REALM} in cache collection)"
+    os::cmd::expect_failure_and_text 'oc login -u user1' "An invalid name was supplied|Can't find client principal user1@${DEFAULT_REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user1'
 
-    os::cmd::expect_failure_and_text 'oc login -u user2 -p wrongpassword' "(An invalid name was supplied)|(Can't find client principal user2@${DEFAULT_REALM} in cache collection)"
+    os::cmd::expect_failure_and_text 'oc login -u user2 -p wrongpassword' "An invalid name was supplied|Can't find client principal user2@${DEFAULT_REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user2'
 
-    os::cmd::expect_failure_and_text 'oc login -u user2 -p password' "(An invalid name was supplied)|(Can't find client principal user2@${DEFAULT_REALM} in cache collection)"
+    os::cmd::expect_failure_and_text 'oc login -u user2 -p password' "An invalid name was supplied|Can't find client principal user2@${DEFAULT_REALM} in cache collection"
     os::cmd::expect_failure_and_not_text 'oc whoami' 'user2'
 
     os::cmd::expect_failure_and_text "oc login -u 'user3@${REALM}'" "Can't find client principal user3@${REALM} in cache collection"

@@ -16,6 +16,8 @@ reset_tmp_dir
 set +e
 # use a subshell to prevent `exit` calls from killing this script
 ( './gssapi-tests.sh' ) 2>&1
+out=$?
 set -e
 
 cat "${JUNIT_REPORT_OUTPUT}" 1>&2
+exit $out

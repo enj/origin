@@ -91,6 +91,7 @@ function update_auth_proxy_config {
 function run_gssapi_tests() {
     local image_name="${1}"
     local server_config="${2}"
+    local spec='{.status.containerStatuses[0].state.terminated.exitCode}'
     oc run "${image_name}" \
         --image="${PROJECT}/${image_name}" \
         --generator=run-pod/v1 --restart=Never --attach \
@@ -99,6 +100,8 @@ function run_gssapi_tests() {
         2>> "${JUNIT_GSSAPI_OUTPUT}"
     os::cmd::expect_success_and_text "cat '${LOG_DIR}/${image_name}-${server_config}.log'" 'SUCCESS'
     os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${image_name}-${server_config}.log'" 'FAILURE'
+    sleep 10
+    os::cmd::expect_success_and_text "oc get pod '${image_name}' -o jsonpath='${spec}'" '0'
     os::cmd::expect_success "oc delete pod ${image_name}"
 }
 
@@ -134,7 +137,7 @@ KUBECONFIG="${ADMIN_KUBECONFIG}"
 
 install_registry
 wait_for_registry
-REGISTRY_IP="$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')"
+# REGISTRY_IP="$(oc get svc docker-registry -n default -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].targetPort}')"
 # TODO REGISTRY_IP re-add
 
 os::cmd::expect_success 'oc login -u system:admin'
@@ -164,9 +167,9 @@ for os_image in "${OS_IMAGES[@]}"; do
     cp "${TEST_DATA}/scripts/test-wrapper.sh" "${TEST_DATA}/${os_image}/base"
     cp "${TEST_DATA}/scripts/gssapi-tests.sh" "${TEST_DATA}/${os_image}/base"
 
-    os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/base"
-    os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos"
-    os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos_configured"
+    # os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/base"
+    # os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos"
+    # os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos_configured"
 
     # TODO Figure out how to set environment variables with binary builds; needed for ${REALM} and ${HOST}
 
