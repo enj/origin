@@ -100,7 +100,7 @@ function run_gssapi_tests() {
         2>> "${JUNIT_GSSAPI_OUTPUT}"
     os::cmd::expect_success_and_text "cat '${LOG_DIR}/${image_name}-${server_config}.log'" 'SUCCESS'
     os::cmd::expect_success_and_not_text "cat '${LOG_DIR}/${image_name}-${server_config}.log'" 'FAILURE'
-    sleep 10
+    os::cmd::try_until_success "oc get pod '${image_name}' -o jsonpath='${spec}'" # TODO fix this
     os::cmd::expect_success_and_text "oc get pod '${image_name}' -o jsonpath='${spec}'" '0'
     os::cmd::expect_success "oc delete pod ${image_name}"
 }
@@ -166,6 +166,7 @@ for os_image in "${OS_IMAGES[@]}"; do
     cp -R "${OS_ROOT}/hack" "${TEST_DATA}/${os_image}/base"
     cp "${TEST_DATA}/scripts/test-wrapper.sh" "${TEST_DATA}/${os_image}/base"
     cp "${TEST_DATA}/scripts/gssapi-tests.sh" "${TEST_DATA}/${os_image}/base"
+    cp "${TEST_DATA}/config/config" "${TEST_DATA}/${os_image}/base"
 
     # os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/base"
     # os::cmd::expect_success "oc create -f ${TEST_DATA}/${os_image}/kerberos"
