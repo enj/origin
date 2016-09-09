@@ -541,7 +541,7 @@ func (c *MasterConfig) GetRestStorage() map[string]rest.Storage {
 		saAccountGrantMethod = oauthapi.GrantHandlerType(c.Options.OAuthConfig.GrantConfig.ServiceAccountMethod)
 	}
 
-	combinedOAuthClientGetter := saoauth.NewServiceAccountOAuthClientGetter(c.KubeClient(), c.KubeClient(), clientRegistry, saAccountGrantMethod)
+	combinedOAuthClientGetter := saoauth.NewServiceAccountOAuthClientGetter(c.KubeClient(), c.KubeClient(), c.OpenShiftClient(), clientRegistry, saAccountGrantMethod)
 	authorizeTokenStorage, err := authorizetokenetcd.NewREST(c.RESTOptionsGetter, combinedOAuthClientGetter)
 	checkStorageErr(err)
 	accessTokenStorage, err := accesstokenetcd.NewREST(c.RESTOptionsGetter, combinedOAuthClientGetter)

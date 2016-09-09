@@ -1,7 +1,9 @@
 package oauthclient
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -10,27 +12,88 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	scopeauthorizer "github.com/openshift/origin/pkg/authorization/authorizer/scope"
+	osclient "github.com/openshift/origin/pkg/client"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
 	"github.com/openshift/origin/pkg/oauth/registry/oauthclient"
+	routeapi "github.com/openshift/origin/pkg/route/api"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
 	OAuthRedirectURISecretAnnotationPrefix = "serviceaccounts.openshift.io/oauth-redirecturi."
 	OAuthWantChallengesAnnotationPrefix    = "serviceaccounts.openshift.io/oauth-want-challenges"
+
+	OAuthRedirectModelAnnotationPrefix              = "serviceaccounts.openshift.io/oauth-redirectmodel."
+	OAuthRedirectModelAnnotationURIPrefix           = OAuthRedirectModelAnnotationPrefix + "uri."
+	OAuthRedirectModelAnnotationResourcePrefix      = OAuthRedirectModelAnnotationPrefix + "resource."
+	OAuthRedirectModelAnnotationURISchemePrefix     = OAuthRedirectModelAnnotationURIPrefix + "scheme."
+	OAuthRedirectModelAnnotationURIPortPrefix       = OAuthRedirectModelAnnotationURIPrefix + "port."
+	OAuthRedirectModelAnnotationURIPathPrefix       = OAuthRedirectModelAnnotationURIPrefix + "path."
+	OAuthRedirectModelAnnotationResourceKindPrefix  = OAuthRedirectModelAnnotationResourcePrefix + "kind."
+	OAuthRedirectModelAnnotationResourceNamePrefix  = OAuthRedirectModelAnnotationResourcePrefix + "name."
+	OAuthRedirectModelAnnotationResourceGroupPrefix = OAuthRedirectModelAnnotationResourcePrefix + "group."
+
+	RouteKind = "Route"
 )
+
+var invalidRedirectURI = errors.New("Invalid redirect URI")
 
 type saOAuthClientAdapter struct {
 	saClient     kclient.ServiceAccountsNamespacer
 	secretClient kclient.SecretsNamespacer
+	routeClient  osclient.RoutesNamespacer
 
 	delegate    oauthclient.Getter
 	grantMethod oauthapi.GrantHandlerType
 }
 
+type model struct {
+	scheme string
+	port   string
+	path   string
+
+	group string
+	kind  string
+	name  string
+}
+
+type redirectURI struct {
+	scheme string
+	host   string
+	port   string
+	path   string
+}
+
+func (uri *redirectURI) getURI() (string, error) {
+	var host string
+	if uri.port != "" {
+		host = fmt.Sprintf("%s:%s", uri.host, uri.port)
+	} else {
+		host = uri.host
+	}
+	u, err := url.Parse(fmt.Sprintf("%s://%s/%s", uri.scheme, host, uri.path))
+	if err == nil && u.Fragment == "" {
+		return u.String(), nil
+	}
+	return "", invalidRedirectURI
+}
+
+func (uri *redirectURI) merge(m model) {
+	if m.scheme != "" {
+		uri.scheme = m.scheme
+	}
+	if m.path != "" {
+		uri.path = m.path
+	}
+	if m.port != "" {
+		uri.port = m.port
+	}
+}
+
 var _ oauthclient.Getter = &saOAuthClientAdapter{}
 
-func NewServiceAccountOAuthClientGetter(saClient kclient.ServiceAccountsNamespacer, secretClient kclient.SecretsNamespacer, delegate oauthclient.Getter, grantMethod oauthapi.GrantHandlerType) oauthclient.Getter {
-	return &saOAuthClientAdapter{saClient: saClient, secretClient: secretClient, delegate: delegate, grantMethod: grantMethod}
+func NewServiceAccountOAuthClientGetter(saClient kclient.ServiceAccountsNamespacer, secretClient kclient.SecretsNamespacer, routeClient osclient.RoutesNamespacer, delegate oauthclient.Getter, grantMethod oauthapi.GrantHandlerType) oauthclient.Getter {
+	return &saOAuthClientAdapter{saClient: saClient, secretClient: secretClient, routeClient: routeClient, delegate: delegate, grantMethod: grantMethod}
 }
 
 func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oauthapi.OAuthClient, error) {
@@ -45,9 +108,19 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 	}
 
 	redirectURIs := []string{}
+	models := map[string]model{}
 	for key, value := range sa.Annotations {
 		if strings.HasPrefix(key, OAuthRedirectURISecretAnnotationPrefix) {
 			redirectURIs = append(redirectURIs, value)
+		} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationPrefix) {
+			updateModels(models, key, value)
+		}
+	}
+	if len(models) > 0 {
+		ri := a.routeClient.Routes(saNamespace)
+		redirectURIData := extractValidRedirectURIs(models, ri)
+		if len(redirectURIData) > 0 {
+			redirectURIs = append(redirectURIs, extractRedirectURIStrings(redirectURIData)...)
 		}
 	}
 	if len(redirectURIs) == 0 {
@@ -79,6 +152,121 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 		GrantMethod:  a.grantMethod,
 	}
 	return saClient, nil
+}
+
+func updateModels(models map[string]model, key, value string) {
+	if strings.HasPrefix(key, OAuthRedirectModelAnnotationURISchemePrefix) {
+		k := getKey(OAuthRedirectModelAnnotationURISchemePrefix, key)
+		tmp := models[k]
+		tmp.scheme = value
+		models[k] = tmp
+	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationURIPortPrefix) {
+		k := getKey(OAuthRedirectModelAnnotationURIPortPrefix, key)
+		tmp := models[k]
+		tmp.port = value
+		models[k] = tmp
+	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationURIPathPrefix) {
+		k := getKey(OAuthRedirectModelAnnotationURIPathPrefix, key)
+		tmp := models[k]
+		tmp.path = value
+		models[k] = tmp
+	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationResourceKindPrefix) {
+		k := getKey(OAuthRedirectModelAnnotationResourceKindPrefix, key)
+		tmp := models[k]
+		tmp.kind = value
+		models[k] = tmp
+	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationResourceNamePrefix) {
+		k := getKey(OAuthRedirectModelAnnotationResourceNamePrefix, key)
+		tmp := models[k]
+		tmp.name = value
+		models[k] = tmp
+	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationResourceGroupPrefix) {
+		k := getKey(OAuthRedirectModelAnnotationResourceGroupPrefix, key)
+		tmp := models[k]
+		tmp.group = value
+		models[k] = tmp
+	}
+}
+
+func getKey(prefix, key string) string {
+	return key[len(prefix):]
+}
+
+func extractValidRedirectURIs(models map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
+	var data []redirectURI
+	var osRoutes []model
+
+	for _, model := range models {
+		if isOpenShiftRoute(&model) {
+			osRoutes = append(osRoutes, model)
+		}
+	}
+	if len(osRoutes) > 0 {
+		data = append(data, getOSRoutes(osRoutes, routeInterface)...)
+	}
+
+	return data
+}
+
+func getOSRoutes(modelList []model, routeInterface osclient.RouteInterface) []redirectURI {
+	var data []redirectURI
+	rm := map[string][]redirectURI{}
+
+	if len(modelList) > 1 {
+		routes, err := routeInterface.List(kapi.ListOptions{})
+		if err != nil {
+			return data
+		}
+		for _, r := range routes.Items {
+			updateRouteMap(rm, &r)
+		}
+	} else {
+		r, err := routeInterface.Get(modelList[0].name)
+		if err != nil {
+			return data
+		}
+		updateRouteMap(rm, r)
+	}
+
+	for _, m := range modelList {
+		if r, ok := rm[m.name]; ok {
+			for _, rURI := range r {
+				u := rURI
+				u.merge(m)
+				data = append(data, u)
+			}
+		}
+	}
+
+	return data
+}
+
+func updateRouteMap(rm map[string][]redirectURI, r *routeapi.Route) {
+	for _, i := range r.Status.Ingress {
+		if i.Host == "" {
+			continue
+		}
+		u := redirectURI{scheme: "https"}
+		u.host = i.Host
+		u.path = r.Spec.Path
+		u.port = r.Spec.Port.TargetPort.StrVal
+		rm[r.Name] = append(rm[r.Name], u)
+	}
+}
+
+func isOpenShiftRoute(m *model) bool {
+	return m.kind == RouteKind && m.group == routeapi.FutureGroupName
+}
+
+func extractRedirectURIStrings(redirectURIData []redirectURI) []string {
+	var data []string
+	for _, u := range redirectURIData {
+		s, err := u.getURI()
+		if err == nil {
+			data = append(data, s)
+		}
+	}
+	return sets.NewString(data...).List()
 }
 
 func getScopeRestrictionsFor(namespace, name string) []oauthapi.ScopeRestriction {

@@ -9,6 +9,7 @@ import (
 	ktestclient "k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/types"
 
+	ostestclient "github.com/openshift/origin/pkg/client/testclient"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
 )
 
@@ -17,6 +18,7 @@ func TestGetClient(t *testing.T) {
 		name       string
 		clientName string
 		kubeClient *ktestclient.Fake
+		osClient   *ostestclient.Fake
 
 		expectedDelegation bool
 		expectedErr        string
@@ -27,6 +29,7 @@ func TestGetClient(t *testing.T) {
 			name:               "delegate",
 			clientName:         "not:serviceaccount",
 			kubeClient:         ktestclient.NewSimpleFake(),
+			osClient:           ostestclient.NewSimpleFake(),
 			expectedDelegation: true,
 			expectedActions:    []ktestclient.Action{},
 		},
@@ -34,6 +37,7 @@ func TestGetClient(t *testing.T) {
 			name:            "missing sa",
 			clientName:      "system:serviceaccount:ns-01:missing-sa",
 			kubeClient:      ktestclient.NewSimpleFake(),
+			osClient:        ostestclient.NewSimpleFake(),
 			expectedErr:     `ServiceAccount "missing-sa" not found`,
 			expectedActions: []ktestclient.Action{ktestclient.NewGetAction("serviceaccounts", "ns-01", "missing-sa")},
 		},
@@ -48,6 +52,7 @@ func TestGetClient(t *testing.T) {
 						Annotations: map[string]string{},
 					},
 				}),
+			osClient:        ostestclient.NewSimpleFake(),
 			expectedErr:     `system:serviceaccount:ns-01:default has no redirectURIs; set serviceaccounts.openshift.io/oauth-redirecturi.<some-value>`,
 			expectedActions: []ktestclient.Action{ktestclient.NewGetAction("serviceaccounts", "ns-01", "default")},
 		},
@@ -62,6 +67,7 @@ func TestGetClient(t *testing.T) {
 						Annotations: map[string]string{OAuthRedirectURISecretAnnotationPrefix + "one": "anywhere"},
 					},
 				}),
+			osClient:    ostestclient.NewSimpleFake(),
 			expectedErr: `system:serviceaccount:ns-01:default has no tokens`,
 			expectedActions: []ktestclient.Action{
 				ktestclient.NewGetAction("serviceaccounts", "ns-01", "default"),
@@ -92,6 +98,7 @@ func TestGetClient(t *testing.T) {
 					Type: kapi.SecretTypeServiceAccountToken,
 					Data: map[string][]byte{kapi.ServiceAccountTokenKey: []byte("foo")},
 				}),
+			osClient: ostestclient.NewSimpleFake(),
 			expectedClient: &oauthapi.OAuthClient{
 				ObjectMeta:        kapi.ObjectMeta{Name: "system:serviceaccount:ns-01:default"},
 				ScopeRestrictions: getScopeRestrictionsFor("ns-01", "default"),
@@ -108,7 +115,7 @@ func TestGetClient(t *testing.T) {
 
 	for _, tc := range testCases {
 		delegate := &fakeDelegate{}
-		getter := NewServiceAccountOAuthClientGetter(tc.kubeClient, tc.kubeClient, delegate, oauthapi.GrantHandlerPrompt)
+		getter := NewServiceAccountOAuthClientGetter(tc.kubeClient, tc.kubeClient, tc.osClient, delegate, oauthapi.GrantHandlerPrompt)
 		client, err := getter.GetClient(kapi.NewContext(), tc.clientName)
 		switch {
 		case len(tc.expectedErr) == 0 && err == nil:
