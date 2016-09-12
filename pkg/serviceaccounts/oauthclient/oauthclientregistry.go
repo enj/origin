@@ -38,6 +38,15 @@ const (
 
 var invalidRedirectURI = errors.New("Invalid redirect URI")
 
+var modelPrefixes = []string{
+	OAuthRedirectModelAnnotationURISchemePrefix,
+	OAuthRedirectModelAnnotationURIPortPrefix,
+	OAuthRedirectModelAnnotationURIPathPrefix,
+	OAuthRedirectModelAnnotationResourceKindPrefix,
+	OAuthRedirectModelAnnotationResourceNamePrefix,
+	OAuthRedirectModelAnnotationResourceGroupPrefix,
+}
+
 type saOAuthClientAdapter struct {
 	saClient     kclient.ServiceAccountsNamespacer
 	secretClient kclient.SecretsNamespacer
@@ -108,14 +117,12 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 	}
 
 	redirectURIs := []string{}
-	models := map[string]model{}
 	for key, value := range sa.Annotations {
 		if strings.HasPrefix(key, OAuthRedirectURISecretAnnotationPrefix) {
 			redirectURIs = append(redirectURIs, value)
-		} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationPrefix) {
-			updateModels(models, key, value)
 		}
 	}
+	models := parseModels(sa.Annotations)
 	if len(models) > 0 {
 		ri := a.routeClient.Routes(saNamespace)
 		redirectURIData := extractValidRedirectURIs(models, ri)
@@ -154,42 +161,38 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 	return saClient, nil
 }
 
-func updateModels(models map[string]model, key, value string) {
-	if strings.HasPrefix(key, OAuthRedirectModelAnnotationURISchemePrefix) {
-		k := getKey(OAuthRedirectModelAnnotationURISchemePrefix, key)
-		tmp := models[k]
-		tmp.scheme = value
-		models[k] = tmp
-	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationURIPortPrefix) {
-		k := getKey(OAuthRedirectModelAnnotationURIPortPrefix, key)
-		tmp := models[k]
-		tmp.port = value
-		models[k] = tmp
-	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationURIPathPrefix) {
-		k := getKey(OAuthRedirectModelAnnotationURIPathPrefix, key)
-		tmp := models[k]
-		tmp.path = value
-		models[k] = tmp
-	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationResourceKindPrefix) {
-		k := getKey(OAuthRedirectModelAnnotationResourceKindPrefix, key)
-		tmp := models[k]
-		tmp.kind = value
-		models[k] = tmp
-	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationResourceNamePrefix) {
-		k := getKey(OAuthRedirectModelAnnotationResourceNamePrefix, key)
-		tmp := models[k]
-		tmp.name = value
-		models[k] = tmp
-	} else if strings.HasPrefix(key, OAuthRedirectModelAnnotationResourceGroupPrefix) {
-		k := getKey(OAuthRedirectModelAnnotationResourceGroupPrefix, key)
-		tmp := models[k]
-		tmp.group = value
-		models[k] = tmp
+func parseModels(annotations map[string]string) map[string]model {
+	models := map[string]model{}
+	for key, value := range annotations {
+		if prefix, name, ok := parseModelPrefixName(key); ok {
+			m := models[name]
+			switch prefix {
+			case OAuthRedirectModelAnnotationURISchemePrefix:
+				m.scheme = value
+			case OAuthRedirectModelAnnotationURIPortPrefix:
+				m.port = value
+			case OAuthRedirectModelAnnotationURIPathPrefix:
+				m.path = value
+			case OAuthRedirectModelAnnotationResourceKindPrefix:
+				m.kind = value
+			case OAuthRedirectModelAnnotationResourceNamePrefix:
+				m.name = value
+			case OAuthRedirectModelAnnotationResourceGroupPrefix:
+				m.group = value
+			}
+			models[name] = m
+		}
 	}
+	return models
 }
 
-func getKey(prefix, key string) string {
-	return key[len(prefix):]
+func parseModelPrefixName(key string) (string, string, bool) {
+	for _, prefix := range modelPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return prefix, key[len(prefix):], true
+		}
+	}
+	return "", "", false
 }
 
 func extractValidRedirectURIs(models map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
