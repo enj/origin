@@ -11,6 +11,8 @@ import (
 
 	ostestclient "github.com/openshift/origin/pkg/client/testclient"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
+	routeapi "github.com/openshift/origin/pkg/route/api"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestGetClient(t *testing.T) {
@@ -111,6 +113,64 @@ func TestGetClient(t *testing.T) {
 				ktestclient.NewListAction("secrets", "ns-01", kapi.ListOptions{}),
 			},
 		},
+		{
+			name:       "good SA with valid, simple route redirects",
+			clientName: "system:serviceaccount:ns-01:default",
+			kubeClient: ktestclient.NewSimpleFake(
+				&kapi.ServiceAccount{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "default",
+						UID:       types.UID("any"),
+						Annotations: map[string]string{
+							OAuthRedirectURISecretAnnotationPrefix + "one":        "anywhere",
+							OAuthRedirectModelAnnotationResourceKindPrefix + "1":  RouteKind,
+							OAuthRedirectModelAnnotationResourceNamePrefix + "1":  "route1",
+							OAuthRedirectModelAnnotationResourceGroupPrefix + "1": routeapi.FutureGroupName,
+						},
+					},
+				},
+				&kapi.Secret{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "default",
+						Annotations: map[string]string{
+							kapi.ServiceAccountNameKey: "default",
+							kapi.ServiceAccountUIDKey:  "any",
+						},
+					},
+					Type: kapi.SecretTypeServiceAccountToken,
+					Data: map[string][]byte{kapi.ServiceAccountTokenKey: []byte("foo")},
+				}),
+			osClient: ostestclient.NewSimpleFake(
+				&routeapi.Route{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "route1",
+						UID:       types.UID("route1"),
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/defaultpath",
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "example1.com"},
+						},
+					},
+				},
+			),
+			expectedClient: &oauthapi.OAuthClient{
+				ObjectMeta:        kapi.ObjectMeta{Name: "system:serviceaccount:ns-01:default"},
+				ScopeRestrictions: getScopeRestrictionsFor("ns-01", "default"),
+				AdditionalSecrets: []string{"foo"},
+				RedirectURIs:      []string{"anywhere", "https://example1.com/defaultpath"},
+				GrantMethod:       oauthapi.GrantHandlerPrompt,
+			},
+			expectedActions: []ktestclient.Action{
+				ktestclient.NewGetAction("serviceaccounts", "ns-01", "default"),
+				ktestclient.NewListAction("secrets", "ns-01", kapi.ListOptions{}),
+			},
+		}, // TODO add more route annotation tests
 	}
 
 	for _, tc := range testCases {
@@ -151,4 +211,438 @@ type fakeDelegate struct {
 func (d *fakeDelegate) GetClient(ctx kapi.Context, name string) (*oauthapi.OAuthClient, error) {
 	d.called = true
 	return nil, nil
+}
+
+func TestRedirectURIString(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		uri      redirectURI
+		expected string
+	}{
+		{
+			name: "host with no port",
+			uri: redirectURI{
+				scheme: "http",
+				host:   "example1.com",
+				port:   "",
+				path:   "/test1",
+			},
+			expected: "http://example1.com/test1",
+		},
+		{
+			name: "host with port",
+			uri: redirectURI{
+				scheme: "https",
+				host:   "example2.com",
+				port:   "8000",
+				path:   "/test2",
+			},
+			expected: "https://example2.com:8000/test2",
+		},
+	} {
+		if test.expected != test.uri.String() {
+			t.Errorf("%s: expected %s, got %s", test.name, test.expected, test.uri.String())
+		}
+	}
+}
+
+func TestMerge(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		uri      redirectURI
+		m        model
+		expected redirectURI
+	}{
+		{
+			name: "empty model",
+			uri: redirectURI{
+				scheme: "http",
+				host:   "example1.com",
+				port:   "9000",
+				path:   "/test1",
+			},
+			m: model{
+				scheme: "",
+				port:   "",
+				path:   "",
+			},
+			expected: redirectURI{
+				scheme: "http",
+				host:   "example1.com",
+				port:   "9000",
+				path:   "/test1",
+			},
+		},
+		{
+			name: "full model",
+			uri: redirectURI{
+				scheme: "http",
+				host:   "example1.com",
+				port:   "9000",
+				path:   "/test1",
+			},
+			m: model{
+				scheme: "https",
+				port:   "8000",
+				path:   "/ello",
+			},
+			expected: redirectURI{
+				scheme: "https",
+				host:   "example1.com",
+				port:   "8000",
+				path:   "/ello",
+			},
+		},
+		{
+			name: "only path",
+			uri: redirectURI{
+				scheme: "http",
+				host:   "example1.com",
+				port:   "9000",
+				path:   "/test1",
+			},
+			m: model{
+				scheme: "",
+				port:   "",
+				path:   "/newpath",
+			},
+			expected: redirectURI{
+				scheme: "http",
+				host:   "example1.com",
+				port:   "9000",
+				path:   "/newpath",
+			},
+		},
+	} {
+		test.uri.merge(test.m)
+		if test.expected != test.uri {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, test.uri)
+		}
+	}
+}
+
+func TestParseModels(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		annotations map[string]string
+		expected    map[string]model
+	}{
+		{
+			name:        "empty annotations",
+			annotations: map[string]string{},
+			expected:    map[string]model{},
+		},
+		{
+			name:        "no model annotations",
+			annotations: map[string]string{OAuthRedirectURISecretAnnotationPrefix + "one": "anywhere"},
+			expected:    map[string]model{},
+		},
+		{
+			name: "simple model",
+			annotations: map[string]string{
+				OAuthRedirectModelAnnotationResourceKindPrefix + "one":  RouteKind,
+				OAuthRedirectModelAnnotationResourceNamePrefix + "one":  "route1",
+				OAuthRedirectModelAnnotationResourceGroupPrefix + "one": routeapi.FutureGroupName,
+			},
+			expected: map[string]model{
+				"one": {
+					scheme: "",
+					port:   "",
+					path:   "",
+					group:  routeapi.FutureGroupName,
+					kind:   RouteKind,
+					name:   "route1",
+				},
+			},
+		},
+		{
+			name: "multiple full models",
+			annotations: map[string]string{
+				OAuthRedirectModelAnnotationResourceKindPrefix + "one":  RouteKind,
+				OAuthRedirectModelAnnotationResourceNamePrefix + "one":  "route1",
+				OAuthRedirectModelAnnotationResourceGroupPrefix + "one": routeapi.FutureGroupName,
+				OAuthRedirectModelAnnotationURIPathPrefix + "one":       "/path1",
+				OAuthRedirectModelAnnotationURIPortPrefix + "one":       "8000",
+				OAuthRedirectModelAnnotationURISchemePrefix + "one":     "https",
+
+				OAuthRedirectModelAnnotationResourceKindPrefix + "two":  RouteKind,
+				OAuthRedirectModelAnnotationResourceNamePrefix + "two":  "route2",
+				OAuthRedirectModelAnnotationResourceGroupPrefix + "two": routeapi.FutureGroupName,
+				OAuthRedirectModelAnnotationURIPathPrefix + "two":       "/path2",
+				OAuthRedirectModelAnnotationURIPortPrefix + "two":       "9000",
+				OAuthRedirectModelAnnotationURISchemePrefix + "two":     "http",
+			},
+			expected: map[string]model{
+				"one": {
+					scheme: "https",
+					port:   "8000",
+					path:   "/path1",
+					group:  routeapi.FutureGroupName,
+					kind:   RouteKind,
+					name:   "route1",
+				},
+				"two": {
+					scheme: "http",
+					port:   "9000",
+					path:   "/path2",
+					group:  routeapi.FutureGroupName,
+					kind:   RouteKind,
+					name:   "route2",
+				},
+			},
+		},
+	} {
+		if !reflect.DeepEqual(test.expected, parseModels(test.annotations)) {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, parseModels(test.annotations))
+		}
+	}
+}
+
+// TODO add more tests
+func TestGetOSRoutesRedirectURIs(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		modelList []model
+		routes    []routeapi.Route
+		expected  []redirectURI
+	}{
+		{
+			name: "single ingress routes",
+			modelList: []model{
+				{
+					scheme: "https",
+					port:   "8000",
+					path:   "/path1",
+					group:  routeapi.FutureGroupName,
+					kind:   RouteKind,
+					name:   "route1",
+				},
+				{
+					scheme: "http",
+					port:   "9000",
+					path:   "",
+					group:  routeapi.FutureGroupName,
+					kind:   RouteKind,
+					name:   "route2",
+				},
+			},
+			routes: []routeapi.Route{
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						Name: "route1",
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/pathA",
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "exampleA.com"},
+						},
+					},
+				},
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						Name: "route2",
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/pathB",
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "exampleB.com"},
+						},
+					},
+				},
+			},
+			expected: []redirectURI{
+				{
+					scheme: "https",
+					host:   "exampleA.com",
+					port:   "8000",
+					path:   "/path1",
+				},
+				{
+					scheme: "http",
+					host:   "exampleB.com",
+					port:   "9000",
+					path:   "/pathB",
+				},
+			},
+		},
+	} {
+		if !reflect.DeepEqual(test.expected, getOSRoutesRedirectURIs(test.modelList, test.routes)) {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, getOSRoutesRedirectURIs(test.modelList, test.routes))
+		}
+	}
+}
+
+func TestGetRouteMap(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		routes   []routeapi.Route
+		expected map[string][]redirectURI
+	}{
+		{
+			name: "single route with single ingress",
+			routes: []routeapi.Route{
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						Name: "routeA",
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/pathA",
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "exampleA.com"},
+						},
+					},
+				},
+			},
+			expected: map[string][]redirectURI{
+				"routeA": {
+					{
+						scheme: "https",
+						host:   "exampleA.com",
+						port:   "",
+						path:   "/pathA",
+					},
+				},
+			},
+		},
+		{
+			name: "multiple routes with multiple ingresses",
+			routes: []routeapi.Route{
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						Name: "route0",
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/path0",
+						Port: &routeapi.RoutePort{
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "8000",
+							},
+						},
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "example0A.com"},
+							{Host: "example0B.com"},
+							{Host: "example0C.com"},
+						},
+					},
+				},
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						Name: "route1",
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/path1",
+						Port: &routeapi.RoutePort{
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "7000",
+							},
+						},
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "redhat.com"},
+							{Host: "coreos.com"},
+							{Host: "github.com"},
+						},
+					},
+				},
+				{
+					ObjectMeta: kapi.ObjectMeta{
+						Name: "route2",
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/path2",
+						Port: &routeapi.RoutePort{
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.String,
+								StrVal: "6000",
+							},
+						},
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "google.com"},
+							{Host: "yahoo.com"},
+							{Host: "bing.com"},
+						},
+					},
+				},
+			},
+			expected: map[string][]redirectURI{
+				"route0": {
+					{
+						scheme: "https",
+						host:   "example0A.com",
+						port:   "8000",
+						path:   "/path0",
+					},
+					{
+						scheme: "https",
+						host:   "example0B.com",
+						port:   "8000",
+						path:   "/path0",
+					},
+					{
+						scheme: "https",
+						host:   "example0C.com",
+						port:   "8000",
+						path:   "/path0",
+					},
+				},
+				"route1": {
+					{
+						scheme: "https",
+						host:   "redhat.com",
+						port:   "7000",
+						path:   "/path1",
+					},
+					{
+						scheme: "https",
+						host:   "coreos.com",
+						port:   "7000",
+						path:   "/path1",
+					},
+					{
+						scheme: "https",
+						host:   "github.com",
+						port:   "7000",
+						path:   "/path1",
+					},
+				},
+				"route2": {
+					{
+						scheme: "https",
+						host:   "google.com",
+						port:   "6000",
+						path:   "/path2",
+					},
+					{
+						scheme: "https",
+						host:   "yahoo.com",
+						port:   "6000",
+						path:   "/path2",
+					},
+					{
+						scheme: "https",
+						host:   "bing.com",
+						port:   "6000",
+						path:   "/path2",
+					},
+				},
+			},
+		},
+	} {
+		if !reflect.DeepEqual(test.expected, getRouteMap(test.routes)) {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, getRouteMap(test.routes))
+		}
+	}
 }

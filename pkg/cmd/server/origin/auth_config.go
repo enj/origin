@@ -53,8 +53,7 @@ type AuthConfig struct {
 
 func BuildAuthConfig(masterConfig *MasterConfig) (*AuthConfig, error) {
 	options := masterConfig.Options
-	kubeClient := masterConfig.KubeClient()
-	osClient := masterConfig.OpenShiftClient()
+	osClient, kubeClient := masterConfig.OAuthServerClients()
 
 	groupVersion := unversioned.GroupVersion{Group: "", Version: options.EtcdStorageConfig.OpenShiftStorageVersion}
 

@@ -790,9 +790,9 @@ func (c *MasterConfig) KubeClient() *kclient.Client {
 	return c.PrivilegedLoopbackKubernetesClient
 }
 
-// OpenShiftClient returns the openshift client object
-func (c *MasterConfig) OpenShiftClient() *osclient.Client {
-	return c.PrivilegedLoopbackOpenShiftClient
+// OAuthServerClients returns the openshift and kubernetes OAuth server client objects
+func (c *MasterConfig) OAuthServerClients() (*osclient.Client, *kclient.Client) {
+	return c.PrivilegedLoopbackOpenShiftClient, c.PrivilegedLoopbackKubernetesClient
 }
 
 // PolicyClient returns the policy client object

@@ -1,8 +1,8 @@
 package oauthclient
 
 import (
-	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -35,8 +35,6 @@ const (
 
 	RouteKind = "Route"
 )
-
-var invalidRedirectURI = errors.New("Invalid redirect URI")
 
 var modelPrefixes = []string{
 	OAuthRedirectModelAnnotationURISchemePrefix,
@@ -73,28 +71,22 @@ type redirectURI struct {
 	path   string
 }
 
-func (uri *redirectURI) getURI() (string, error) {
-	var host string
-	if uri.port != "" {
-		host = fmt.Sprintf("%s:%s", uri.host, uri.port)
-	} else {
-		host = uri.host
+func (uri *redirectURI) String() string {
+	host := uri.host
+	if len(uri.port) > 0 {
+		host = net.JoinHostPort(host, uri.port)
 	}
-	u, err := url.Parse(fmt.Sprintf("%s://%s/%s", uri.scheme, host, uri.path))
-	if err == nil && u.Fragment == "" {
-		return u.String(), nil
-	}
-	return "", invalidRedirectURI
+	return (&url.URL{Scheme: uri.scheme, Host: host, Path: uri.path}).String()
 }
 
 func (uri *redirectURI) merge(m model) {
-	if m.scheme != "" {
+	if len(m.scheme) != 0 {
 		uri.scheme = m.scheme
 	}
-	if m.path != "" {
+	if len(m.path) != 0 {
 		uri.path = m.path
 	}
-	if m.port != "" {
+	if len(m.port) != 0 {
 		uri.port = m.port
 	}
 }
@@ -197,64 +189,71 @@ func parseModelPrefixName(key string) (string, string, bool) {
 
 func extractValidRedirectURIs(models map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
 	var data []redirectURI
-	var osRoutes []model
+	var osRouteModels []model
 
 	for _, model := range models {
 		if isOpenShiftRoute(&model) {
-			osRoutes = append(osRoutes, model)
+			osRouteModels = append(osRouteModels, model)
 		}
 	}
-	if len(osRoutes) > 0 {
-		data = append(data, getOSRoutes(osRoutes, routeInterface)...)
+	if len(osRouteModels) > 0 {
+		routes := getOSRoutes(osRouteModels, routeInterface)
+		data = append(data, getOSRoutesRedirectURIs(osRouteModels, routes)...)
 	}
 
 	return data
 }
 
-func getOSRoutes(modelList []model, routeInterface osclient.RouteInterface) []redirectURI {
-	var data []redirectURI
-	rm := map[string][]redirectURI{}
-
+func getOSRoutes(modelList []model, routeInterface osclient.RouteInterface) []routeapi.Route {
+	var routes []routeapi.Route
 	if len(modelList) > 1 {
-		routes, err := routeInterface.List(kapi.ListOptions{})
-		if err != nil {
-			return data
-		}
-		for _, r := range routes.Items {
-			updateRouteMap(rm, &r)
+		r, err := routeInterface.List(kapi.ListOptions{})
+		if err == nil {
+			routes = r.Items
 		}
 	} else {
 		r, err := routeInterface.Get(modelList[0].name)
-		if err != nil {
-			return data
+		if err == nil {
+			routes = append(routes, *r)
 		}
-		updateRouteMap(rm, r)
 	}
+	return routes
+}
 
-	for _, m := range modelList {
-		if r, ok := rm[m.name]; ok {
-			for _, rURI := range r {
-				u := rURI
-				u.merge(m)
-				data = append(data, u)
+func getOSRoutesRedirectURIs(modelList []model, routes []routeapi.Route) []redirectURI {
+	var data []redirectURI
+	rm := getRouteMap(routes)
+	if len(rm) > 0 {
+		for _, m := range modelList {
+			if r, ok := rm[m.name]; ok {
+				for _, rURI := range r {
+					u := rURI
+					u.merge(m)
+					data = append(data, u)
+				}
 			}
 		}
 	}
-
 	return data
 }
 
-func updateRouteMap(rm map[string][]redirectURI, r *routeapi.Route) {
-	for _, i := range r.Status.Ingress {
-		if i.Host == "" {
-			continue
+func getRouteMap(routes []routeapi.Route) map[string][]redirectURI {
+	rm := map[string][]redirectURI{}
+	for _, r := range routes {
+		for _, i := range r.Status.Ingress {
+			if len(i.Host) == 0 {
+				continue
+			}
+			u := redirectURI{scheme: "https"}
+			u.host = i.Host
+			u.path = r.Spec.Path
+			if r.Spec.Port != nil {
+				u.port = r.Spec.Port.TargetPort.String()
+			}
+			rm[r.Name] = append(rm[r.Name], u)
 		}
-		u := redirectURI{scheme: "https"}
-		u.host = i.Host
-		u.path = r.Spec.Path
-		u.port = r.Spec.Port.TargetPort.StrVal
-		rm[r.Name] = append(rm[r.Name], u)
 	}
+	return rm
 }
 
 func isOpenShiftRoute(m *model) bool {
@@ -264,10 +263,7 @@ func isOpenShiftRoute(m *model) bool {
 func extractRedirectURIStrings(redirectURIData []redirectURI) []string {
 	var data []string
 	for _, u := range redirectURIData {
-		s, err := u.getURI()
-		if err == nil {
-			data = append(data, s)
-		}
+		data = append(data, u.String())
 	}
 	return sets.NewString(data...).List()
 }
