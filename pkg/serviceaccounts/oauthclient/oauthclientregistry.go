@@ -48,7 +48,7 @@ var modelPrefixes = []string{
 	OAuthRedirectModelAnnotationResourceGroupPrefix,
 }
 
-type modelsToURIsFunc func(modelList []model) []redirectURI
+type namesToObjMapperFunc func(names sets.String) map[string][]redirectURI
 
 var routeGroupKind = unversioned.GroupKind{Group: routeapi.FutureGroupName, Kind: RouteKind}
 
@@ -76,6 +76,18 @@ func (m *model) getGroupKind() unversioned.GroupKind {
 	return unversioned.GroupKind{Group: m.group, Kind: m.kind}
 }
 
+type modelList []model
+
+func (ml modelList) getNames() sets.String {
+	var data []string
+	for _, model := range ml {
+		if len(model.name) > 0 {
+			data = append(data, model.name)
+		}
+	}
+	return sets.NewString(data...)
+}
+
 type redirectURI struct {
 	scheme string
 	host   string
@@ -92,7 +104,7 @@ func (uri *redirectURI) String() string {
 }
 
 func (uri *redirectURI) isValid() bool {
-	return len(uri.scheme) != 0 && len(uri.host) != 0
+	return len(uri.scheme) > 0 && len(uri.host) > 0
 }
 
 func newDefaultRedirectURI() redirectURI {
@@ -100,16 +112,16 @@ func newDefaultRedirectURI() redirectURI {
 }
 
 func (uri *redirectURI) merge(m model) {
-	if len(m.scheme) != 0 {
+	if len(m.scheme) > 0 {
 		uri.scheme = m.scheme
 	}
-	if len(m.path) != 0 {
+	if len(m.path) > 0 {
 		uri.path = m.path
 	}
-	if len(m.port) != 0 {
+	if len(m.port) > 0 {
 		uri.port = m.port
 	}
-	if len(m.host) != 0 {
+	if len(m.host) > 0 {
 		uri.host = m.host
 	}
 }
@@ -211,82 +223,88 @@ func parseModelPrefixName(key string) (string, string, bool) {
 	return "", "", false
 }
 
-func extractRedirectURIs(models map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
+func extractRedirectURIs(modelsMap map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
 	var data []redirectURI
-	groupKindModelListMapper := map[unversioned.GroupKind][]model{}
+	groupKindModelListMapper := map[unversioned.GroupKind]modelList{}
 
-	groupKindModelToURI := map[unversioned.GroupKind]modelsToURIsFunc{
-		routeGroupKind: func(osRouteModels []model) []redirectURI {
-			routes := getOSRoutes(osRouteModels, routeInterface)
-			return getOSRoutesRedirectURIs(osRouteModels, routes)
+	groupKindModelToURI := map[unversioned.GroupKind]namesToObjMapperFunc{
+		routeGroupKind: func(osRouteNames sets.String) map[string][]redirectURI {
+			return redirectURIsFromRoutes(osRouteNames, routeInterface)
 		},
 	}
 
-	for _, model := range models {
+	for _, model := range modelsMap {
 		gk := model.getGroupKind()
 		if _, ok := groupKindModelToURI[gk]; ok {
 			groupKindModelListMapper[gk] = append(groupKindModelListMapper[gk], model)
 		}
 	}
 
-	for gk, modelList := range groupKindModelListMapper {
-		if len(modelList) > 0 {
-			data = append(data, groupKindModelToURI[gk](modelList)...)
+	for gk, models := range groupKindModelListMapper {
+		if len(models) > 0 {
+			if nameList := models.getNames(); nameList.Len() > 0 {
+				if mapper := groupKindModelToURI[gk](nameList); len(mapper) > 0 {
+					data = append(data, getRedirectURIs(models, mapper)...)
+				}
+			}
 		}
 	}
 
 	return data
 }
 
-func getOSRoutes(modelList []model, routeInterface osclient.RouteInterface) []routeapi.Route {
+func getRedirectURIs(models modelList, objMapper map[string][]redirectURI) []redirectURI {
+	var data []redirectURI
+	for _, m := range models {
+		if r, ok := objMapper[m.name]; ok {
+			for _, rURI := range r {
+				u := rURI
+				u.merge(m)
+				data = append(data, u)
+			}
+		}
+	}
+	return data
+}
+
+func redirectURIsFromRoutes(osRouteNames sets.String, routeInterface osclient.RouteInterface) map[string][]redirectURI {
 	var routes []routeapi.Route
-	if len(modelList) > 1 {
+	if osRouteNames.Len() > 1 {
 		r, err := routeInterface.List(kapi.ListOptions{})
 		if err == nil {
 			routes = r.Items
 		}
 	} else {
-		r, err := routeInterface.Get(modelList[0].name)
+		r, err := routeInterface.Get(osRouteNames.List()[0])
 		if err == nil {
 			routes = append(routes, *r)
 		}
 	}
-	return routes
-}
-
-func getOSRoutesRedirectURIs(modelList []model, routes []routeapi.Route) []redirectURI {
-	var data []redirectURI
-	if rm := getRouteMap(routes); len(rm) > 0 {
-		for _, m := range modelList {
-			if r, ok := rm[m.name]; ok {
-				for _, rURI := range r {
-					u := rURI
-					u.merge(m)
-					data = append(data, u)
-				}
-			}
-		}
-	}
-	return data
-}
-
-func getRouteMap(routes []routeapi.Route) map[string][]redirectURI {
 	rm := map[string][]redirectURI{}
-	for _, r := range routes {
-		for _, i := range r.Status.Ingress {
-			u := newDefaultRedirectURI()
-			u.host = i.Host
-			u.path = r.Spec.Path
-			if r.Spec.Port != nil {
-				u.port = r.Spec.Port.TargetPort.String()
-			}
-			if r.Spec.TLS == nil {
-				u.scheme = "http"
-			}
-			rm[r.Name] = append(rm[r.Name], u)
+	for _, route := range routes {
+		if osRouteNames.Has(route.Name) {
+			rm[route.Name] = redirectURIsFromRoute(route)
 		}
 	}
 	return rm
+}
+
+func redirectURIsFromRoute(route routeapi.Route) []redirectURI {
+	var uris []redirectURI
+	uri := newDefaultRedirectURI()
+	uri.path = route.Spec.Path
+	if route.Spec.Port != nil {
+		uri.port = route.Spec.Port.TargetPort.String()
+	}
+	if route.Spec.TLS == nil {
+		uri.scheme = "http"
+	}
+	for _, ingress := range route.Status.Ingress {
+		u := uri
+		u.host = ingress.Host
+		uris = append(uris, u)
+	}
+	return uris
 }
 
 func extractValidRedirectURIStrings(redirectURIData []redirectURI) []string {
