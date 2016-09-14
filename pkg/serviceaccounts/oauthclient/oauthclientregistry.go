@@ -147,7 +147,7 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 		// 2. service DNS (useless in general)
 		// 3. route DNS (useful)
 		// 4. loopback? (useful, but maybe a bit weird)
-		RedirectURIs: redirectURIs,
+		RedirectURIs: sets.NewString(redirectURIs...).List(),
 		GrantMethod:  a.grantMethod,
 	}
 	return saClient, nil
@@ -222,8 +222,7 @@ func getOSRoutes(modelList []model, routeInterface osclient.RouteInterface) []ro
 
 func getOSRoutesRedirectURIs(modelList []model, routes []routeapi.Route) []redirectURI {
 	var data []redirectURI
-	rm := getRouteMap(routes)
-	if len(rm) > 0 {
+	if rm := getRouteMap(routes); len(rm) > 0 {
 		for _, m := range modelList {
 			if r, ok := rm[m.name]; ok {
 				for _, rURI := range r {
@@ -265,7 +264,7 @@ func extractRedirectURIStrings(redirectURIData []redirectURI) []string {
 	for _, u := range redirectURIData {
 		data = append(data, u.String())
 	}
-	return sets.NewString(data...).List()
+	return data
 }
 
 func getScopeRestrictionsFor(namespace, name string) []oauthapi.ScopeRestriction {
