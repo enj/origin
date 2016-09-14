@@ -16,6 +16,7 @@ import (
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
 	"github.com/openshift/origin/pkg/oauth/registry/oauthclient"
 	routeapi "github.com/openshift/origin/pkg/route/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -29,6 +30,7 @@ const (
 	OAuthRedirectModelAnnotationURISchemePrefix     = OAuthRedirectModelAnnotationURIPrefix + "scheme."
 	OAuthRedirectModelAnnotationURIPortPrefix       = OAuthRedirectModelAnnotationURIPrefix + "port."
 	OAuthRedirectModelAnnotationURIPathPrefix       = OAuthRedirectModelAnnotationURIPrefix + "path."
+	OAuthRedirectModelAnnotationURIHostPrefix       = OAuthRedirectModelAnnotationURIPrefix + "host."
 	OAuthRedirectModelAnnotationResourceKindPrefix  = OAuthRedirectModelAnnotationResourcePrefix + "kind."
 	OAuthRedirectModelAnnotationResourceNamePrefix  = OAuthRedirectModelAnnotationResourcePrefix + "name."
 	OAuthRedirectModelAnnotationResourceGroupPrefix = OAuthRedirectModelAnnotationResourcePrefix + "group."
@@ -40,10 +42,15 @@ var modelPrefixes = []string{
 	OAuthRedirectModelAnnotationURISchemePrefix,
 	OAuthRedirectModelAnnotationURIPortPrefix,
 	OAuthRedirectModelAnnotationURIPathPrefix,
+	OAuthRedirectModelAnnotationURIHostPrefix,
 	OAuthRedirectModelAnnotationResourceKindPrefix,
 	OAuthRedirectModelAnnotationResourceNamePrefix,
 	OAuthRedirectModelAnnotationResourceGroupPrefix,
 }
+
+type modelsToURIsFunc func(modelList []model) []redirectURI
+
+var routeGroupKind = unversioned.GroupKind{Group: routeapi.FutureGroupName, Kind: RouteKind}
 
 type saOAuthClientAdapter struct {
 	saClient     kclient.ServiceAccountsNamespacer
@@ -58,10 +65,15 @@ type model struct {
 	scheme string
 	port   string
 	path   string
+	host   string
 
 	group string
 	kind  string
 	name  string
+}
+
+func (m *model) getGroupKind() unversioned.GroupKind {
+	return unversioned.GroupKind{Group: m.group, Kind: m.kind}
 }
 
 type redirectURI struct {
@@ -79,6 +91,14 @@ func (uri *redirectURI) String() string {
 	return (&url.URL{Scheme: uri.scheme, Host: host, Path: uri.path}).String()
 }
 
+func (uri *redirectURI) isValid() bool {
+	return len(uri.scheme) != 0 && len(uri.host) != 0
+}
+
+func newDefaultRedirectURI() redirectURI {
+	return redirectURI{scheme: "https"}
+}
+
 func (uri *redirectURI) merge(m model) {
 	if len(m.scheme) != 0 {
 		uri.scheme = m.scheme
@@ -88,6 +108,9 @@ func (uri *redirectURI) merge(m model) {
 	}
 	if len(m.port) != 0 {
 		uri.port = m.port
+	}
+	if len(m.host) != 0 {
+		uri.host = m.host
 	}
 }
 
@@ -117,9 +140,9 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 	models := parseModels(sa.Annotations)
 	if len(models) > 0 {
 		ri := a.routeClient.Routes(saNamespace)
-		redirectURIData := extractValidRedirectURIs(models, ri)
+		redirectURIData := extractRedirectURIs(models, ri)
 		if len(redirectURIData) > 0 {
-			redirectURIs = append(redirectURIs, extractRedirectURIStrings(redirectURIData)...)
+			redirectURIs = append(redirectURIs, extractValidRedirectURIStrings(redirectURIData)...)
 		}
 	}
 	if len(redirectURIs) == 0 {
@@ -145,8 +168,7 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 		// TODO update this to allow https redirection to any
 		// 1. service IP (useless in general)
 		// 2. service DNS (useless in general)
-		// 3. route DNS (useful)
-		// 4. loopback? (useful, but maybe a bit weird)
+		// 3. loopback? (useful, but maybe a bit weird)
 		RedirectURIs: sets.NewString(redirectURIs...).List(),
 		GrantMethod:  a.grantMethod,
 	}
@@ -165,6 +187,8 @@ func parseModels(annotations map[string]string) map[string]model {
 				m.port = value
 			case OAuthRedirectModelAnnotationURIPathPrefix:
 				m.path = value
+			case OAuthRedirectModelAnnotationURIHostPrefix:
+				m.host = value
 			case OAuthRedirectModelAnnotationResourceKindPrefix:
 				m.kind = value
 			case OAuthRedirectModelAnnotationResourceNamePrefix:
@@ -187,18 +211,28 @@ func parseModelPrefixName(key string) (string, string, bool) {
 	return "", "", false
 }
 
-func extractValidRedirectURIs(models map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
+func extractRedirectURIs(models map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
 	var data []redirectURI
-	var osRouteModels []model
+	groupKindModelListMapper := map[unversioned.GroupKind][]model{}
+
+	groupKindModelToURI := map[unversioned.GroupKind]modelsToURIsFunc{
+		routeGroupKind: func(osRouteModels []model) []redirectURI {
+			routes := getOSRoutes(osRouteModels, routeInterface)
+			return getOSRoutesRedirectURIs(osRouteModels, routes)
+		},
+	}
 
 	for _, model := range models {
-		if isOpenShiftRoute(&model) {
-			osRouteModels = append(osRouteModels, model)
+		gk := model.getGroupKind()
+		if _, ok := groupKindModelToURI[gk]; ok {
+			groupKindModelListMapper[gk] = append(groupKindModelListMapper[gk], model)
 		}
 	}
-	if len(osRouteModels) > 0 {
-		routes := getOSRoutes(osRouteModels, routeInterface)
-		data = append(data, getOSRoutesRedirectURIs(osRouteModels, routes)...)
+
+	for gk, modelList := range groupKindModelListMapper {
+		if len(modelList) > 0 {
+			data = append(data, groupKindModelToURI[gk](modelList)...)
+		}
 	}
 
 	return data
@@ -240,14 +274,14 @@ func getRouteMap(routes []routeapi.Route) map[string][]redirectURI {
 	rm := map[string][]redirectURI{}
 	for _, r := range routes {
 		for _, i := range r.Status.Ingress {
-			if len(i.Host) == 0 {
-				continue
-			}
-			u := redirectURI{scheme: "https"}
+			u := newDefaultRedirectURI()
 			u.host = i.Host
 			u.path = r.Spec.Path
 			if r.Spec.Port != nil {
 				u.port = r.Spec.Port.TargetPort.String()
+			}
+			if r.Spec.TLS == nil {
+				u.scheme = "http"
 			}
 			rm[r.Name] = append(rm[r.Name], u)
 		}
@@ -255,14 +289,12 @@ func getRouteMap(routes []routeapi.Route) map[string][]redirectURI {
 	return rm
 }
 
-func isOpenShiftRoute(m *model) bool {
-	return m.kind == RouteKind && m.group == routeapi.FutureGroupName
-}
-
-func extractRedirectURIStrings(redirectURIData []redirectURI) []string {
+func extractValidRedirectURIStrings(redirectURIData []redirectURI) []string {
 	var data []string
 	for _, u := range redirectURIData {
-		data = append(data, u.String())
+		if u.isValid() {
+			data = append(data, u.String())
+		}
 	}
 	return data
 }

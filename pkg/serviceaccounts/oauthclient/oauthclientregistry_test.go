@@ -157,6 +157,7 @@ func TestGetClient(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/defaultpath",
+						TLS:  &routeapi.TLSConfig{},
 					},
 					Status: routeapi.RouteStatus{
 						Ingress: []routeapi.RouteIngress{
@@ -221,6 +222,7 @@ func TestGetClient(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/defaultpath",
+						TLS:  &routeapi.TLSConfig{},
 					},
 					Status: routeapi.RouteStatus{
 						Ingress: []routeapi.RouteIngress{
@@ -282,6 +284,7 @@ func TestGetClient(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/defaultpath",
+						TLS:  &routeapi.TLSConfig{},
 					},
 					Status: routeapi.RouteStatus{
 						Ingress: []routeapi.RouteIngress{
@@ -349,6 +352,7 @@ func TestGetClient(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/defaultpath",
+						TLS:  &routeapi.TLSConfig{},
 					},
 					Status: routeapi.RouteStatus{
 						Ingress: []routeapi.RouteIngress{
@@ -368,6 +372,7 @@ func TestGetClient(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/path2",
+						TLS:  &routeapi.TLSConfig{},
 					},
 					Status: routeapi.RouteStatus{
 						Ingress: []routeapi.RouteIngress{
@@ -840,7 +845,7 @@ func TestGetRouteMap(t *testing.T) {
 			expected: map[string][]redirectURI{
 				"routeA": {
 					{
-						scheme: "https",
+						scheme: "http",
 						host:   "exampleA.com",
 						port:   "",
 						path:   "/pathA",
@@ -878,6 +883,7 @@ func TestGetRouteMap(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/path1",
+						TLS:  &routeapi.TLSConfig{},
 						Port: &routeapi.RoutePort{
 							TargetPort: intstr.IntOrString{
 								Type:   intstr.String,
@@ -899,6 +905,7 @@ func TestGetRouteMap(t *testing.T) {
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/path2",
+						TLS:  &routeapi.TLSConfig{},
 						Port: &routeapi.RoutePort{
 							TargetPort: intstr.IntOrString{
 								Type:   intstr.String,
@@ -918,19 +925,19 @@ func TestGetRouteMap(t *testing.T) {
 			expected: map[string][]redirectURI{
 				"route0": {
 					{
-						scheme: "https",
+						scheme: "http",
 						host:   "example0A.com",
 						port:   "8000",
 						path:   "/path0",
 					},
 					{
-						scheme: "https",
+						scheme: "http",
 						host:   "example0B.com",
 						port:   "8000",
 						path:   "/path0",
 					},
 					{
-						scheme: "https",
+						scheme: "http",
 						host:   "example0C.com",
 						port:   "8000",
 						path:   "/path0",
