@@ -12,7 +12,9 @@ import (
 	ostestclient "github.com/openshift/origin/pkg/client/testclient"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
 	routeapi "github.com/openshift/origin/pkg/route/api"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestGetClient(t *testing.T) {
@@ -555,7 +557,7 @@ func TestMerge(t *testing.T) {
 	}
 }
 
-func TestParseModels(t *testing.T) {
+func TestParseModelsMap(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		annotations map[string]string
@@ -626,22 +628,24 @@ func TestParseModels(t *testing.T) {
 			},
 		},
 	} {
-		if !reflect.DeepEqual(test.expected, parseModels(test.annotations)) {
-			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, parseModels(test.annotations))
+		if !reflect.DeepEqual(test.expected, parseModelsMap(test.annotations)) {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, parseModelsMap(test.annotations))
 		}
 	}
 }
 
-func TestGetOSRoutesRedirectURIs(t *testing.T) {
+func TestGetRedirectURIs(t *testing.T) {
 	for _, test := range []struct {
 		name      string
-		modelList []model
-		routes    []routeapi.Route
-		expected  []redirectURI
+		namespace string
+		models    modelList
+		routes    []*routeapi.Route
+		expected  redirectURIList
 	}{
 		{
-			name: "single ingress routes",
-			modelList: []model{
+			name:      "single ingress routes",
+			namespace: "ns01",
+			models: modelList{
 				{
 					scheme: "https",
 					port:   "8000",
@@ -659,10 +663,11 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 					name:   "route2",
 				},
 			},
-			routes: []routeapi.Route{
+			routes: []*routeapi.Route{
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route1",
+						Name:      "route1",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/pathA",
@@ -675,7 +680,8 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 				},
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route2",
+						Name:      "route2",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/pathB",
@@ -687,7 +693,7 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 					},
 				},
 			},
-			expected: []redirectURI{
+			expected: redirectURIList{
 				{
 					scheme: "https",
 					host:   "exampleA.com",
@@ -703,8 +709,9 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple ingress routes",
-			modelList: []model{
+			name:      "multiple ingress routes",
+			namespace: "ns01",
+			models: modelList{
 				{
 					scheme: "https",
 					port:   "8000",
@@ -730,10 +737,11 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 					name:   "route2",
 				},
 			},
-			routes: []routeapi.Route{
+			routes: []*routeapi.Route{
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route1",
+						Name:      "route1",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/pathA",
@@ -748,7 +756,8 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 				},
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route2",
+						Name:      "route2",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/pathB",
@@ -767,7 +776,7 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 					},
 				},
 			},
-			expected: []redirectURI{
+			expected: redirectURIList{
 				{
 					scheme: "https",
 					host:   "A.com",
@@ -813,25 +822,31 @@ func TestGetOSRoutesRedirectURIs(t *testing.T) {
 			},
 		},
 	} {
-		_ = test
-		//if !reflect.DeepEqual(test.expected, getRedirectURIs(test.modelList, test.routes)) {
-		//	t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, getRedirectURIs(test.modelList, test.routes))
-		//}
+		a := buildRouteClient(test.routes)
+		actual := test.models.getRedirectURIs(a.redirectURIsFromRoutes(test.namespace, test.models.getNames()))
+		if !reflect.DeepEqual(test.expected, actual) {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, actual)
+		}
 	}
 }
 
-func TestGetRouteMap(t *testing.T) {
+func TestRedirectURIsFromRoutes(t *testing.T) {
 	for _, test := range []struct {
-		name     string
-		routes   []routeapi.Route
-		expected map[string][]redirectURI
+		name      string
+		namespace string
+		names     sets.String
+		routes    []*routeapi.Route
+		expected  map[string]redirectURIList
 	}{
 		{
-			name: "single route with single ingress",
-			routes: []routeapi.Route{
+			name:      "single route with single ingress",
+			namespace: "ns01",
+			names:     sets.NewString("routeA"),
+			routes: []*routeapi.Route{
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "routeA",
+						Name:      "routeA",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/pathA",
@@ -843,7 +858,7 @@ func TestGetRouteMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string][]redirectURI{
+			expected: map[string]redirectURIList{
 				"routeA": {
 					{
 						scheme: "http",
@@ -855,11 +870,14 @@ func TestGetRouteMap(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple routes with multiple ingresses",
-			routes: []routeapi.Route{
+			name:      "multiple routes with multiple ingresses",
+			namespace: "ns01",
+			names:     sets.NewString("route0", "route1", "route2"),
+			routes: []*routeapi.Route{
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route0",
+						Name:      "route0",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/path0",
@@ -880,7 +898,8 @@ func TestGetRouteMap(t *testing.T) {
 				},
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route1",
+						Name:      "route1",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/path1",
@@ -902,7 +921,8 @@ func TestGetRouteMap(t *testing.T) {
 				},
 				{
 					ObjectMeta: kapi.ObjectMeta{
-						Name: "route2",
+						Name:      "route2",
+						Namespace: "ns01",
 					},
 					Spec: routeapi.RouteSpec{
 						Path: "/path2",
@@ -923,7 +943,7 @@ func TestGetRouteMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string][]redirectURI{
+			expected: map[string]redirectURIList{
 				"route0": {
 					{
 						scheme: "http",
@@ -987,9 +1007,17 @@ func TestGetRouteMap(t *testing.T) {
 			},
 		},
 	} {
-		_ = test
-		//if !reflect.DeepEqual(test.expected, redirectURIsFromRoute(test.routes)) {
-		//	t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, redirectURIsFromRoute(test.routes))
-		//}
+		a := buildRouteClient(test.routes)
+		if !reflect.DeepEqual(test.expected, a.redirectURIsFromRoutes(test.namespace, test.names)) {
+			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, a.redirectURIsFromRoutes(test.namespace, test.names))
+		}
 	}
+}
+
+func buildRouteClient(routes []*routeapi.Route) saOAuthClientAdapter {
+	objects := []runtime.Object{}
+	for _, route := range routes {
+		objects = append(objects, route)
+	}
+	return saOAuthClientAdapter{routeClient: ostestclient.NewSimpleFake(objects...)}
 }

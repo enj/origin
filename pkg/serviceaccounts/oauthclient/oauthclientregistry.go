@@ -48,7 +48,7 @@ var modelPrefixes = []string{
 	OAuthRedirectModelAnnotationResourceGroupPrefix,
 }
 
-type namesToObjMapperFunc func(names sets.String) map[string][]redirectURI
+type namesToObjMapperFunc func(namespace string, names sets.String) map[string]redirectURIList
 
 var routeGroupKind = unversioned.GroupKind{Group: routeapi.FutureGroupName, Kind: RouteKind}
 
@@ -88,6 +88,20 @@ func (ml modelList) getNames() sets.String {
 	return sets.NewString(data...)
 }
 
+func (ml modelList) getRedirectURIs(objMapper map[string]redirectURIList) redirectURIList {
+	var data redirectURIList
+	for _, m := range ml {
+		if uris, ok := objMapper[m.name]; ok {
+			for _, uri := range uris {
+				u := uri
+				u.merge(m)
+				data = append(data, u)
+			}
+		}
+	}
+	return data
+}
+
 type redirectURI struct {
 	scheme string
 	host   string
@@ -107,8 +121,16 @@ func (uri *redirectURI) isValid() bool {
 	return len(uri.scheme) > 0 && len(uri.host) > 0
 }
 
-func newDefaultRedirectURI() redirectURI {
-	return redirectURI{scheme: "https"}
+type redirectURIList []redirectURI
+
+func (rl redirectURIList) extractValidRedirectURIStrings() []string {
+	var data []string
+	for _, u := range rl {
+		if u.isValid() {
+			data = append(data, u.String())
+		}
+	}
+	return data
 }
 
 func (uri *redirectURI) merge(m model) {
@@ -124,6 +146,10 @@ func (uri *redirectURI) merge(m model) {
 	if len(m.host) > 0 {
 		uri.host = m.host
 	}
+}
+
+func newDefaultRedirectURI() redirectURI {
+	return redirectURI{scheme: "https"}
 }
 
 var _ oauthclient.Getter = &saOAuthClientAdapter{}
@@ -149,12 +175,9 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 			redirectURIs = append(redirectURIs, value)
 		}
 	}
-	models := parseModels(sa.Annotations)
-	if len(models) > 0 {
-		ri := a.routeClient.Routes(saNamespace)
-		redirectURIData := extractRedirectURIs(models, ri)
-		if len(redirectURIData) > 0 {
-			redirectURIs = append(redirectURIs, extractValidRedirectURIStrings(redirectURIData)...)
+	if modelsMap := parseModelsMap(sa.Annotations); len(modelsMap) > 0 {
+		if uris := a.extractRedirectURIs(modelsMap, saNamespace); len(uris) > 0 {
+			redirectURIs = append(redirectURIs, uris.extractValidRedirectURIStrings()...)
 		}
 	}
 	if len(redirectURIs) == 0 {
@@ -187,7 +210,7 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 	return saClient, nil
 }
 
-func parseModels(annotations map[string]string) map[string]model {
+func parseModelsMap(annotations map[string]string) map[string]model {
 	models := map[string]model{}
 	for key, value := range annotations {
 		if prefix, name, ok := parseModelPrefixName(key); ok {
@@ -223,14 +246,11 @@ func parseModelPrefixName(key string) (string, string, bool) {
 	return "", "", false
 }
 
-func extractRedirectURIs(modelsMap map[string]model, routeInterface osclient.RouteInterface) []redirectURI {
-	var data []redirectURI
+func (a *saOAuthClientAdapter) extractRedirectURIs(modelsMap map[string]model, namespace string) redirectURIList {
+	var data redirectURIList
 	groupKindModelListMapper := map[unversioned.GroupKind]modelList{}
-
 	groupKindModelToURI := map[unversioned.GroupKind]namesToObjMapperFunc{
-		routeGroupKind: func(osRouteNames sets.String) map[string][]redirectURI {
-			return redirectURIsFromRoutes(osRouteNames, routeInterface)
-		},
+		routeGroupKind: a.redirectURIsFromRoutes,
 	}
 
 	for _, model := range modelsMap {
@@ -242,9 +262,9 @@ func extractRedirectURIs(modelsMap map[string]model, routeInterface osclient.Rou
 
 	for gk, models := range groupKindModelListMapper {
 		if len(models) > 0 {
-			if nameList := models.getNames(); nameList.Len() > 0 {
-				if mapper := groupKindModelToURI[gk](nameList); len(mapper) > 0 {
-					data = append(data, getRedirectURIs(models, mapper)...)
+			if names := models.getNames(); names.Len() > 0 {
+				if objMapper := groupKindModelToURI[gk](namespace, names); len(objMapper) > 0 {
+					data = append(data, models.getRedirectURIs(objMapper)...)
 				}
 			}
 		}
@@ -253,22 +273,9 @@ func extractRedirectURIs(modelsMap map[string]model, routeInterface osclient.Rou
 	return data
 }
 
-func getRedirectURIs(models modelList, objMapper map[string][]redirectURI) []redirectURI {
-	var data []redirectURI
-	for _, m := range models {
-		if r, ok := objMapper[m.name]; ok {
-			for _, rURI := range r {
-				u := rURI
-				u.merge(m)
-				data = append(data, u)
-			}
-		}
-	}
-	return data
-}
-
-func redirectURIsFromRoutes(osRouteNames sets.String, routeInterface osclient.RouteInterface) map[string][]redirectURI {
+func (a *saOAuthClientAdapter) redirectURIsFromRoutes(namespace string, osRouteNames sets.String) map[string]redirectURIList {
 	var routes []routeapi.Route
+	routeInterface := a.routeClient.Routes(namespace)
 	if osRouteNames.Len() > 1 {
 		r, err := routeInterface.List(kapi.ListOptions{})
 		if err == nil {
@@ -280,17 +287,17 @@ func redirectURIsFromRoutes(osRouteNames sets.String, routeInterface osclient.Ro
 			routes = append(routes, *r)
 		}
 	}
-	rm := map[string][]redirectURI{}
+	routeMap := map[string]redirectURIList{}
 	for _, route := range routes {
 		if osRouteNames.Has(route.Name) {
-			rm[route.Name] = redirectURIsFromRoute(route)
+			routeMap[route.Name] = redirectURIsFromRoute(route)
 		}
 	}
-	return rm
+	return routeMap
 }
 
-func redirectURIsFromRoute(route routeapi.Route) []redirectURI {
-	var uris []redirectURI
+func redirectURIsFromRoute(route routeapi.Route) redirectURIList {
+	var uris redirectURIList
 	uri := newDefaultRedirectURI()
 	uri.path = route.Spec.Path
 	if route.Spec.Port != nil {
@@ -305,16 +312,6 @@ func redirectURIsFromRoute(route routeapi.Route) []redirectURI {
 		uris = append(uris, u)
 	}
 	return uris
-}
-
-func extractValidRedirectURIStrings(redirectURIData []redirectURI) []string {
-	var data []string
-	for _, u := range redirectURIData {
-		if u.isValid() {
-			data = append(data, u.String())
-		}
-	}
-	return data
 }
 
 func getScopeRestrictionsFor(namespace, name string) []oauthapi.ScopeRestriction {
