@@ -402,6 +402,89 @@ func TestGetClient(t *testing.T) {
 				ktestclient.NewListAction("routes", "ns-01", kapi.ListOptions{}),
 			},
 		},
+		{
+			name:       "host overrides route data",
+			clientName: "system:serviceaccount:ns-01:default",
+			kubeClient: ktestclient.NewSimpleFake(
+				&kapi.ServiceAccount{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "default",
+						UID:       types.UID("any"),
+						Annotations: map[string]string{
+							OAuthRedirectModelAnnotationResourceKindPrefix + "1":  RouteKind,
+							OAuthRedirectModelAnnotationResourceNamePrefix + "1":  "route1",
+							OAuthRedirectModelAnnotationResourceGroupPrefix + "1": routeapi.FutureGroupName,
+							OAuthRedirectModelAnnotationURIHostPrefix + "1":       "redhat.com",
+							OAuthRedirectModelAnnotationResourceKindPrefix + "2":  RouteKind,
+							OAuthRedirectModelAnnotationResourceNamePrefix + "2":  "route2",
+							OAuthRedirectModelAnnotationResourceGroupPrefix + "2": routeapi.FutureGroupName,
+							OAuthRedirectModelAnnotationURIHostPrefix + "2":       "google.com",
+						},
+					},
+				},
+				&kapi.Secret{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "default",
+						Annotations: map[string]string{
+							kapi.ServiceAccountNameKey: "default",
+							kapi.ServiceAccountUIDKey:  "any",
+						},
+					},
+					Type: kapi.SecretTypeServiceAccountToken,
+					Data: map[string][]byte{kapi.ServiceAccountTokenKey: []byte("foo")},
+				}),
+			osClient: ostestclient.NewSimpleFake(
+				&routeapi.Route{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "route1",
+						UID:       types.UID("route1"),
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/defaultpath",
+						TLS:  &routeapi.TLSConfig{},
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: ""},
+						},
+					},
+				},
+				&routeapi.Route{
+					ObjectMeta: kapi.ObjectMeta{
+						Namespace: "ns-01",
+						Name:      "route2",
+						UID:       types.UID("route2"),
+					},
+					Spec: routeapi.RouteSpec{
+						Path: "/otherpath",
+						TLS:  &routeapi.TLSConfig{},
+					},
+					Status: routeapi.RouteStatus{
+						Ingress: []routeapi.RouteIngress{
+							{Host: "ignored.com"},
+							{Host: "alsoignored.com"},
+						},
+					},
+				},
+			),
+			expectedClient: &oauthapi.OAuthClient{
+				ObjectMeta:        kapi.ObjectMeta{Name: "system:serviceaccount:ns-01:default"},
+				ScopeRestrictions: getScopeRestrictionsFor("ns-01", "default"),
+				AdditionalSecrets: []string{"foo"},
+				RedirectURIs:      []string{"https://google.com/otherpath", "https://redhat.com/defaultpath"},
+				GrantMethod:       oauthapi.GrantHandlerPrompt,
+			},
+			expectedKubeActions: []ktestclient.Action{
+				ktestclient.NewGetAction("serviceaccounts", "ns-01", "default"),
+				ktestclient.NewListAction("secrets", "ns-01", kapi.ListOptions{}),
+			},
+			expectedOSActions: []ktestclient.Action{
+				ktestclient.NewListAction("routes", "ns-01", kapi.ListOptions{}),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
