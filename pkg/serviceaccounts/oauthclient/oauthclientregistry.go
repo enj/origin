@@ -277,13 +277,11 @@ func (a *saOAuthClientAdapter) redirectURIsFromRoutes(namespace string, osRouteN
 	var routes []routeapi.Route
 	routeInterface := a.routeClient.Routes(namespace)
 	if osRouteNames.Len() > 1 {
-		r, err := routeInterface.List(kapi.ListOptions{})
-		if err == nil {
+		if r, err := routeInterface.List(kapi.ListOptions{}); err == nil {
 			routes = r.Items
 		}
 	} else {
-		r, err := routeInterface.Get(osRouteNames.List()[0])
-		if err == nil {
+		if r, err := routeInterface.Get(osRouteNames.List()[0]); err == nil {
 			routes = append(routes, *r)
 		}
 	}
