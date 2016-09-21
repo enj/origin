@@ -65,7 +65,7 @@ func New(flags *pflag.FlagSet) *Factory {
 	// DefaultCluster should not be a global
 	// A call to ClientConfig() should always return the best clientCfg possible
 	// even if an error was returned, and let the caller decide what to do
-	kclientcmd.DefaultCluster.Server = ""
+	kclientcmd.ClusterDefaults.Server = ""
 
 	// TODO: there should be two client configs, one for OpenShift, and one for Kubernetes
 	clientConfig := DefaultClientConfig(flags)

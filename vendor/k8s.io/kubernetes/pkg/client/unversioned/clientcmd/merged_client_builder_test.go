@@ -70,19 +70,26 @@ func (icc *testICC) Possible() bool {
 }
 
 func TestInClusterConfig(t *testing.T) {
-	// override direct client config for this run
-	originalDefault := DefaultClientConfig
-	defer func() {
-		DefaultClientConfig = originalDefault
-	}()
-
-	baseDefault := &DirectClientConfig{
-		overrides: &ConfigOverrides{},
-	}
 	default1 := &DirectClientConfig{
 		config:      *createValidTestConfig(),
 		contextName: "clean",
 		overrides:   &ConfigOverrides{},
+	}
+	invalidDefaultConfig := clientcmdapi.NewConfig()
+	invalidDefaultConfig.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server: "http://localhost:8080",
+	}
+	invalidDefaultConfig.Contexts["other"] = &clientcmdapi.Context{
+		Cluster: "clean",
+	}
+	invalidDefaultConfig.CurrentContext = "clean"
+
+	defaultInvalid := &DirectClientConfig{
+		config:    *invalidDefaultConfig,
+		overrides: &ConfigOverrides{},
+	}
+	if _, err := defaultInvalid.ClientConfig(); err == nil || !IsConfigurationInvalid(err) {
+		t.Fatal(err)
 	}
 	config1, err := default1.ClientConfig()
 	if err != nil {
@@ -124,6 +131,16 @@ func TestInClusterConfig(t *testing.T) {
 			icc:           &testICC{},
 
 			checkedICC: true,
+			result:     config1,
+			err:        nil,
+		},
+
+		"in-cluster not checked when default config is invalid": {
+			defaultConfig: defaultInvalid,
+			clientConfig:  &testClientConfig{config: config1},
+			icc:           &testICC{},
+
+			checkedICC: false,
 			result:     config1,
 			err:        nil,
 		},
@@ -174,15 +191,21 @@ func TestInClusterConfig(t *testing.T) {
 			result:     config2,
 			err:        nil,
 		},
+
+		"in-cluster not checked when standard default is invalid": {
+			defaultConfig: &DefaultClientConfig,
+			clientConfig:  &testClientConfig{config: config2},
+			icc:           &testICC{},
+
+			checkedICC: false,
+			result:     config2,
+			err:        nil,
+		},
 	}
 
 	for name, test := range testCases {
-		if test.defaultConfig != nil {
-			DefaultClientConfig = *test.defaultConfig
-		} else {
-			DefaultClientConfig = *baseDefault
-		}
 		c := &DeferredLoadingClientConfig{icc: test.icc}
+		c.loader = &ClientConfigLoadingRules{DefaultClientConfig: test.defaultConfig}
 		c.clientConfig = test.clientConfig
 
 		cfg, err := c.ClientConfig()
@@ -207,7 +230,7 @@ func TestInClusterConfigNamespace(t *testing.T) {
 		ok         bool
 		err        error
 	}{
-		"in-cluster checked on other error": {
+		"in-cluster checked on empty error": {
 			clientConfig: &testClientConfig{err: ErrEmptyConfig},
 			icc:          &testICC{},
 
@@ -237,7 +260,7 @@ func TestInClusterConfigNamespace(t *testing.T) {
 			ok:     true,
 		},
 
-		"in-cluster checked when namespcae is not specified, but is defaulted": {
+		"in-cluster checked when namespace is not specified, but is defaulted": {
 			clientConfig: &testClientConfig{namespace: "test", namespaceSpecified: false},
 			icc:          &testICC{},
 
@@ -274,7 +297,7 @@ func TestInClusterConfigNamespace(t *testing.T) {
 			ok:         true,
 		},
 
-		"in-cluster config returned when config is empty with default": {
+		"in-cluster config returned when config is empty and namespace is defaulted but not explicitly set": {
 			clientConfig: &testClientConfig{err: ErrEmptyConfig},
 			icc: &testICC{
 				possible: true,
