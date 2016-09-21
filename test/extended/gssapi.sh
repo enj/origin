@@ -32,6 +32,10 @@ junit_gssapi_output="${LOG_DIR}/raw_test_output_gssapi.log"
 
 os::test::junit::declare_suite_start "${test_name}"
 
+# When testing locally, allows for easy rebuilding of oc with GSSAPI enabled
+if [[ -n "${BUILD_GSSAPI_OC:-}" ]]; then
+    os::cmd::expect_success 'hack/build-go.sh cmd/oc -tags=gssapi'
+fi
 os::cmd::expect_success_and_text 'oc version' 'GSSAPI Kerberos SPNEGO'
 
 function cleanup() {
