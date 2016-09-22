@@ -213,26 +213,28 @@ func (a *saOAuthClientAdapter) GetClient(ctx kapi.Context, name string) (*oautha
 func parseModelsMap(annotations map[string]string) map[string]model {
 	models := map[string]model{}
 	for key, value := range annotations {
-		if prefix, name, ok := parseModelPrefixName(key); ok {
-			m := models[name]
-			switch prefix {
-			case OAuthRedirectModelAnnotationURISchemePrefix:
-				m.scheme = value
-			case OAuthRedirectModelAnnotationURIPortPrefix:
-				m.port = value
-			case OAuthRedirectModelAnnotationURIPathPrefix:
-				m.path = value
-			case OAuthRedirectModelAnnotationURIHostPrefix:
-				m.host = value
-			case OAuthRedirectModelAnnotationResourceKindPrefix:
-				m.kind = value
-			case OAuthRedirectModelAnnotationResourceNamePrefix:
-				m.name = value
-			case OAuthRedirectModelAnnotationResourceGroupPrefix:
-				m.group = value
-			}
-			models[name] = m
+		prefix, name, ok := parseModelPrefixName(key)
+		if !ok {
+			continue
 		}
+		m := models[name]
+		switch prefix {
+		case OAuthRedirectModelAnnotationURISchemePrefix:
+			m.scheme = value
+		case OAuthRedirectModelAnnotationURIPortPrefix:
+			m.port = value
+		case OAuthRedirectModelAnnotationURIPathPrefix:
+			m.path = value
+		case OAuthRedirectModelAnnotationURIHostPrefix:
+			m.host = value
+		case OAuthRedirectModelAnnotationResourceKindPrefix:
+			m.kind = value
+		case OAuthRedirectModelAnnotationResourceNamePrefix:
+			m.name = value
+		case OAuthRedirectModelAnnotationResourceGroupPrefix:
+			m.group = value
+		}
+		models[name] = m
 	}
 	return models
 }
