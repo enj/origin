@@ -791,6 +791,7 @@ func (c *MasterConfig) KubeClient() *kclient.Client {
 }
 
 // OAuthServerClients returns the openshift and kubernetes OAuth server client objects
+// The returned clients are privileged
 func (c *MasterConfig) OAuthServerClients() (*osclient.Client, *kclient.Client) {
 	return c.PrivilegedLoopbackOpenShiftClient, c.PrivilegedLoopbackKubernetesClient
 }

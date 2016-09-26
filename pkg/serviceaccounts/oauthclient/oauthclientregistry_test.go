@@ -633,7 +633,7 @@ func TestMerge(t *testing.T) {
 			},
 		},
 	} {
-		test.uri.merge(test.m)
+		test.uri.merge(&test.m)
 		if test.expected != test.uri {
 			t.Errorf("%s: expected %#v, got %#v", test.name, test.expected, test.uri)
 		}
