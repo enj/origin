@@ -463,6 +463,6 @@ func CreateNewProject(clusterAdminClient *client.Client, clientConfig restclient
 		return nil, err
 	}
 
-	client, _, _, err := util.GetClientForUser(clientConfig, adminUser)
+	client, _, _, err := util.GetClientForUser(clusterAdminClient, clientConfig, adminUser)
 	return client, err
 }

@@ -103,7 +103,7 @@ func TestEndpointAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating project: %v", err)
 	}
-	_, projectAdminClient, _, err := testutil.GetClientForUser(*clientConfig, "myadmin")
+	_, projectAdminClient, _, err := testutil.GetClientForUser(clusterAdminOSClient, *clientConfig, "myadmin")
 	if err != nil {
 		t.Fatalf("error getting project admin client: %v", err)
 	}

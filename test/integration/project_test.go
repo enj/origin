@@ -11,7 +11,7 @@ import (
 
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	buildapi "github.com/openshift/origin/pkg/build/api"
-	policy "github.com/openshift/origin/pkg/cmd/admin/policy"
+	"github.com/openshift/origin/pkg/cmd/admin/policy"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	projectapi "github.com/openshift/origin/pkg/project/api"
 	testutil "github.com/openshift/origin/test/util"
@@ -173,7 +173,7 @@ func TestProjectWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	bobClient, _, _, err := testutil.GetClientForUser(*clusterAdminClientConfig, "bob")
+	bobClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestScopedProjectAccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fullBobClient, _, _, err := testutil.GetClientForUser(*clusterAdminClientConfig, "bob")
+	fullBobClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

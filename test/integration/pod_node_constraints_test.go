@@ -11,7 +11,7 @@ import (
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 
 	"github.com/openshift/origin/pkg/client"
-	policy "github.com/openshift/origin/pkg/cmd/admin/policy"
+	"github.com/openshift/origin/pkg/cmd/admin/policy"
 	configapi "github.com/openshift/origin/pkg/cmd/server/api"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
@@ -114,7 +114,7 @@ func setupUserPodNodeConstraintsTest(t *testing.T, pluginConfig *pluginapi.PodNo
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	userClient, userkubeClient, _, err := testutil.GetClientForUser(*clusterAdminClientConfig, user)
+	userClient, userkubeClient, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, user)
 	if err != nil {
 		t.Fatalf("error getting user/kube client: %v", err)
 	}

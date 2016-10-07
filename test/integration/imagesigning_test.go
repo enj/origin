@@ -222,7 +222,7 @@ func testSetupImageSignatureTest(t *testing.T, userName string) (adminClient *cl
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	userClient, _, _, err = testutil.GetClientForUser(*clusterAdminConfig, userName)
+	userClient, _, _, err = testutil.GetClientForUser(adminClient, *clusterAdminConfig, userName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -18,7 +18,7 @@ import (
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	buildapi "github.com/openshift/origin/pkg/build/api"
 	"github.com/openshift/origin/pkg/client"
-	policy "github.com/openshift/origin/pkg/cmd/admin/policy"
+	"github.com/openshift/origin/pkg/cmd/admin/policy"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
@@ -313,7 +313,7 @@ func TestAuthorizationResolution(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	buildListerClient, _, _, err := testutil.GetClientForUser(*clusterAdminConfig, "build-lister")
+	buildListerClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminConfig, "build-lister")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -801,7 +801,7 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	dannyClient, _, dannyConfig, err := testutil.GetClientForUser(*clusterAdminClientConfig, "danny")
+	dannyClient, _, dannyConfig, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "danny")
 	if err != nil {
 		t.Fatalf("error requesting token: %v", err)
 	}
@@ -1085,7 +1085,7 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	otherAdminClient, _, _, err := testutil.GetClientForUser(*clusterAdminClientConfig, "other-admin")
+	otherAdminClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "other-admin")
 	if err != nil {
 		t.Fatalf("error requesting token: %v", err)
 	}
