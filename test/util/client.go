@@ -16,14 +16,15 @@ import (
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/util/wait"
 
+	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	"github.com/openshift/origin/pkg/client"
 	configapi "github.com/openshift/origin/pkg/cmd/server/api"
 	"github.com/openshift/origin/pkg/cmd/server/origin"
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
 	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
-	"github.com/openshift/origin/pkg/cmd/util/tokencmd"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
 	"github.com/openshift/origin/pkg/serviceaccounts"
+	userapi "github.com/openshift/origin/pkg/user/api"
 )
 
 // GetBaseDir returns the base directory used for test.
@@ -64,39 +65,38 @@ func GetClusterAdminClientConfig(adminKubeConfigFile string) (*restclient.Config
 }
 
 func GetClientForUser(clientConfig restclient.Config, username string) (*client.Client, *kclient.Client, *restclient.Config, error) {
-	token, err := tokencmd.RequestToken(&clientConfig, nil, username, "password")
+	adminClient, err := client.New(&clientConfig)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	userClientConfig := clientcmd.AnonymousClientConfig(&clientConfig)
-	userClientConfig.BearerToken = token
-
-	kubeClient, err := kclient.New(&userClientConfig)
+	user, err := getOrCreateUser(adminClient, username)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	osClient, err := client.New(&userClientConfig)
+	token, err := getScopedTokenForUser(adminClient, user, []string{scope.UserFull})
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	return osClient, kubeClient, &userClientConfig, nil
+	return getScopedClientForConfig(&clientConfig, token.Name)
 }
 
-func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.Config, username string, scopes []string) (*client.Client, *kclient.Client, *restclient.Config, error) {
-	// make sure the user exists
-	if _, _, _, err := GetClientForUser(clientConfig, username); err != nil {
-		return nil, nil, nil, err
+func getOrCreateUser(adminClient *client.Client, username string) (*userapi.User, error) {
+	user, err := adminClient.Users().Create(&userapi.User{ObjectMeta: kapi.ObjectMeta{Name: username}})
+	if kerrs.IsAlreadyExists(err) {
+		user, err = adminClient.Users().Get(username)
 	}
-	user, err := adminClient.Users().Get(username)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
+	return user, nil
+}
 
+func getScopedTokenForUser(adminClient *client.Client, user *userapi.User, scopes []string) (*oauthapi.OAuthAccessToken, error) {
 	token := &oauthapi.OAuthAccessToken{
-		ObjectMeta:  kapi.ObjectMeta{Name: fmt.Sprintf("%s-token-plus-some-padding-here-to-make-the-limit-%d", username, rand.Int())},
+		ObjectMeta:  kapi.ObjectMeta{Name: fmt.Sprintf("%s-token-plus-some-padding-here-to-make-the-limit-%d", user.Name, rand.Int())},
 		ClientName:  origin.OpenShiftCLIClientID,
 		ExpiresIn:   86400,
 		Scopes:      scopes,
@@ -104,12 +104,20 @@ func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.
 		UserName:    user.Name,
 		UserUID:     string(user.UID),
 	}
-	if _, err := adminClient.OAuthAccessTokens().Create(token); err != nil {
-		return nil, nil, nil, err
+
+	var err error
+	token, err = adminClient.OAuthAccessTokens().Create(token)
+
+	if err != nil {
+		return nil, err
 	}
 
-	scopedConfig := clientcmd.AnonymousClientConfig(&clientConfig)
-	scopedConfig.BearerToken = token.Name
+	return token, nil
+}
+
+func getScopedClientForConfig(clientConfig *restclient.Config, token string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+	scopedConfig := clientcmd.AnonymousClientConfig(clientConfig)
+	scopedConfig.BearerToken = token
 	kubeClient, err := kclient.New(&scopedConfig)
 	if err != nil {
 		return nil, nil, nil, err
@@ -119,6 +127,21 @@ func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.
 		return nil, nil, nil, err
 	}
 	return osClient, kubeClient, &scopedConfig, nil
+}
+
+func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.Config, username string, scopes []string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+	// make sure the user exists
+	user, err := getOrCreateUser(adminClient, username)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	token, err := getScopedTokenForUser(adminClient, user, scopes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return getScopedClientForConfig(&clientConfig, token.Name)
 }
 
 func GetClientForServiceAccount(adminClient *kclient.Client, clientConfig restclient.Config, namespace, name string) (*client.Client, *kclient.Client, *restclient.Config, error) {
@@ -154,20 +177,7 @@ func GetClientForServiceAccount(adminClient *kclient.Client, clientConfig restcl
 		return nil, nil, nil, err
 	}
 
-	saClientConfig := clientcmd.AnonymousClientConfig(&clientConfig)
-	saClientConfig.BearerToken = token
-
-	kubeClient, err := kclient.New(&saClientConfig)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	osClient, err := client.New(&saClientConfig)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return osClient, kubeClient, &saClientConfig, nil
+	return getScopedClientForConfig(&clientConfig, token)
 }
 
 // WaitForResourceQuotaSync watches given resource quota until its hard limit is updated to match the desired
