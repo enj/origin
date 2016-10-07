@@ -64,12 +64,7 @@ func GetClusterAdminClientConfig(adminKubeConfigFile string) (*restclient.Config
 	return conf, nil
 }
 
-func GetClientForUser(clientConfig restclient.Config, username string) (*client.Client, *kclient.Client, *restclient.Config, error) {
-	adminClient, err := client.New(&clientConfig)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
+func GetClientForUser(adminClient *client.Client, clientConfig restclient.Config, username string) (*client.Client, *kclient.Client, *restclient.Config, error) {
 	user, err := getOrCreateUser(adminClient, username)
 	if err != nil {
 		return nil, nil, nil, err
@@ -80,18 +75,18 @@ func GetClientForUser(clientConfig restclient.Config, username string) (*client.
 		return nil, nil, nil, err
 	}
 
-	return getScopedClientForConfig(&clientConfig, token.Name)
+	return getClientForConfigAndToken(&clientConfig, token.Name)
 }
 
 func getOrCreateUser(adminClient *client.Client, username string) (*userapi.User, error) {
 	user, err := adminClient.Users().Create(&userapi.User{ObjectMeta: kapi.ObjectMeta{Name: username}})
+	if err == nil {
+		return user, nil
+	}
 	if kerrs.IsAlreadyExists(err) {
-		user, err = adminClient.Users().Get(username)
+		return adminClient.Users().Get(username)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+	return nil, err
 }
 
 func getScopedTokenForUser(adminClient *client.Client, user *userapi.User, scopes []string) (*oauthapi.OAuthAccessToken, error) {
@@ -104,29 +99,21 @@ func getScopedTokenForUser(adminClient *client.Client, user *userapi.User, scope
 		UserName:    user.Name,
 		UserUID:     string(user.UID),
 	}
-
-	var err error
-	token, err = adminClient.OAuthAccessTokens().Create(token)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return token, nil
+	return adminClient.OAuthAccessTokens().Create(token)
 }
 
-func getScopedClientForConfig(clientConfig *restclient.Config, token string) (*client.Client, *kclient.Client, *restclient.Config, error) {
-	scopedConfig := clientcmd.AnonymousClientConfig(clientConfig)
-	scopedConfig.BearerToken = token
-	kubeClient, err := kclient.New(&scopedConfig)
+func getClientForConfigAndToken(clientConfig *restclient.Config, token string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+	config := clientcmd.AnonymousClientConfig(clientConfig)
+	config.BearerToken = token
+	kubeClient, err := kclient.New(&config)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	osClient, err := client.New(&scopedConfig)
+	osClient, err := client.New(&config)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return osClient, kubeClient, &scopedConfig, nil
+	return osClient, kubeClient, &config, nil
 }
 
 func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.Config, username string, scopes []string) (*client.Client, *kclient.Client, *restclient.Config, error) {
@@ -141,7 +128,7 @@ func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.
 		return nil, nil, nil, err
 	}
 
-	return getScopedClientForConfig(&clientConfig, token.Name)
+	return getClientForConfigAndToken(&clientConfig, token.Name)
 }
 
 func GetClientForServiceAccount(adminClient *kclient.Client, clientConfig restclient.Config, namespace, name string) (*client.Client, *kclient.Client, *restclient.Config, error) {
@@ -177,7 +164,7 @@ func GetClientForServiceAccount(adminClient *kclient.Client, clientConfig restcl
 		return nil, nil, nil, err
 	}
 
-	return getScopedClientForConfig(&clientConfig, token)
+	return getClientForConfigAndToken(&clientConfig, token)
 }
 
 // WaitForResourceQuotaSync watches given resource quota until its hard limit is updated to match the desired
