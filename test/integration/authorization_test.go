@@ -1190,7 +1190,8 @@ func TestOldLocalSubjectAccessReviewEndpoint(t *testing.T) {
 				Resource: "imagestreams/layers",
 			},
 		}
-		actualResponse, err := haroldClient.SubjectAccessReviews().Create(sar)
+		actualResponse := &authorizationapi.SubjectAccessReviewResponse{}
+		err := haroldClient.(*client.Client).Post().Namespace(namespace).Resource("subjectAccessReviews").Body(sar).Do().Into(actualResponse)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1216,7 +1217,8 @@ func TestOldLocalSubjectAccessReviewEndpoint(t *testing.T) {
 				Resource:  "imagestreams/layers",
 			},
 		}
-		actualResponse, err := haroldClient.SubjectAccessReviews().Create(sar)
+		actualResponse := &authorizationapi.SubjectAccessReviewResponse{}
+		err := haroldClient.(*client.Client).Post().Namespace(namespace).Resource("subjectAccessReviews").Body(sar).Do().Into(actualResponse)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1261,7 +1263,8 @@ func TestOldLocalSubjectAccessReviewEndpoint(t *testing.T) {
 				Resource: "imagestreams/layers",
 			},
 		}
-		actualResponse, err := haroldClient.SubjectAccessReviews().Create(sar)
+		actualResponse := &authorizationapi.SubjectAccessReviewResponse{}
+		err = haroldClient.(*client.Client).Post().Namespace(otherNamespace).Resource("subjectAccessReviews").Body(sar).Do().Into(actualResponse)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1316,7 +1319,8 @@ func TestOldLocalResourceAccessReviewEndpoint(t *testing.T) {
 				Resource: "imagestreams/layers",
 			},
 		}
-		actualResponse, err := haroldClient.ResourceAccessReviews().Create(rar)
+		actualResponse := &authorizationapi.ResourceAccessReviewResponse{}
+		err := haroldClient.(*client.Client).Post().Namespace(namespace).Resource("resourceAccessReviews").Body(rar).Do().Into(actualResponse)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1342,7 +1346,8 @@ func TestOldLocalResourceAccessReviewEndpoint(t *testing.T) {
 				Resource:  "imagestreams/layers",
 			},
 		}
-		actualResponse, err := haroldClient.ResourceAccessReviews().Create(rar)
+		actualResponse := &authorizationapi.ResourceAccessReviewResponse{}
+		err := haroldClient.(*client.Client).Post().Namespace(namespace).Resource("resourceAccessReviews").Body(rar).Do().Into(actualResponse)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
