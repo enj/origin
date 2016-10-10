@@ -98,7 +98,7 @@ func (c *CLI) ChangeUser(name string) *CLI {
 	if err != nil {
 		FatalErr(err)
 	}
-	clusterAdminClient, err := testutil.GetClusterAdminClient(adminClientConfig)
+	clusterAdminClient, err := testutil.GetClusterAdminClient(c.adminConfigPath)
 	if err != nil {
 		FatalErr(err)
 	}
