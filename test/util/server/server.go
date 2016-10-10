@@ -346,8 +346,8 @@ func StartConfiguredMasterWithOptions(masterConfig *configapi.MasterConfig, test
 
 	for {
 		// confirm that we can actually query from the api server
-		if client, err := util.GetClusterAdminClient(adminKubeConfigFile); err == nil {
-			if _, err := client.ClusterPolicies().List(kapi.ListOptions{}); err == nil {
+		if adminClient, err := util.GetClusterAdminClient(adminKubeConfigFile); err == nil {
+			if _, err := adminClient.ClusterPolicies().List(kapi.ListOptions{}); err == nil {
 				break
 			}
 		}
@@ -380,7 +380,7 @@ func StartTestMasterAPI() (*configapi.MasterConfig, string, error) {
 
 // serviceAccountSecretsExist checks whether the given service account has at least a token and a dockercfg
 // secret associated with it.
-func serviceAccountSecretsExist(client *kclient.Client, namespace string, sa *kapi.ServiceAccount) bool {
+func serviceAccountSecretsExist(client kclient.Interface, namespace string, sa *kapi.ServiceAccount) bool {
 	foundTokenSecret := false
 	foundDockercfgSecret := false
 	for _, secret := range sa.Secrets {
@@ -404,7 +404,7 @@ func serviceAccountSecretsExist(client *kclient.Client, namespace string, sa *ka
 // WaitForPodCreationServiceAccounts ensures that the service account needed for pod creation exists
 // and that the cache for the admission control that checks for pod tokens has caught up to allow
 // pod creation.
-func WaitForPodCreationServiceAccounts(client *kclient.Client, namespace string) error {
+func WaitForPodCreationServiceAccounts(client kclient.Interface, namespace string) error {
 	if err := WaitForServiceAccounts(client, namespace, []string{bootstrappolicy.DefaultServiceAccountName}); err != nil {
 		return err
 	}
@@ -434,7 +434,7 @@ func WaitForPodCreationServiceAccounts(client *kclient.Client, namespace string)
 
 // WaitForServiceAccounts ensures the service accounts needed by build pods exist in the namespace
 // The extra controllers tend to starve the service account controller
-func WaitForServiceAccounts(client *kclient.Client, namespace string, accounts []string) error {
+func WaitForServiceAccounts(client kclient.Interface, namespace string, accounts []string) error {
 	serviceAccounts := client.ServiceAccounts(namespace)
 	return wait.Poll(time.Second, ServiceAccountWaitTimeout, func() (bool, error) {
 		for _, account := range accounts {
@@ -451,7 +451,7 @@ func WaitForServiceAccounts(client *kclient.Client, namespace string, accounts [
 
 // CreateNewProject creates a new project using the clusterAdminClient, then gets a token for the adminUser and returns
 // back a client for the admin user
-func CreateNewProject(clusterAdminClient *client.Client, clientConfig restclient.Config, projectName, adminUser string) (*client.Client, error) {
+func CreateNewProject(clusterAdminClient client.Interface, clientConfig restclient.Config, projectName, adminUser string) (client.Interface, error) {
 	newProjectOptions := &newproject.NewProjectOptions{
 		Client:      clusterAdminClient,
 		ProjectName: projectName,
@@ -463,6 +463,6 @@ func CreateNewProject(clusterAdminClient *client.Client, clientConfig restclient
 		return nil, err
 	}
 
-	client, _, _, err := util.GetClientForUser(clusterAdminClient, clientConfig, adminUser)
-	return client, err
+	osClient, _, _, err := util.GetClientForUser(clusterAdminClient, clientConfig, adminUser)
+	return osClient, err
 }

@@ -181,7 +181,7 @@ func mockImageStreamMapping(stream, image, tag, reference string) *imageapi.Imag
 	}
 }
 
-func setup(t *testing.T) *client.Client {
+func setup(t *testing.T) client.Interface {
 	testutil.RequireEtcd(t)
 	_, clusterAdminKubeConfigFile, err := testserver.StartTestMaster()
 	if err != nil {
@@ -206,7 +206,7 @@ func setup(t *testing.T) *client.Client {
 	return projectAdminClient
 }
 
-func runTest(t *testing.T, testname string, projectAdminClient *client.Client, imageStream *imageapi.ImageStream, imageStreamMapping *imageapi.ImageStreamMapping, config *buildapi.BuildConfig, tag string) {
+func runTest(t *testing.T, testname string, projectAdminClient client.Interface, imageStream *imageapi.ImageStream, imageStreamMapping *imageapi.ImageStreamMapping, config *buildapi.BuildConfig, tag string) {
 	created, err := projectAdminClient.BuildConfigs(testutil.Namespace()).Create(config)
 	if err != nil {
 		t.Fatalf("Couldn't create BuildConfig: %v", err)

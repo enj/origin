@@ -11,7 +11,7 @@ import (
 	testserver "github.com/openshift/origin/test/util/server"
 )
 
-func setupAuditTest(t *testing.T) (*kclient.Client, *client.Client) {
+func setupAuditTest(t *testing.T) (kclient.Interface, client.Interface) {
 	testutil.RequireEtcd(t)
 	masterConfig, err := testserver.DefaultMasterOptions()
 	if err != nil {

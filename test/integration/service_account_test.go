@@ -55,7 +55,7 @@ func TestServiceAccountAuthorization(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(saToken) == 0 {
-		t.Fatalf("token was not created")
+		t.Fatal("token was not created")
 	}
 	cluster1SAClientConfig := restclient.Config{
 		Host:        cluster1AdminConfig.Host,
@@ -83,7 +83,7 @@ func TestServiceAccountAuthorization(t *testing.T) {
 		Users:               []string{saUsername},
 	}
 	if err := addRoleOptions.AddRole(); err != nil {
-		t.Fatalf("could not add role to service account")
+		t.Fatal("could not add role to service account")
 	}
 
 	// Give the policy cache a second to catch its breath
@@ -170,7 +170,7 @@ func TestServiceAccountAuthorization(t *testing.T) {
 		Users:               []string{saUsername},
 	}
 	if err := addRoleOptions2.AddRole(); err != nil {
-		t.Fatalf("could not add role to service account")
+		t.Fatal("could not add role to service account")
 	}
 
 	// Give the policy cache a second to catch its breath
@@ -204,7 +204,7 @@ func writeClientConfigToKubeConfig(config restclient.Config, path string) error 
 	return nil
 }
 
-func waitForServiceAccountToken(client *kclient.Client, ns, name string, attempts int, interval time.Duration) (string, error) {
+func waitForServiceAccountToken(client kclient.Interface, ns, name string, attempts int, interval time.Duration) (string, error) {
 	for i := 0; i <= attempts; i++ {
 		time.Sleep(interval)
 		token, err := getServiceAccountToken(client, ns, name)
@@ -218,7 +218,7 @@ func waitForServiceAccountToken(client *kclient.Client, ns, name string, attempt
 	return "", nil
 }
 
-func getServiceAccountToken(client *kclient.Client, ns, name string) (string, error) {
+func getServiceAccountToken(client kclient.Interface, ns, name string) (string, error) {
 	secrets, err := client.Secrets(ns).List(api.ListOptions{})
 	if err != nil {
 		return "", err
@@ -263,7 +263,7 @@ func TestAutomaticCreationOfPullSecrets(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(saToken) == 0 {
-		t.Errorf("token was not created")
+		t.Error("token was not created")
 	}
 
 	// Get the matching dockercfg secret
@@ -272,11 +272,11 @@ func TestAutomaticCreationOfPullSecrets(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(saPullSecret) == 0 {
-		t.Errorf("pull secret was not created")
+		t.Error("pull secret was not created")
 	}
 }
 
-func waitForServiceAccountPullSecret(client *kclient.Client, ns, name string, attempts int, interval time.Duration) (string, error) {
+func waitForServiceAccountPullSecret(client kclient.Interface, ns, name string, attempts int, interval time.Duration) (string, error) {
 	for i := 0; i <= attempts; i++ {
 		time.Sleep(interval)
 		token, err := getServiceAccountPullSecret(client, ns, name)
@@ -290,7 +290,7 @@ func waitForServiceAccountPullSecret(client *kclient.Client, ns, name string, at
 	return "", nil
 }
 
-func getServiceAccountPullSecret(client *kclient.Client, ns, name string) (string, error) {
+func getServiceAccountPullSecret(client kclient.Interface, ns, name string) (string, error) {
 	secrets, err := client.Secrets(ns).List(api.ListOptions{})
 	if err != nil {
 		return "", err
@@ -327,7 +327,7 @@ func TestEnforcingServiceAccount(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(saToken) == 0 {
-		t.Errorf("token was not created")
+		t.Error("token was not created")
 	}
 
 	pod := &api.Pod{}

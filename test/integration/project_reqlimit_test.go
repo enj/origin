@@ -188,7 +188,7 @@ func TestProjectRequestLimitAsSystemAdmin(t *testing.T) {
 	}
 }
 
-func testProjectRequestLimitAdmission(t *testing.T, errorPrefix string, clusterAdminClient *client.Client, clientConfig *restclient.Config, tests map[string]bool) {
+func testProjectRequestLimitAdmission(t *testing.T, errorPrefix string, clusterAdminClient client.Interface, clientConfig *restclient.Config, tests map[string]bool) {
 	for user, expectSuccess := range tests {
 		oclient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clientConfig, user)
 		if err != nil {

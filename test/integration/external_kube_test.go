@@ -84,12 +84,12 @@ func TestExternalKube(t *testing.T) {
 
 func healthzProxyTest(masterConfig *configapi.MasterConfig, t *testing.T) {
 	// Ping the healthz endpoint on the second OpenShift cluster
-	url, err := url.Parse(masterConfig.MasterPublicURL)
+	u, err := url.Parse(masterConfig.MasterPublicURL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	url.Path = "/healthz"
-	response, body, err := httpprobe.New().Probe(url, nil, 1*time.Second)
+	u.Path = "/healthz"
+	response, body, err := httpprobe.New().Probe(u, nil, 1*time.Second)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +98,7 @@ func healthzProxyTest(masterConfig *configapi.MasterConfig, t *testing.T) {
 	}
 }
 
-func watchProxyTest(cluster1AdminKubeClient, cluster2AdminKubeClient *kclient.Client, t *testing.T) {
+func watchProxyTest(cluster1AdminKubeClient, cluster2AdminKubeClient kclient.Interface, t *testing.T) {
 	// list namespaces in order to determine correct resourceVersion
 	namespaces, err := cluster1AdminKubeClient.Namespaces().List(kapi.ListOptions{})
 
@@ -127,7 +127,7 @@ func watchProxyTest(cluster1AdminKubeClient, cluster2AdminKubeClient *kclient.Cl
 		}
 		addedNamespace, ok := e.Object.(*kapi.Namespace)
 		if !ok {
-			t.Fatalf("unexpected cast error from event Object to Namespace")
+			t.Fatal("unexpected cast error from event Object to Namespace")
 		}
 		if addedNamespace.ObjectMeta.Name != createdNamespace.Name {
 			t.Fatalf("namespace returned from Watch is not the same ast that created: got %v, wanted %v", createdNamespace, addedNamespace)

@@ -36,7 +36,7 @@ func KubeConfigPath() string {
 	return filepath.Join(GetBaseDir(), "openshift.local.config", "master", "admin.kubeconfig")
 }
 
-func GetClusterAdminKubeClient(adminKubeConfigFile string) (*kclient.Client, error) {
+func GetClusterAdminKubeClient(adminKubeConfigFile string) (kclient.Interface, error) {
 	c, _, err := configapi.GetKubeClient(adminKubeConfigFile, nil)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func GetClusterAdminKubeClient(adminKubeConfigFile string) (*kclient.Client, err
 	return c, nil
 }
 
-func GetClusterAdminClient(adminKubeConfigFile string) (*client.Client, error) {
+func GetClusterAdminClient(adminKubeConfigFile string) (client.Interface, error) {
 	clientConfig, err := GetClusterAdminClientConfig(adminKubeConfigFile)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func GetClusterAdminClientConfig(adminKubeConfigFile string) (*restclient.Config
 	return conf, nil
 }
 
-func GetClientForUser(adminClient *client.Client, clientConfig restclient.Config, username string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+func GetClientForUser(adminClient client.Interface, clientConfig restclient.Config, username string) (client.Interface, kclient.Interface, *restclient.Config, error) {
 	user, err := getOrCreateUser(adminClient, username)
 	if err != nil {
 		return nil, nil, nil, err
@@ -78,7 +78,7 @@ func GetClientForUser(adminClient *client.Client, clientConfig restclient.Config
 	return getClientForConfigAndToken(&clientConfig, token.Name)
 }
 
-func getOrCreateUser(adminClient *client.Client, username string) (*userapi.User, error) {
+func getOrCreateUser(adminClient client.Interface, username string) (*userapi.User, error) {
 	user, err := adminClient.Users().Create(&userapi.User{ObjectMeta: kapi.ObjectMeta{Name: username}})
 	if err == nil {
 		return user, nil
@@ -89,7 +89,7 @@ func getOrCreateUser(adminClient *client.Client, username string) (*userapi.User
 	return nil, err
 }
 
-func getScopedTokenForUser(adminClient *client.Client, user *userapi.User, scopes []string) (*oauthapi.OAuthAccessToken, error) {
+func getScopedTokenForUser(adminClient client.Interface, user *userapi.User, scopes []string) (*oauthapi.OAuthAccessToken, error) {
 	token := &oauthapi.OAuthAccessToken{
 		ObjectMeta:  kapi.ObjectMeta{Name: fmt.Sprintf("%s-token-plus-some-padding-here-to-make-the-limit-%d", user.Name, rand.Int())},
 		ClientName:  origin.OpenShiftCLIClientID,
@@ -102,7 +102,7 @@ func getScopedTokenForUser(adminClient *client.Client, user *userapi.User, scope
 	return adminClient.OAuthAccessTokens().Create(token)
 }
 
-func getClientForConfigAndToken(clientConfig *restclient.Config, token string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+func getClientForConfigAndToken(clientConfig *restclient.Config, token string) (client.Interface, kclient.Interface, *restclient.Config, error) {
 	config := clientcmd.AnonymousClientConfig(clientConfig)
 	config.BearerToken = token
 	kubeClient, err := kclient.New(&config)
@@ -116,7 +116,7 @@ func getClientForConfigAndToken(clientConfig *restclient.Config, token string) (
 	return osClient, kubeClient, &config, nil
 }
 
-func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.Config, username string, scopes []string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+func GetScopedClientForUser(adminClient client.Interface, clientConfig restclient.Config, username string, scopes []string) (client.Interface, kclient.Interface, *restclient.Config, error) {
 	// make sure the user exists
 	user, err := getOrCreateUser(adminClient, username)
 	if err != nil {
@@ -131,7 +131,7 @@ func GetScopedClientForUser(adminClient *client.Client, clientConfig restclient.
 	return getClientForConfigAndToken(&clientConfig, token.Name)
 }
 
-func GetClientForServiceAccount(adminClient *kclient.Client, clientConfig restclient.Config, namespace, name string) (*client.Client, *kclient.Client, *restclient.Config, error) {
+func GetClientForServiceAccount(adminClient kclient.Interface, clientConfig restclient.Config, namespace, name string) (client.Interface, kclient.Interface, *restclient.Config, error) {
 	_, err := adminClient.Namespaces().Create(&kapi.Namespace{ObjectMeta: kapi.ObjectMeta{Name: namespace}})
 	if err != nil && !kerrs.IsAlreadyExists(err) {
 		return nil, nil, nil, err

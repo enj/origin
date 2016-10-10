@@ -6,6 +6,7 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kapierror "k8s.io/kubernetes/pkg/api/errors"
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	clusterdiags "github.com/openshift/origin/pkg/diagnostics/cluster"
@@ -25,7 +26,7 @@ func TestDiagNodeConditions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	nodeDiag := clusterdiags.NodeDefinitions{KubeClient: client}
+	nodeDiag := clusterdiags.NodeDefinitions{KubeClient: client.(*kclient.Client)}
 	err = wait.Poll(200*time.Millisecond, 5*time.Second, func() (bool, error) {
 		if _, err := client.Nodes().Get(nodeConfig.NodeName); kapierror.IsNotFound(err) {
 			return false, nil

@@ -99,7 +99,7 @@ func TestClusterReaderCoverage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	discoveryClient := client.NewDiscoveryClient(clusterAdminClient.RESTClient)
+	discoveryClient := clusterAdminClient.(*client.Client).Discovery()
 
 	// (map[string]*unversioned.APIResourceList, error)
 	allResourceList, err := discoveryClient.ServerResources()
@@ -1190,8 +1190,7 @@ func TestOldLocalSubjectAccessReviewEndpoint(t *testing.T) {
 				Resource: "imagestreams/layers",
 			},
 		}
-		actualResponse := &authorizationapi.SubjectAccessReviewResponse{}
-		err := haroldClient.Post().Namespace(namespace).Resource("subjectAccessReviews").Body(sar).Do().Into(actualResponse)
+		actualResponse, err := haroldClient.SubjectAccessReviews().Create(sar)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1217,8 +1216,7 @@ func TestOldLocalSubjectAccessReviewEndpoint(t *testing.T) {
 				Resource:  "imagestreams/layers",
 			},
 		}
-		actualResponse := &authorizationapi.SubjectAccessReviewResponse{}
-		err := haroldClient.Post().Namespace(namespace).Resource("subjectAccessReviews").Body(sar).Do().Into(actualResponse)
+		actualResponse, err := haroldClient.SubjectAccessReviews().Create(sar)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1263,8 +1261,7 @@ func TestOldLocalSubjectAccessReviewEndpoint(t *testing.T) {
 				Resource: "imagestreams/layers",
 			},
 		}
-		actualResponse := &authorizationapi.SubjectAccessReviewResponse{}
-		err = haroldClient.Post().Namespace(otherNamespace).Resource("subjectAccessReviews").Body(sar).Do().Into(actualResponse)
+		actualResponse, err := haroldClient.SubjectAccessReviews().Create(sar)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1319,8 +1316,7 @@ func TestOldLocalResourceAccessReviewEndpoint(t *testing.T) {
 				Resource: "imagestreams/layers",
 			},
 		}
-		actualResponse := &authorizationapi.ResourceAccessReviewResponse{}
-		err := haroldClient.Post().Namespace(namespace).Resource("resourceAccessReviews").Body(rar).Do().Into(actualResponse)
+		actualResponse, err := haroldClient.ResourceAccessReviews().Create(rar)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1346,8 +1342,7 @@ func TestOldLocalResourceAccessReviewEndpoint(t *testing.T) {
 				Resource:  "imagestreams/layers",
 			},
 		}
-		actualResponse := &authorizationapi.ResourceAccessReviewResponse{}
-		err := haroldClient.Post().Namespace(namespace).Resource("resourceAccessReviews").Body(rar).Do().Into(actualResponse)
+		actualResponse, err := haroldClient.ResourceAccessReviews().Create(rar)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

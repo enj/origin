@@ -82,7 +82,7 @@ func mockBuild() *buildapi.Build {
 	}
 }
 
-func RunBuildControllerTest(t testingT, osClient *client.Client, kClient *kclient.Client) {
+func RunBuildControllerTest(t testingT, osClient client.Interface, kClient kclient.Interface) {
 	// Setup an error channel
 	errChan := make(chan error) // go routines will send a message on this channel if an error occurs. Once this happens the test is over
 
@@ -158,7 +158,7 @@ type buildControllerPodTest struct {
 	States []buildControllerPodState
 }
 
-func RunBuildPodControllerTest(t testingT, osClient *client.Client, kClient *kclient.Client) {
+func RunBuildPodControllerTest(t testingT, osClient client.Interface, kClient kclient.Interface) {
 	ns := testutil.Namespace()
 	waitTime := BuildPodControllerTestWait
 
@@ -313,7 +313,7 @@ func waitForWatch(t testingT, name string, w watchapi.Interface) *watchapi.Event
 	}
 }
 
-func RunImageChangeTriggerTest(t testingT, clusterAdminClient *client.Client) {
+func RunImageChangeTriggerTest(t testingT, clusterAdminClient client.Interface) {
 	tag := "latest"
 	streamName := "test-image-trigger-repo"
 
@@ -501,7 +501,7 @@ WaitLoop3:
 	}
 }
 
-func RunBuildDeleteTest(t testingT, clusterAdminClient *client.Client, clusterAdminKubeClient *kclient.Client) {
+func RunBuildDeleteTest(t testingT, clusterAdminClient client.Interface, clusterAdminKubeClient kclient.Interface) {
 
 	buildWatch, err := clusterAdminClient.Builds(testutil.Namespace()).Watch(kapi.ListOptions{})
 	if err != nil {
@@ -566,7 +566,7 @@ func waitForWatchType(t testingT, name string, w watchapi.Interface, expect watc
 	return nil
 }
 
-func RunBuildRunningPodDeleteTest(t testingT, clusterAdminClient *client.Client, clusterAdminKubeClient *kclient.Client) {
+func RunBuildRunningPodDeleteTest(t testingT, clusterAdminClient client.Interface, clusterAdminKubeClient kclient.Interface) {
 
 	buildWatch, err := clusterAdminClient.Builds(testutil.Namespace()).Watch(kapi.ListOptions{})
 	if err != nil {
@@ -633,7 +633,7 @@ func RunBuildRunningPodDeleteTest(t testingT, clusterAdminClient *client.Client,
 	}
 }
 
-func RunBuildCompletePodDeleteTest(t testingT, clusterAdminClient *client.Client, clusterAdminKubeClient *kclient.Client) {
+func RunBuildCompletePodDeleteTest(t testingT, clusterAdminClient client.Interface, clusterAdminKubeClient kclient.Interface) {
 
 	buildWatch, err := clusterAdminClient.Builds(testutil.Namespace()).Watch(kapi.ListOptions{})
 	if err != nil {
@@ -697,7 +697,7 @@ func RunBuildCompletePodDeleteTest(t testingT, clusterAdminClient *client.Client
 	}
 }
 
-func RunBuildConfigChangeControllerTest(t testingT, clusterAdminClient *client.Client, clusterAdminKubeClient *kclient.Client) {
+func RunBuildConfigChangeControllerTest(t testingT, clusterAdminClient client.Interface, clusterAdminKubeClient kclient.Interface) {
 	config := configChangeBuildConfig()
 	created, err := clusterAdminClient.BuildConfigs(testutil.Namespace()).Create(config)
 	if err != nil {

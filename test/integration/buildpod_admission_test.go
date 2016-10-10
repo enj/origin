@@ -26,10 +26,10 @@ var buildPodAdmissionTestTimeout time.Duration = 10 * time.Second
 func TestBuildDefaultGitHTTPProxy(t *testing.T) {
 	defer testutil.DumpEtcdOnFailure(t)
 	httpProxy := "http://my.test.proxy:12345"
-	oclient, kclient := setupBuildDefaultsAdmissionTest(t, &defaultsapi.BuildDefaultsConfig{
+	osClient, kubeClient := setupBuildDefaultsAdmissionTest(t, &defaultsapi.BuildDefaultsConfig{
 		GitHTTPProxy: httpProxy,
 	})
-	build, _ := runBuildPodAdmissionTest(t, oclient, kclient, buildPodAdmissionTestDockerBuild())
+	build, _ := runBuildPodAdmissionTest(t, osClient, kubeClient, buildPodAdmissionTestDockerBuild())
 	if actual := build.Spec.Source.Git.HTTPProxy; actual == nil || *actual != httpProxy {
 		t.Errorf("Resulting build did not get expected HTTP proxy: %v", actual)
 	}
@@ -38,10 +38,10 @@ func TestBuildDefaultGitHTTPProxy(t *testing.T) {
 func TestBuildDefaultGitHTTPSProxy(t *testing.T) {
 	defer testutil.DumpEtcdOnFailure(t)
 	httpsProxy := "https://my.test.proxy:12345"
-	oclient, kclient := setupBuildDefaultsAdmissionTest(t, &defaultsapi.BuildDefaultsConfig{
+	osClient, kubeClient := setupBuildDefaultsAdmissionTest(t, &defaultsapi.BuildDefaultsConfig{
 		GitHTTPSProxy: httpsProxy,
 	})
-	build, _ := runBuildPodAdmissionTest(t, oclient, kclient, buildPodAdmissionTestDockerBuild())
+	build, _ := runBuildPodAdmissionTest(t, osClient, kubeClient, buildPodAdmissionTestDockerBuild())
 	if actual := build.Spec.Source.Git.HTTPSProxy; actual == nil || *actual != httpsProxy {
 		t.Errorf("Resulting build did not get expected HTTPS proxy: %v", actual)
 	}
@@ -59,10 +59,10 @@ func TestBuildDefaultEnvironment(t *testing.T) {
 			Value: "VALUE2",
 		},
 	}
-	oclient, kclient := setupBuildDefaultsAdmissionTest(t, &defaultsapi.BuildDefaultsConfig{
+	osClient, kubeClient := setupBuildDefaultsAdmissionTest(t, &defaultsapi.BuildDefaultsConfig{
 		Env: env,
 	})
-	build, _ := runBuildPodAdmissionTest(t, oclient, kclient, buildPodAdmissionTestDockerBuild())
+	build, _ := runBuildPodAdmissionTest(t, osClient, kubeClient, buildPodAdmissionTestDockerBuild())
 	if actual := build.Spec.Strategy.DockerStrategy.Env; !reflect.DeepEqual(env, actual) {
 		t.Errorf("Resulting build did not get expected environment: %v", actual)
 	}
@@ -70,26 +70,26 @@ func TestBuildDefaultEnvironment(t *testing.T) {
 
 func TestBuildOverrideForcePull(t *testing.T) {
 	defer testutil.DumpEtcdOnFailure(t)
-	oclient, kclient := setupBuildOverridesAdmissionTest(t, &overridesapi.BuildOverridesConfig{
+	osClient, kubeClient := setupBuildOverridesAdmissionTest(t, &overridesapi.BuildOverridesConfig{
 		ForcePull: true,
 	})
-	build, _ := runBuildPodAdmissionTest(t, oclient, kclient, buildPodAdmissionTestDockerBuild())
+	build, _ := runBuildPodAdmissionTest(t, osClient, kubeClient, buildPodAdmissionTestDockerBuild())
 	if !build.Spec.Strategy.DockerStrategy.ForcePull {
-		t.Errorf("ForcePull was not set on resulting build")
+		t.Error("ForcePull was not set on resulting build")
 	}
 }
 
 func TestBuildOverrideForcePullCustomStrategy(t *testing.T) {
 	defer testutil.DumpEtcdOnFailure(t)
-	oclient, kclient := setupBuildOverridesAdmissionTest(t, &overridesapi.BuildOverridesConfig{
+	osClient, kubeClient := setupBuildOverridesAdmissionTest(t, &overridesapi.BuildOverridesConfig{
 		ForcePull: true,
 	})
-	build, pod := runBuildPodAdmissionTest(t, oclient, kclient, buildPodAdmissionTestCustomBuild())
+	build, pod := runBuildPodAdmissionTest(t, osClient, kubeClient, buildPodAdmissionTestCustomBuild())
 	if pod.Spec.Containers[0].ImagePullPolicy != kapi.PullAlways {
-		t.Errorf("Pod ImagePullPolicy is not PullAlways")
+		t.Error("Pod ImagePullPolicy is not PullAlways")
 	}
 	if !build.Spec.Strategy.CustomStrategy.ForcePull {
-		t.Errorf("ForcePull was not set on resulting build")
+		t.Error("ForcePull was not set on resulting build")
 	}
 }
 
@@ -121,7 +121,7 @@ func buildPodAdmissionTestDockerBuild() *buildapi.Build {
 	return build
 }
 
-func runBuildPodAdmissionTest(t *testing.T, client *client.Client, kclient *kclient.Client, build *buildapi.Build) (*buildapi.Build, *kapi.Pod) {
+func runBuildPodAdmissionTest(t *testing.T, client client.Interface, kclient kclient.Interface, build *buildapi.Build) (*buildapi.Build, *kapi.Pod) {
 
 	ns := testutil.Namespace()
 	_, err := client.Builds(ns).Create(build)
@@ -167,7 +167,7 @@ func runBuildPodAdmissionTest(t *testing.T, client *client.Client, kclient *kcli
 	return nil, nil
 }
 
-func setupBuildDefaultsAdmissionTest(t *testing.T, defaultsConfig *defaultsapi.BuildDefaultsConfig) (*client.Client, *kclient.Client) {
+func setupBuildDefaultsAdmissionTest(t *testing.T, defaultsConfig *defaultsapi.BuildDefaultsConfig) (client.Interface, kclient.Interface) {
 	return setupBuildPodAdmissionTest(t, map[string]configapi.AdmissionPluginConfig{
 		"BuildDefaults": {
 			Configuration: defaultsConfig,
@@ -175,7 +175,7 @@ func setupBuildDefaultsAdmissionTest(t *testing.T, defaultsConfig *defaultsapi.B
 	})
 }
 
-func setupBuildOverridesAdmissionTest(t *testing.T, overridesConfig *overridesapi.BuildOverridesConfig) (*client.Client, *kclient.Client) {
+func setupBuildOverridesAdmissionTest(t *testing.T, overridesConfig *overridesapi.BuildOverridesConfig) (client.Interface, kclient.Interface) {
 	return setupBuildPodAdmissionTest(t, map[string]configapi.AdmissionPluginConfig{
 		"BuildOverrides": {
 			Configuration: overridesConfig,
@@ -183,7 +183,7 @@ func setupBuildOverridesAdmissionTest(t *testing.T, overridesConfig *overridesap
 	})
 }
 
-func setupBuildPodAdmissionTest(t *testing.T, pluginConfig map[string]configapi.AdmissionPluginConfig) (*client.Client, *kclient.Client) {
+func setupBuildPodAdmissionTest(t *testing.T, pluginConfig map[string]configapi.AdmissionPluginConfig) (client.Interface, kclient.Interface) {
 	testutil.RequireEtcd(t)
 	master, err := testserver.DefaultMasterOptions()
 	if err != nil {

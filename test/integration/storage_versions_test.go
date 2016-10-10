@@ -152,7 +152,7 @@ func runStorageTest(t *testing.T, ns string, autoscalingVersion, batchVersion, e
 
 	legacyClient := legacyExtensionsAutoscaling{
 		projectAdminKubeClient.Autoscaling().HorizontalPodAutoscalers(ns),
-		projectAdminKubeClient.AutoscalingClient.RESTClient,
+		projectAdminKubeClient.(*kclient.Client).AutoscalingClient.RESTClient,
 		ns,
 	}
 	hpaTestcases := map[string]struct {

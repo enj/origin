@@ -9,8 +9,10 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 
 	buildapi "github.com/openshift/origin/pkg/build/api"
+	"github.com/openshift/origin/pkg/client"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	imageapi "github.com/openshift/origin/pkg/image/api"
 	testutil "github.com/openshift/origin/test/util"
@@ -102,7 +104,7 @@ func TestWebhookGitHubPushWithImage(t *testing.T) {
 	} {
 
 		// trigger build event sending push notification
-		postFile(clusterAdminClient.RESTClient.Client, "push", "pushevent.json", clusterAdminClientConfig.Host+s, http.StatusOK, t)
+		postFile(clusterAdminClient.(*client.Client).RESTClient.Client, "push", "pushevent.json", clusterAdminClientConfig.Host+s, http.StatusOK, t)
 
 		event := <-watch.ResultChan()
 		actual := event.Object.(*buildapi.Build)
@@ -203,7 +205,7 @@ func TestWebhookGitHubPushWithImageStream(t *testing.T) {
 	} {
 
 		// trigger build event sending push notification
-		postFile(clusterAdminClient.RESTClient.Client, "push", "pushevent.json", clusterAdminClientConfig.Host+s, http.StatusOK, t)
+		postFile(clusterAdminClient.(*client.Client).RESTClient.Client, "push", "pushevent.json", clusterAdminClientConfig.Host+s, http.StatusOK, t)
 
 		event := <-watch.ResultChan()
 		actual := event.Object.(*buildapi.Build)
@@ -265,7 +267,7 @@ func TestWebhookGitHubPing(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		postFile(kubeClient.RESTClient.Client, "ping", "pingevent.json", clusterAdminClientConfig.Host+s, http.StatusOK, t)
+		postFile(kubeClient.(*kclient.Client).RESTClient.Client, "ping", "pingevent.json", clusterAdminClientConfig.Host+s, http.StatusOK, t)
 
 		// TODO: improve negative testing
 		timer := time.NewTimer(time.Second / 2)

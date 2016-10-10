@@ -31,6 +31,11 @@ func TestBootstrapPolicyAuthenticatedUsersAgainstOpenshiftNamespace(t *testing.T
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	clusterAdminClient, err := testutil.GetClusterAdminClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	valerieOpenshiftClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "valerie")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -118,6 +123,11 @@ func TestBootstrapPolicySelfSubjectAccessReviews(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	clusterAdminClient, err := testutil.GetClusterAdminClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	valerieOpenshiftClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "valerie")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -162,6 +172,11 @@ func TestSelfSubjectAccessReviewsNonExistingNamespace(t *testing.T) {
 	clusterAdminClientConfig, err := testutil.GetClusterAdminClientConfig(clusterAdminKubeConfig)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+
+	clusterAdminClient, err := testutil.GetClusterAdminClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	valerieOpenshiftClient, _, _, err := testutil.GetClientForUser(clusterAdminClient, *clusterAdminClientConfig, "valerie")

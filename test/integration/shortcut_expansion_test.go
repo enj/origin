@@ -29,7 +29,7 @@ func TestCachingDiscoveryClient(t *testing.T) {
 
 	resourceType := "buildconfigs"
 
-	originDiscoveryClient := client.NewDiscoveryClient(originClient.RESTClient)
+	originDiscoveryClient := originClient.(*client.Client).Discovery()
 	originUncachedMapper := clientcmd.NewShortcutExpander(originDiscoveryClient, nil)
 	if !sets.NewString(originUncachedMapper.All...).Has(resourceType) {
 		t.Errorf("expected %v, got: %v", resourceType, originUncachedMapper.All)
@@ -73,7 +73,7 @@ func TestCachingDiscoveryClient(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	atomicDiscoveryClient := client.NewDiscoveryClient(atomicClient.RESTClient)
+	atomicDiscoveryClient := atomicClient.(*client.Client).Discovery()
 	atomicUncachedMapper := clientcmd.NewShortcutExpander(atomicDiscoveryClient, nil)
 	if sets.NewString(atomicUncachedMapper.All...).Has(resourceType) {
 		t.Errorf("expected no %v, got: %v", resourceType, atomicUncachedMapper.All)

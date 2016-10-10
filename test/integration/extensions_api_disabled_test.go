@@ -11,6 +11,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 func TestExtensionsAPIDisabledAutoscaleBatchEnabled(t *testing.T) {
@@ -80,7 +81,7 @@ func TestExtensionsAPIDisabledAutoscaleBatchEnabled(t *testing.T) {
 
 	legacyAutoscalers := legacyExtensionsAutoscaling{
 		projectAdminKubeClient.Autoscaling().HorizontalPodAutoscalers(projName),
-		projectAdminKubeClient.ExtensionsClient.RESTClient,
+		projectAdminKubeClient.(*kclient.Client).ExtensionsClient.RESTClient,
 		projName,
 	}
 
@@ -189,7 +190,7 @@ func TestExtensionsAPIDisabled(t *testing.T) {
 
 	legacyAutoscalers := legacyExtensionsAutoscaling{
 		projectAdminKubeClient.Autoscaling().HorizontalPodAutoscalers(projName),
-		projectAdminKubeClient.AutoscalingClient.RESTClient,
+		projectAdminKubeClient.(*kclient.Client).ExtensionsClient.RESTClient,
 		projName,
 	}
 

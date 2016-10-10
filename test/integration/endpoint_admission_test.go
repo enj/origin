@@ -24,7 +24,7 @@ var exampleAddresses = map[string]string{
 	"external": "1.2.3.4",
 }
 
-func testOne(t *testing.T, client *kclient.Client, namespace, addrType string, success bool) *kapi.Endpoints {
+func testOne(t *testing.T, client kclient.Interface, namespace, addrType string, success bool) *kapi.Endpoints {
 	testEndpoint := &kapi.Endpoints{}
 	testEndpoint.GenerateName = "test"
 	testEndpoint.Subsets = []kapi.EndpointSubset{
@@ -122,6 +122,6 @@ func TestEndpointAdmission(t *testing.T) {
 	ep.Subsets[0].Addresses[0].IP = exampleAddresses["service"]
 	ep, err = projectAdminClient.Endpoints("myproject").Update(ep)
 	if err == nil {
-		t.Fatalf("unexpected success modifying endpoint")
+		t.Fatal("unexpected success modifying endpoint")
 	}
 }

@@ -13,7 +13,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 
+	"github.com/openshift/origin/pkg/client"
 	templatesapi "github.com/openshift/origin/pkg/template/api"
 	testutil "github.com/openshift/origin/test/util"
 	testserver "github.com/openshift/origin/test/util/server"
@@ -58,11 +60,11 @@ func TestPatchConflicts(t *testing.T) {
 		resource string
 	}{
 		{
-			client:   clusterAdminKubeClient.RESTClient,
+			client:   clusterAdminKubeClient.(*kclient.Client).RESTClient,
 			resource: "secrets",
 		},
 		{
-			client:   clusterAdminClient.RESTClient,
+			client:   clusterAdminClient.(*client.Client).RESTClient,
 			resource: "templates",
 		},
 	}
