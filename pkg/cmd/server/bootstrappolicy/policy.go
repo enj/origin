@@ -31,7 +31,7 @@ import (
 const (
 	// roleSystemOnly is an annotation key that determines if a role is system only
 	roleSystemOnly = "authorization.openshift.io/system-only"
-	// roleIsSystemOnly is an annotation value that denotes roleSystemOnly, and thus excludes it from the UI
+	// roleIsSystemOnly is an annotation value that denotes roleSystemOnly, and thus excludes the role from the UI
 	roleIsSystemOnly = "true"
 )
 
@@ -100,6 +100,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				Name: ClusterAdminRoleName,
 				Annotations: map[string]string{
 					OpenShiftDescription: "A super-user that can perform any action in any project. When granted to a user within a local policy, they have full control over quota and roles and every action on every resource in the project.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -113,6 +114,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: SudoerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("impersonate").Groups(kapiGroup).Resources(authorizationapi.SystemUserResource).Names(SystemAdminUsername).RuleOrDie(),
@@ -121,6 +125,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ClusterReaderRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(read...).Groups(kapiGroup).Resources("bindings", "componentstatuses", "configmaps", "egressnetworkpolicies", "endpoints", "events", "limitranges",
@@ -198,6 +205,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BuildStrategyDockerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("create").Groups(buildGroup).Resources(authorizationapi.DockerBuildResource).RuleOrDie(),
@@ -206,6 +216,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BuildStrategyCustomRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("create").Groups(buildGroup).Resources(authorizationapi.CustomBuildResource).RuleOrDie(),
@@ -214,6 +227,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BuildStrategySourceRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("create").Groups(buildGroup).Resources(authorizationapi.SourceBuildResource).RuleOrDie(),
@@ -222,6 +238,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BuildStrategyJenkinsPipelineRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("create").Groups(buildGroup).Resources(authorizationapi.JenkinsPipelineBuildResource).RuleOrDie(),
@@ -232,9 +251,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: AdminRoleName,
 				Annotations: map[string]string{
-					OpenShiftDescription: "A project manager. If used in a local binding, an admin user will have rights to view any resource in the project and modify any resource in the project except for role creation and quota. If the cluster-admin wants to allow an admin to modify roles, the cluster-admin must create a project-scoped Policy object using JSON.",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDescription: "A project manager. If used in a local binding, an admin user will have rights to view any resource in the project and modify any resource in the project except for role creation and quota. If the cluster-admin wants to allow an admin to modify roles, the cluster-admin must create a project-scoped Policy object using JSON."},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(readWrite...).Groups(kapiGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
@@ -297,9 +314,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: EditRoleName,
 				Annotations: map[string]string{
-					OpenShiftDescription: "A user that can modify most objects in a project, but does not have the power to view or modify roles or bindings.",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDescription: "A user that can modify most objects in a project, but does not have the power to view or modify roles or bindings."},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(readWrite...).Groups(kapiGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
@@ -353,9 +368,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ViewRoleName,
 				Annotations: map[string]string{
-					OpenShiftDescription: "A user who cannot make any modifications, but can see most objects in a project. They cannot view or modify roles or bindings.",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDescription: "A user who cannot make any modifications, but can see most objects in a project. They cannot view or modify roles or bindings."},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// TODO add "replicationcontrollers/scale" here
@@ -406,9 +419,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BasicUserRoleName,
 				Annotations: map[string]string{
-					OpenShiftDescription: "A user that can get basic information about projects and users.",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDescription: "A user that can get basic information about projects and users."},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get").Groups(userGroup).Resources("users").Names("~").RuleOrDie(),
@@ -422,6 +433,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: SelfAccessReviewerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("selfsubjectrulesreviews").RuleOrDie(),
@@ -433,6 +447,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				Name: SelfProvisionerRoleName,
 				Annotations: map[string]string{
 					OpenShiftDescription: "A user that can create their own projects.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -444,6 +459,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				Name: StatusCheckerRoleName,
 				Annotations: map[string]string{
 					OpenShiftDescription: "A user that can get basic cluster status information.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -460,6 +476,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImageAuditorRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get", "list", "watch", "patch", "update").Groups(imageGroup).Resources("images").RuleOrDie(),
@@ -469,9 +488,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImagePullerRoleName,
 				Annotations: map[string]string{
-					OpenShiftDisplayName: "image-puller",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDisplayName: "image-puller"},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// pull images
@@ -485,6 +502,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			// push an image to our registry
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImagePusherRoleName,
+				Annotations: map[string]string{
+					OpenShiftDisplayName: "image-pusher",
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// push and pull images
@@ -495,9 +515,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImageBuilderRoleName,
 				Annotations: map[string]string{
-					OpenShiftDisplayName: "image-builder",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDisplayName: "image-builder"},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// push and pull images
@@ -510,6 +528,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImagePrunerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get", "list").Groups(kapiGroup).Resources("pods", "replicationcontrollers").RuleOrDie(),
@@ -525,6 +546,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImageSignerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get").Groups(imageGroup).Resources("images", "imagestreams/layers").RuleOrDie(),
@@ -535,9 +559,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DeployerRoleName,
 				Annotations: map[string]string{
-					OpenShiftDisplayName: "deployer",
-					roleSystemOnly:       roleIsSystemOnly,
-				},
+					OpenShiftDisplayName: "deployer"},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get", "list", "watch", "update").Groups(kapiGroup).Resources("replicationcontrollers").RuleOrDie(),
@@ -551,6 +573,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: MasterRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
@@ -563,6 +588,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: OAuthTokenDeleterRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("delete").Groups(oauthGroup).Resources("oauthaccesstokens", "oauthauthorizetokens").RuleOrDie(),
@@ -571,6 +599,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: RouterRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("list", "watch").Groups(kapiGroup).Resources("endpoints").RuleOrDie(),
@@ -583,6 +614,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: RegistryRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("list").Groups(kapiGroup).Resources("limitranges", "resourcequotas").RuleOrDie(),
@@ -596,6 +630,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: NodeProxierRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Used to build serviceLister
@@ -605,6 +642,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: NodeAdminRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Allow read-only access to the API objects
@@ -617,6 +657,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: NodeReaderRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Allow read-only access to the API objects
@@ -632,6 +675,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: NodeRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Needed to check API access.  These creates are non-mutating
@@ -675,6 +721,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: SDNReaderRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(read...).Groups(sdnGroup).Resources("hostsubnets", "netnamespaces").RuleOrDie(),
@@ -688,6 +737,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: SDNManagerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get", "list", "watch", "create", "delete").Groups(sdnGroup).Resources("hostsubnets", "netnamespaces").RuleOrDie(),
@@ -699,6 +751,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: WebHooksRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("get", "create").Groups(buildGroup).Resources("buildconfigs/webhooks").RuleOrDie(),
@@ -708,6 +763,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DiscoveryRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.DiscoveryRule,
@@ -717,6 +775,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: RegistryAdminRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(readWrite...).Groups(kapiGroup).Resources("serviceaccounts", "secrets").RuleOrDie(),
@@ -737,6 +798,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: RegistryEditorRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(readWrite...).Groups(kapiGroup).Resources("serviceaccounts", "secrets").RuleOrDie(),
@@ -751,6 +815,9 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 		{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: RegistryViewerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule(read...).Groups(imageGroup).Resources("imagestreamimages", "imagestreammappings", "imagestreams", "imagestreamtags").RuleOrDie(),
