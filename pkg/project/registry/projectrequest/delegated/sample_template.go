@@ -38,7 +38,7 @@ func DefaultTemplate() *templateapi.Template {
 	project.Annotations = map[string]string{
 		bootstrappolicy.OpenShiftDescription: "${" + ProjectDescriptionParam + "}",
 		bootstrappolicy.OpenShiftDisplayName: "${" + ProjectDisplayNameParam + "}",
-		projectapi.ProjectRequester:   "${" + ProjectRequesterParam + "}",
+		projectapi.ProjectRequester:          "${" + ProjectRequesterParam + "}",
 	}
 	templateContents = append(templateContents, project)
 

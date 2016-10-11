@@ -6,6 +6,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/project/api"
 )
 
@@ -176,9 +177,9 @@ func TestValidateProjectUpdate(t *testing.T) {
 			Name:            "project-name",
 			ResourceVersion: "1",
 			Annotations: map[string]string{
-				bootstrappolicy.OpenShiftDescription:  "This is a description",
-				bootstrappolicy.OpenShiftDisplayName:  "display name",
-				api.ProjectNodeSelector: "infra=true, env = test",
+				bootstrappolicy.OpenShiftDescription: "This is a description",
+				bootstrappolicy.OpenShiftDisplayName: "display name",
+				api.ProjectNodeSelector:              "infra=true, env = test",
 			},
 			Labels: map[string]string{"label-name": "value"},
 		},
@@ -188,9 +189,9 @@ func TestValidateProjectUpdate(t *testing.T) {
 			Name:            "project-name",
 			ResourceVersion: "1",
 			Annotations: map[string]string{
-				bootstrappolicy.OpenShiftDescription:  "This is a description",
-				bootstrappolicy.OpenShiftDisplayName:  "display name change",
-				api.ProjectNodeSelector: "infra=true, env = test",
+				bootstrappolicy.OpenShiftDescription: "This is a description",
+				bootstrappolicy.OpenShiftDisplayName: "display name change",
+				api.ProjectNodeSelector:              "infra=true, env = test",
 			},
 			Labels: map[string]string{"label-name": "value"},
 		},
@@ -224,9 +225,9 @@ func TestValidateProjectUpdate(t *testing.T) {
 					Name:            "project-name",
 					ResourceVersion: "1",
 					Annotations: map[string]string{
-						bootstrappolicy.OpenShiftDescription:  "This is a description",
-						bootstrappolicy.OpenShiftDisplayName:  "display name\n",
-						api.ProjectNodeSelector: "infra=true, env = test",
+						bootstrappolicy.OpenShiftDescription: "This is a description",
+						bootstrappolicy.OpenShiftDisplayName: "display name\n",
+						api.ProjectNodeSelector:              "infra=true, env = test",
 					},
 					Labels: project.Labels,
 				},
@@ -240,9 +241,9 @@ func TestValidateProjectUpdate(t *testing.T) {
 					Name:            "project-name",
 					ResourceVersion: "1",
 					Annotations: map[string]string{
-						bootstrappolicy.OpenShiftDescription:  "This is a description",
-						bootstrappolicy.OpenShiftDisplayName:  "display name",
-						api.ProjectNodeSelector: "infra=true, env = test2",
+						bootstrappolicy.OpenShiftDescription: "This is a description",
+						bootstrappolicy.OpenShiftDisplayName: "display name",
+						api.ProjectNodeSelector:              "infra=true, env = test2",
 					},
 					Labels: project.Labels,
 				},

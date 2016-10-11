@@ -16,6 +16,7 @@ import (
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	buildapi "github.com/openshift/origin/pkg/build/api"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	imageapi "github.com/openshift/origin/pkg/image/api"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"

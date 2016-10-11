@@ -11,6 +11,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/openshift/origin/pkg/client/testclient"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	projectapi "github.com/openshift/origin/pkg/project/api"
 )
 

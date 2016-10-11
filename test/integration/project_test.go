@@ -60,7 +60,7 @@ func TestProjectIsNamespace(t *testing.T) {
 			Name: "new-project",
 			Annotations: map[string]string{
 				bootstrappolicy.OpenShiftDisplayName: "Hello World",
-				"openshift.io/node-selector":  "env=test",
+				"openshift.io/node-selector":         "env=test",
 			},
 		},
 	}

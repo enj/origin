@@ -8,6 +8,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 
 	oapi "github.com/openshift/origin/pkg/api"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/project/api"
 	projectapi "github.com/openshift/origin/pkg/project/api"
 	"github.com/openshift/origin/pkg/util/labelselector"
