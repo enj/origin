@@ -14,9 +14,9 @@ import (
 	kctl "k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	buildapi "github.com/openshift/origin/pkg/build/api"
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	imageapi "github.com/openshift/origin/pkg/image/api"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
@@ -463,7 +463,7 @@ func printImageStreamList(streams *imageapi.ImageStreamList, w io.Writer, opts k
 
 func printProject(project *projectapi.Project, w io.Writer, opts kctl.PrintOptions) error {
 	name := formatResourceName(opts.Kind, project.Name, opts.WithKind)
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s", name, project.Annotations[bootstrappolicy.OpenShiftDisplayName], project.Status.Phase)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s", name, project.Annotations[constants.OpenShiftDisplayName], project.Status.Phase)
 	if err := appendItemLabels(project.Labels, w, opts.ColumnLabels, opts.ShowLabels); err != nil {
 		return err
 	}

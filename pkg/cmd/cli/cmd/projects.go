@@ -11,9 +11,9 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/client"
 	cliconfig "github.com/openshift/origin/pkg/cmd/cli/config"
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
 	"github.com/openshift/origin/pkg/project/api"
 
@@ -158,7 +158,7 @@ func (o ProjectsOptions) RunProjects() error {
 			sort.Sort(SortByProjectName(projects))
 			for _, project := range projects {
 				count = count + 1
-				displayName := project.Annotations[bootstrappolicy.OpenShiftDisplayName]
+				displayName := project.Annotations[constants.OpenShiftDisplayName]
 				linebreak := "\n"
 				if len(displayName) == 0 {
 					displayName = project.Annotations["displayName"]

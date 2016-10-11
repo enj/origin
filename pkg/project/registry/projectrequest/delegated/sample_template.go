@@ -4,6 +4,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/api/latest"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
@@ -36,9 +37,9 @@ func DefaultTemplate() *templateapi.Template {
 	project := &projectapi.Project{}
 	project.Name = ns
 	project.Annotations = map[string]string{
-		bootstrappolicy.OpenShiftDescription: "${" + ProjectDescriptionParam + "}",
-		bootstrappolicy.OpenShiftDisplayName: "${" + ProjectDisplayNameParam + "}",
-		projectapi.ProjectRequester:          "${" + ProjectRequesterParam + "}",
+		constants.OpenShiftDescription: "${" + ProjectDescriptionParam + "}",
+		constants.OpenShiftDisplayName: "${" + ProjectDisplayNameParam + "}",
+		projectapi.ProjectRequester:    "${" + ProjectRequesterParam + "}",
 	}
 	templateContents = append(templateContents, project)
 

@@ -21,10 +21,10 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	buildapi "github.com/openshift/origin/pkg/build/api"
 	"github.com/openshift/origin/pkg/client"
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	imageapi "github.com/openshift/origin/pkg/image/api"
 	oauthapi "github.com/openshift/origin/pkg/oauth/api"
@@ -827,8 +827,8 @@ func (d *ProjectDescriber) Describe(namespace, name string, settings kctl.Descri
 
 	return tabbedString(func(out *tabwriter.Writer) error {
 		formatMeta(out, project.ObjectMeta)
-		formatString(out, "Display Name", project.Annotations[bootstrappolicy.OpenShiftDisplayName])
-		formatString(out, "Description", project.Annotations[bootstrappolicy.OpenShiftDescription])
+		formatString(out, "Display Name", project.Annotations[constants.OpenShiftDisplayName])
+		formatString(out, "Description", project.Annotations[constants.OpenShiftDescription])
 		formatString(out, "Status", project.Status.Phase)
 		formatString(out, "Node Selector", nodeSelector)
 		if len(resourceQuotaList.Items) == 0 {

@@ -11,6 +11,7 @@ import (
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/client"
 	"github.com/openshift/origin/pkg/cmd/admin/policy"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
@@ -97,8 +98,8 @@ func (o *NewProjectOptions) Run(useNodeSelector bool) error {
 	project := &projectapi.Project{}
 	project.Name = o.ProjectName
 	project.Annotations = make(map[string]string)
-	project.Annotations[bootstrappolicy.OpenShiftDescription] = o.Description
-	project.Annotations[bootstrappolicy.OpenShiftDisplayName] = o.DisplayName
+	project.Annotations[constants.OpenShiftDescription] = o.Description
+	project.Annotations[constants.OpenShiftDisplayName] = o.DisplayName
 	if useNodeSelector {
 		project.Annotations[projectapi.ProjectNodeSelector] = o.NodeSelector
 	}

@@ -10,8 +10,8 @@ import (
 	ktestclient "k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/client/testclient"
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	projectapi "github.com/openshift/origin/pkg/project/api"
 )
 
@@ -41,7 +41,7 @@ func TestProjectStatus(t *testing.T) {
 						Name:      "example",
 						Namespace: "",
 						Annotations: map[string]string{
-							bootstrappolicy.OpenShiftDisplayName: "Test",
+							constants.OpenShiftDisplayName: "Test",
 						},
 					},
 				},

@@ -9,15 +9,15 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/cmd/cli/describe"
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/generate/app"
 	imageapi "github.com/openshift/origin/pkg/image/api"
 )
 
 func displayName(meta kapi.ObjectMeta) string {
 	// If an object has a display name, prefer it over the meta name.
-	displayName := meta.Annotations[bootstrappolicy.OpenShiftDisplayName]
+	displayName := meta.Annotations[constants.OpenShiftDisplayName]
 	if len(displayName) > 0 {
 		return displayName
 	}

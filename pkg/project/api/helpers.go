@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
+	"github.com/openshift/origin/pkg/api/constants"
 )
 
 const (
@@ -13,7 +13,7 @@ const (
 // DisplayNameAndNameForProject returns a formatted string containing the name
 // of the project and includes the display name if it differs.
 func DisplayNameAndNameForProject(project *Project) string {
-	displayName := project.Annotations[bootstrappolicy.OpenShiftDisplayName]
+	displayName := project.Annotations[constants.OpenShiftDisplayName]
 	if len(displayName) == 0 {
 		displayName = project.Annotations[displayNameOldAnnotation]
 	}

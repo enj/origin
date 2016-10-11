@@ -10,7 +10,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 
-	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/project/api"
 )
 
@@ -73,7 +73,7 @@ func TestCreateInvalidProject(t *testing.T) {
 	storage := NewREST(mockClient.Namespaces(), &mockLister{}, nil, nil)
 	_, err := storage.Create(kapi.NewContext(), &api.Project{
 		ObjectMeta: kapi.ObjectMeta{
-			Annotations: map[string]string{bootstrappolicy.OpenShiftDisplayName: "h\t\ni"},
+			Annotations: map[string]string{constants.OpenShiftDisplayName: "h\t\ni"},
 		},
 	})
 	if !errors.IsInvalid(err) {

@@ -9,6 +9,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"github.com/openshift/origin/pkg/api/constants"
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	buildapi "github.com/openshift/origin/pkg/build/api"
 	policy "github.com/openshift/origin/pkg/cmd/admin/policy"
@@ -59,8 +60,8 @@ func TestProjectIsNamespace(t *testing.T) {
 		ObjectMeta: kapi.ObjectMeta{
 			Name: "new-project",
 			Annotations: map[string]string{
-				bootstrappolicy.OpenShiftDisplayName: "Hello World",
-				"openshift.io/node-selector":         "env=test",
+				constants.OpenShiftDisplayName: "Hello World",
+				"openshift.io/node-selector":   "env=test",
 			},
 		},
 	}
@@ -77,8 +78,8 @@ func TestProjectIsNamespace(t *testing.T) {
 	if project.Name != namespace.Name {
 		t.Fatalf("Project name did not match namespace name, project %v, namespace %v", project.Name, namespace.Name)
 	}
-	if project.Annotations[bootstrappolicy.OpenShiftDisplayName] != namespace.Annotations[bootstrappolicy.OpenShiftDisplayName] {
-		t.Fatalf("Project display name did not match namespace annotation, project %v, namespace %v", project.Annotations[bootstrappolicy.OpenShiftDisplayName], namespace.Annotations[bootstrappolicy.OpenShiftDisplayName])
+	if project.Annotations[constants.OpenShiftDisplayName] != namespace.Annotations[constants.OpenShiftDisplayName] {
+		t.Fatalf("Project display name did not match namespace annotation, project %v, namespace %v", project.Annotations[constants.OpenShiftDisplayName], namespace.Annotations[constants.OpenShiftDisplayName])
 	}
 	if project.Annotations["openshift.io/node-selector"] != namespace.Annotations["openshift.io/node-selector"] {
 		t.Fatalf("Project node selector did not match namespace node selector, project %v, namespace %v", project.Annotations["openshift.io/node-selector"], namespace.Annotations["openshift.io/node-selector"])
