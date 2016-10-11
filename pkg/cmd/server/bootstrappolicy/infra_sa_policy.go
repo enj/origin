@@ -130,6 +130,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BuildControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// BuildControllerFactory.buildLW
@@ -177,6 +180,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DeploymentConfigControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// DeploymentControllerFactory.deploymentLW
@@ -211,6 +217,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DeploymentControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				{
@@ -250,6 +259,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ReplicationControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// ReplicationManager.rcController.ListWatch
@@ -295,6 +307,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ReplicaSetControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				{
@@ -327,6 +342,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: JobControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// JobController.jobController.ListWatch
@@ -377,6 +395,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: HPAControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// HPA Controller
@@ -427,6 +448,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: PersistentVolumeRecyclerControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// PersistentVolumeRecycler.volumeController.ListWatch
@@ -486,6 +510,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: PersistentVolumeAttachDetachControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// shared informer on PVs
@@ -535,6 +562,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: PersistentVolumeBinderControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// PersistentVolumeBinder.volumeController.ListWatch
@@ -600,6 +630,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: PersistentVolumeProvisionerControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// PersistentVolumeProvisioner.volumeController.ListWatch
@@ -644,6 +677,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DaemonSetControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// DaemonSetsController.dsStore.ListWatch
@@ -695,6 +731,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DisruptionControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// DisruptionBudgetController.dStore.ListWatch
@@ -739,6 +778,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: NamespaceControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Watching/deleting namespaces
@@ -772,6 +814,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: GCControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// GCController.podStore.ListWatch
@@ -798,6 +843,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ServiceLoadBalancerControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// ServiceController.cache.ListWatch
@@ -841,6 +889,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: PetSetControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// PetSetController.podCache.ListWatch
@@ -897,6 +948,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: UnidlingControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				{
@@ -946,6 +1000,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ServiceServingCertControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				{
@@ -970,6 +1027,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: EndpointControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Watching services and pods
@@ -1002,6 +1062,9 @@ func init() {
 		authorizationapi.ClusterRole{
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ServiceIngressIPControllerRoleName,
+				Annotations: map[string]string{
+					roleSystemOnly: roleIsSystemOnly,
+				},
 			},
 			Rules: []authorizationapi.PolicyRule{
 				// Listing and watching services
