@@ -826,8 +826,8 @@ func (d *ProjectDescriber) Describe(namespace, name string, settings kctl.Descri
 
 	return tabbedString(func(out *tabwriter.Writer) error {
 		formatMeta(out, project.ObjectMeta)
-		formatString(out, "Display Name", project.Annotations[projectapi.ProjectDisplayName])
-		formatString(out, "Description", project.Annotations[projectapi.ProjectDescription])
+		formatString(out, "Display Name", project.Annotations[bootstrappolicy.OpenShiftDisplayName])
+		formatString(out, "Description", project.Annotations[bootstrappolicy.OpenShiftDescription])
 		formatString(out, "Status", project.Status.Phase)
 		formatString(out, "Node Selector", nodeSelector)
 		if len(resourceQuotaList.Items) == 0 {

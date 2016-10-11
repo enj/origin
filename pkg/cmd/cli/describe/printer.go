@@ -462,7 +462,7 @@ func printImageStreamList(streams *imageapi.ImageStreamList, w io.Writer, opts k
 
 func printProject(project *projectapi.Project, w io.Writer, opts kctl.PrintOptions) error {
 	name := formatResourceName(opts.Kind, project.Name, opts.WithKind)
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s", name, project.Annotations[projectapi.ProjectDisplayName], project.Status.Phase)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s", name, project.Annotations[bootstrappolicy.OpenShiftDisplayName], project.Status.Phase)
 	if err := appendItemLabels(project.Labels, w, opts.ColumnLabels, opts.ShowLabels); err != nil {
 		return err
 	}

@@ -29,16 +29,10 @@ import (
 )
 
 const (
-	// RoleSomething is an annotation that ???
-	RoleSomething = "authorization.openshift.io/user-friendly"
-	// Do something ???
-	RoleSomethingVal = "true"
-
-	// RoleDisplayName is an annotation that stores the name displayed when querying for roles
-	RoleDisplayName = "openshift.io/display-name"
-
-	// RoleDescription is an annotation that holds the description of the role
-	RoleDescription = "openshift.io/description"
+	// roleSystemOnly is an annotation key that determines if a role is system only
+	roleSystemOnly = "authorization.openshift.io/system-only"
+	// roleIsSystemOnly is an annotation value that denotes roleSystemOnly, and thus excludes it from the UI
+	roleIsSystemOnly = "true"
 )
 
 var (
@@ -105,7 +99,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ClusterAdminRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A super-user that can perform any action in any project. When granted to a user within a local policy, they have full control over quota and roles and every action on every resource in the project.",
+					OpenShiftDescription: "A super-user that can perform any action in any project. When granted to a user within a local policy, they have full control over quota and roles and every action on every resource in the project.",
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -238,8 +232,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: AdminRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A project manager. If used in a local binding, an admin user will have rights to view any resource in the project and modify any resource in the project except for role creation and quota. If the cluster-admin wants to allow an admin to modify roles, the cluster-admin must create a project-scoped Policy object using JSON.",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDescription: "A project manager. If used in a local binding, an admin user will have rights to view any resource in the project and modify any resource in the project except for role creation and quota. If the cluster-admin wants to allow an admin to modify roles, the cluster-admin must create a project-scoped Policy object using JSON.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -303,8 +297,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: EditRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A user that can modify most objects in a project, but does not have the power to view or modify roles or bindings.",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDescription: "A user that can modify most objects in a project, but does not have the power to view or modify roles or bindings.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -359,8 +353,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ViewRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A user who cannot make any modifications, but can see most objects in a project. They cannot view or modify roles or bindings.",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDescription: "A user who cannot make any modifications, but can see most objects in a project. They cannot view or modify roles or bindings.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -412,8 +406,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: BasicUserRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A user that can get basic information about projects and users.",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDescription: "A user that can get basic information about projects and users.",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -438,7 +432,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: SelfProvisionerRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A user that can create their own projects.",
+					OpenShiftDescription: "A user that can create their own projects.",
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -449,7 +443,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: StatusCheckerRoleName,
 				Annotations: map[string]string{
-					RoleDescription: "A user that can get basic cluster status information.",
+					OpenShiftDescription: "A user that can get basic cluster status information.",
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -475,8 +469,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImagePullerRoleName,
 				Annotations: map[string]string{
-					RoleDisplayName: "image-puller",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDisplayName: "image-puller",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -501,8 +495,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: ImageBuilderRoleName,
 				Annotations: map[string]string{
-					RoleDisplayName: "image-builder",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDisplayName: "image-builder",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{
@@ -541,8 +535,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			ObjectMeta: kapi.ObjectMeta{
 				Name: DeployerRoleName,
 				Annotations: map[string]string{
-					RoleDisplayName: "deployer",
-					RoleSomething:   RoleSomethingVal,
+					OpenShiftDisplayName: "deployer",
+					roleSystemOnly:       roleIsSystemOnly,
 				},
 			},
 			Rules: []authorizationapi.PolicyRule{

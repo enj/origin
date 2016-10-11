@@ -114,7 +114,7 @@ func ConvertProject(project *api.Project) *kapi.Namespace {
 	if namespace.Annotations == nil {
 		namespace.Annotations = map[string]string{}
 	}
-	namespace.Annotations[api.ProjectDisplayName] = project.Annotations[api.ProjectDisplayName]
+	namespace.Annotations[bootstrappolicy.OpenShiftDisplayName] = project.Annotations[bootstrappolicy.OpenShiftDisplayName]
 	return namespace
 }
 

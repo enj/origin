@@ -97,8 +97,8 @@ func (o *NewProjectOptions) Run(useNodeSelector bool) error {
 	project := &projectapi.Project{}
 	project.Name = o.ProjectName
 	project.Annotations = make(map[string]string)
-	project.Annotations[projectapi.ProjectDescription] = o.Description
-	project.Annotations[projectapi.ProjectDisplayName] = o.DisplayName
+	project.Annotations[bootstrappolicy.OpenShiftDescription] = o.Description
+	project.Annotations[bootstrappolicy.OpenShiftDisplayName] = o.DisplayName
 	if useNodeSelector {
 		project.Annotations[projectapi.ProjectNodeSelector] = o.NodeSelector
 	}

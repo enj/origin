@@ -40,7 +40,7 @@ func TestProjectStatus(t *testing.T) {
 						Name:      "example",
 						Namespace: "",
 						Annotations: map[string]string{
-							projectapi.ProjectDisplayName: "Test",
+							bootstrappolicy.OpenShiftDisplayName: "Test",
 						},
 					},
 				},
