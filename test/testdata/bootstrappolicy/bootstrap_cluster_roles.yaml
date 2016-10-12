@@ -3,6 +3,11 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
+      openshift.io/description: A super-user that can perform any action in any project.
+        When granted to a user within a local policy, they have full control over
+        quota and roles and every action on every resource in the project.
     creationTimestamp: null
     name: cluster-admin
   rules:
@@ -23,6 +28,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: sudoer
   rules:
@@ -38,6 +45,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: cluster-reader
   rules:
@@ -377,6 +386,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:build-strategy-docker
   rules:
@@ -390,6 +401,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:build-strategy-custom
   rules:
@@ -403,6 +416,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:build-strategy-source
   rules:
@@ -416,6 +431,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:build-strategy-jenkinspipeline
   rules:
@@ -429,6 +446,12 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/description: A project manager. If used in a local binding, an
+        admin user will have rights to view any resource in the project and modify
+        any resource in the project except for role creation and quota. If the cluster-admin
+        wants to allow an admin to modify roles, the cluster-admin must create a project-scoped
+        Policy object using JSON.
     creationTimestamp: null
     name: admin
   rules:
@@ -831,6 +854,9 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/description: A user that can modify most objects in a project,
+        but does not have the power to view or modify roles or bindings.
     creationTimestamp: null
     name: edit
   rules:
@@ -1171,6 +1197,9 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/description: A user who cannot make any modifications, but can
+        see most objects in a project. They cannot view or modify roles or bindings.
     creationTimestamp: null
     name: view
   rules:
@@ -1392,6 +1421,9 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/description: A user that can get basic information about projects
+        and users.
     creationTimestamp: null
     name: basic-user
   rules:
@@ -1447,6 +1479,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: self-access-reviewer
   rules:
@@ -1470,6 +1504,9 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
+      openshift.io/description: A user that can create their own projects.
     creationTimestamp: null
     name: self-provisioner
   rules:
@@ -1483,6 +1520,9 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
+      openshift.io/description: A user that can get basic cluster status information.
     creationTimestamp: null
     name: cluster-status
   rules:
@@ -1513,6 +1553,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:image-auditor
   rules:
@@ -1530,6 +1572,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/display-name: image-puller
     creationTimestamp: null
     name: system:image-puller
   rules:
@@ -1543,6 +1587,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/display-name: image-pusher
     creationTimestamp: null
     name: system:image-pusher
   rules:
@@ -1557,6 +1603,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/display-name: image-builder
     creationTimestamp: null
     name: system:image-builder
   rules:
@@ -1585,6 +1633,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:image-pruner
   rules:
@@ -1647,6 +1697,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:image-signer
   rules:
@@ -1669,6 +1721,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      openshift.io/display-name: deployer
     creationTimestamp: null
     name: system:deployer
   rules:
@@ -1717,6 +1771,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:master
   rules:
@@ -1737,6 +1793,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:oauth-token-deleter
   rules:
@@ -1751,6 +1809,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:router
   rules:
@@ -1788,6 +1848,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:registry
   rules:
@@ -1834,6 +1896,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:node-proxier
   rules:
@@ -1849,6 +1913,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:node-admin
   rules:
@@ -1882,6 +1948,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:node-reader
   rules:
@@ -1913,6 +1981,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:node
   rules:
@@ -2017,6 +2087,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:sdn-reader
   rules:
@@ -2059,6 +2131,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:sdn-manager
   rules:
@@ -2094,6 +2168,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:webhook
   rules:
@@ -2108,6 +2184,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:discovery
   rules:
@@ -2130,6 +2208,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: registry-admin
   rules:
@@ -2241,6 +2321,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: registry-editor
   rules:
@@ -2309,6 +2391,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: registry-viewer
   rules:
@@ -2348,6 +2432,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:build-controller
   rules:
@@ -2406,6 +2492,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:daemonset-controller
   rules:
@@ -2468,6 +2556,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:deployment-controller
   rules:
@@ -2521,6 +2611,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:deploymentconfig-controller
   rules:
@@ -2564,6 +2656,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:disruption-controller
   rules:
@@ -2610,6 +2704,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:endpoint-controller
   rules:
@@ -2644,6 +2740,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:gc-controller
   rules:
@@ -2665,6 +2763,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:hpa-controller
   rules:
@@ -2731,6 +2831,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:job-controller
   rules:
@@ -2792,6 +2894,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:namespace-controller
   rules:
@@ -2826,6 +2930,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:pet-set-controller
   rules:
@@ -2889,6 +2995,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:pv-attach-detach-controller
   rules:
@@ -2951,6 +3059,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:pv-binder-controller
   rules:
@@ -3039,6 +3149,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:pv-provisioner-controller
   rules:
@@ -3093,6 +3205,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:pv-recycler-controller
   rules:
@@ -3173,6 +3287,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:replicaset-controller
   rules:
@@ -3215,6 +3331,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:replication-controller
   rules:
@@ -3269,6 +3387,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:service-ingress-ip-controller
   rules:
@@ -3306,6 +3426,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:service-load-balancer-controller
   rules:
@@ -3351,6 +3473,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:service-serving-cert-controller
   rules:
@@ -3374,6 +3498,8 @@ items:
 - apiVersion: v1
   kind: ClusterRole
   metadata:
+    annotations:
+      authorization.openshift.io/system-only: "true"
     creationTimestamp: null
     name: system:unidling-controller
   rules:
