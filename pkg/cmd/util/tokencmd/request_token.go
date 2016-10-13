@@ -51,6 +51,9 @@ func RequestToken(clientCfg *restclient.Config, reader io.Reader, defaultUsernam
 	if GSSAPIEnabled() {
 		handlers = append(handlers, NewNegotiateChallengeHandler(NewGSSAPINegotiator(defaultUsername)))
 	}
+	if SSPIEnabled() {
+		handlers = append(handlers, NewNegotiateChallengeHandler(NewSSPINegotiator(defaultUsername, defaultPassword)))
+	}
 	if BasicEnabled() {
 		handlers = append(handlers, &BasicChallengeHandler{Host: clientCfg.Host, Reader: reader, Username: defaultUsername, Password: defaultPassword})
 	}
