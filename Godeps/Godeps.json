@@ -6223,6 +6223,14 @@
 			"ImportPath": "k8s.io/kubernetes/third_party/forked/golang/template",
 			"Comment": "v1.4.0-57-g776c994",
 			"Rev": "776c994514145ec6bea3ea2b8805b3c705703dff"
+		},
+		{
+			"ImportPath": "github.com/alexbrainman/sspi",
+			"Rev": "05f02589e649d91a0b4cdea4bb46e7c64d94862a"
+		},
+		{
+			"ImportPath": "github.com/alexbrainman/sspi/negotiate",
+			"Rev": "05f02589e649d91a0b4cdea4bb46e7c64d94862a"
 		}
 	]
 }
