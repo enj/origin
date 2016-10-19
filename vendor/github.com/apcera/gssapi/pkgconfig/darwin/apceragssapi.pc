@@ -1,0 +1,12 @@
+prefix=$GSSAPI
+exec_prefix=${prefix}
+libdir=${exec_prefix}/headers/darwin
+includedir=${prefix}/headers/darwin
+libname=apceragssapi
+
+Name: apceragssapi
+Description: Go GSSAPI
+Version: 1.0
+Requires:
+Libs: -L${libdir} -l${libname}
+Cflags: -I${includedir}

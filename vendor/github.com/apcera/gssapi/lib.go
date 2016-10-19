@@ -7,6 +7,7 @@ package gssapi
 /*
 #cgo linux LDFLAGS: -ldl
 #cgo freebsd pkg-config: heimdal-gssapi
+#cgo darwin pkg-config: apceragssapi --define-variable=prefix=.
 
 #include <gssapi/gssapi.h>
 #include <dlfcn.h>
