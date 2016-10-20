@@ -8,5 +8,5 @@ Name: apceragssapi
 Description: Go GSSAPI
 Version: 1.0
 Requires:
-Libs: -L${libdir} -l${libname}
+Libs: -L${libdir} -lgssapi_krb5 -ldl
 Cflags: -I${includedir}
