@@ -34,6 +34,7 @@ func NewSSPINegotiator(principalName, password string) Negotiater {
 }
 
 func (s *sspiNegotiater) Load() error {
+	glog.V(5).Info("Attempt to load SSPI")
 	return nil
 }
 
@@ -51,7 +52,7 @@ func (s *sspiNegotiater) InitSecContext(requestURL string, challengeToken []byte
 			return nil, err
 		}
 
-		serviceName := "HTTP/" + strings.ToUpper(hostname)
+		serviceName := "HTTP/" + hostname // TODO refactor these together if they are the same
 		glog.V(5).Infof("importing service name %s", serviceName)
 		ctx, token, err := negotiate.NewClientContext(s.cred, serviceName)
 		if err != nil {
@@ -76,6 +77,7 @@ func (s *sspiNegotiater) IsComplete() bool {
 }
 
 func (s *sspiNegotiater) Release() error {
+	glog.V(5).Info("Attempt to release SSPI")
 	var errs []error // TODO make sure these errors and the ones in InitSecContext are safe to use => I think they are
 	if s.ctx != nil {
 		if err := s.ctx.Release(); err != nil {
@@ -98,6 +100,7 @@ func (s *sspiNegotiater) getUserCredentials() (*sspi.Credentials, error) {
 		if err != nil {
 			return nil, err
 		}
+		glog.V(5).Info("Using AcquireUserCredentials because principalName is not empty")
 		cred, err := negotiate.AcquireUserCredentials(domain, username, s.password)
 		if err != nil {
 			if u, uerr := user.Current(); uerr == nil && u.Username == username && domain == getCurrentUserDomain() {
@@ -107,6 +110,7 @@ func (s *sspiNegotiater) getUserCredentials() (*sspi.Credentials, error) {
 			glog.V(5).Info("AcquireUserCredentials failed and not falling back to AcquireCurrentUserCredentials because principalName is not the current user")
 			return nil, err
 		}
+		glog.V(5).Info("AcquireUserCredentials successful")
 		return cred, nil
 	}
 	glog.V(5).Info("Using AcquireCurrentUserCredentials because principalName is empty")
