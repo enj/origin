@@ -136,6 +136,11 @@ func (s *sspiNegotiater) splitDomainAndUsername() (string, string, error) {
 }
 
 func getCurrentUserDomain() string {
-	domain, _ := os.LookupEnv("USERDOMAIN") // TODO there has to be a better way to do this
-	return domain
+	for _, env := range []string{"USERDNSDOMAIN", "USERDOMAIN"} {
+		domain, ok := os.LookupEnv(env) // TODO there has to be a better way to do this => use syscall or sys/x/
+		if ok {
+			return domain
+		}
+	}
+	return ""
 }
