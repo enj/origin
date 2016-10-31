@@ -3,7 +3,6 @@ package jenkinsbootstrapper
 import (
 	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/admission"
@@ -14,7 +13,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	kutilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -89,12 +87,6 @@ func (a *jenkinsBootstrapper) Admit(attributes admission.Attributes) error {
 		return fmt.Errorf("template %s/%s does not contain required service %q", a.jenkinsConfig.TemplateNamespace, a.jenkinsConfig.TemplateName, a.jenkinsConfig.ServiceName)
 	}
 
-	impersonatingConfig := a.privilegedRESTClientConfig
-	oldWrapTransport := impersonatingConfig.WrapTransport
-	impersonatingConfig.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-		return authenticationclient.NewImpersonatingRoundTripper(attributes.GetUserInfo(), oldWrapTransport(rt))
-	}
-
 	var bulkErr error
 
 	bulk := &cmd.Bulk{
@@ -102,10 +94,11 @@ func (a *jenkinsBootstrapper) Admit(attributes admission.Attributes) error {
 			RESTMapper:  registered.RESTMapper(),
 			ObjectTyper: kapi.Scheme,
 			ClientMapper: resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+				user := attributes.GetUserInfo()
 				if latest.OriginKind(mapping.GroupVersionKind) {
-					return client.New(&impersonatingConfig)
+					return authenticationclient.NewImpersonatingOpenShiftClient(user, a.privilegedRESTClientConfig)
 				}
-				return kclient.New(&impersonatingConfig)
+				return authenticationclient.NewImpersonatingKubernetesClient(user, a.privilegedRESTClientConfig)
 			}),
 		},
 		Op: cmd.Create,

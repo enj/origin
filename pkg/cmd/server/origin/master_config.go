@@ -144,9 +144,13 @@ type MasterConfig struct {
 	// APIClientCAs is used to verify client certificates presented for API auth
 	APIClientCAs *x509.CertPool
 
-	// PrivilegedLoopbackClientConfig is the client configuration used to call OpenShift APIs from system components
+	// PrivilegedLoopbackKubernetesClientConfig is the client configuration used to call Kubernetes APIs from system components
 	// To apply different access control to a system component, create a client config specifically for that component.
-	PrivilegedLoopbackClientConfig restclient.Config
+	PrivilegedLoopbackKubernetesClientConfig restclient.Config
+
+	// PrivilegedLoopbackOpenShiftClientConfig is the client configuration used to call OpenShift APIs from system components
+	// To apply different access control to a system component, create a client config specifically for that component.
+	PrivilegedLoopbackOpenShiftClientConfig restclient.Config
 
 	// PrivilegedLoopbackKubernetesClient is the client used to call Kubernetes APIs from system components,
 	// built from KubeClientConfig. It should only be accessed via the *Client() helper methods. To apply
@@ -183,11 +187,11 @@ func BuildMasterConfig(options configapi.MasterConfig) (*MasterConfig, error) {
 		return nil, err
 	}
 
-	privilegedLoopbackKubeClient, _, err := configapi.GetKubeClient(options.MasterClients.OpenShiftLoopbackKubeConfig, options.MasterClients.OpenShiftLoopbackClientConnectionOverrides)
+	privilegedLoopbackKubeClient, privilegedLoopbackKubeClientConfig, err := configapi.GetKubeClient(options.MasterClients.OpenShiftLoopbackKubeConfig, options.MasterClients.OpenShiftLoopbackClientConnectionOverrides)
 	if err != nil {
 		return nil, err
 	}
-	privilegedLoopbackOpenShiftClient, privilegedLoopbackClientConfig, err := configapi.GetOpenShiftClient(options.MasterClients.OpenShiftLoopbackKubeConfig, options.MasterClients.OpenShiftLoopbackClientConnectionOverrides)
+	privilegedLoopbackOpenShiftClient, privilegedLoopbackOpenShiftClientConfig, err := configapi.GetOpenShiftClient(options.MasterClients.OpenShiftLoopbackKubeConfig, options.MasterClients.OpenShiftLoopbackClientConnectionOverrides)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +241,7 @@ func BuildMasterConfig(options configapi.MasterConfig) (*MasterConfig, error) {
 		OriginQuotaRegistry:   quotaRegistry,
 		Authorizer:            authorizer,
 		JenkinsPipelineConfig: options.JenkinsPipelineConfig,
-		RESTClientConfig:      *privilegedLoopbackClientConfig,
+		RESTClientConfig:      *privilegedLoopbackOpenShiftClientConfig,
 		Informers:             informerFactory,
 		ClusterQuotaMapper:    clusterQuotaMappingController.GetClusterQuotaMapper(),
 		DefaultRegistryFn:     imageapi.DefaultRegistryFunc(defaultRegistryFunc),
@@ -295,10 +299,11 @@ func BuildMasterConfig(options configapi.MasterConfig) (*MasterConfig, error) {
 		ClientCAs:    clientCAs,
 		APIClientCAs: apiClientCAs,
 
-		PrivilegedLoopbackClientConfig:     *privilegedLoopbackClientConfig,
-		PrivilegedLoopbackOpenShiftClient:  privilegedLoopbackOpenShiftClient,
-		PrivilegedLoopbackKubernetesClient: privilegedLoopbackKubeClient,
-		Informers:                          informerFactory,
+		PrivilegedLoopbackOpenShiftClientConfig:  *privilegedLoopbackOpenShiftClientConfig,
+		PrivilegedLoopbackOpenShiftClient:        privilegedLoopbackOpenShiftClient,
+		PrivilegedLoopbackKubernetesClientConfig: *privilegedLoopbackKubeClientConfig,
+		PrivilegedLoopbackKubernetesClient:       privilegedLoopbackKubeClient,
+		Informers:                                informerFactory,
 	}
 
 	// ensure that the limit range informer will be started
@@ -995,7 +1000,7 @@ func (c *MasterConfig) GetServiceAccountClients(name string) (*restclient.Config
 		return nil, nil, nil, errors.New("No service account name specified")
 	}
 	return serviceaccounts.Clients(
-		c.PrivilegedLoopbackClientConfig,
+		c.PrivilegedLoopbackOpenShiftClientConfig,
 		&serviceaccounts.ClientLookupTokenRetriever{Client: c.PrivilegedLoopbackKubernetesClient},
 		c.Options.PolicyConfig.OpenShiftInfrastructureNamespace,
 		name,

@@ -2,19 +2,23 @@ package proxy
 
 import (
 	"fmt"
+	"strings"
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	nsregistry "k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 
 	oapi "github.com/openshift/origin/pkg/api"
+	authenticationclient "github.com/openshift/origin/pkg/auth/client"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	"github.com/openshift/origin/pkg/project/api"
@@ -28,6 +32,8 @@ import (
 type REST struct {
 	// client can modify Kubernetes namespaces
 	client kclient.NamespaceInterface
+	// config to build a client that can modify Kubernetes namespaces
+	config restclient.Config
 	// lister can enumerate project lists that enforce policy
 	lister projectauth.Lister
 	// Allows extended behavior during creation, required
@@ -40,9 +46,10 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against Project resources
-func NewREST(client kclient.NamespaceInterface, lister projectauth.Lister, authCache *projectauth.AuthorizationCache, projectCache *projectcache.ProjectCache) *REST {
+func NewREST(client kclient.NamespaceInterface, privilegedConfig restclient.Config, lister projectauth.Lister, authCache *projectauth.AuthorizationCache, projectCache *projectcache.ProjectCache) *REST {
 	return &REST{
 		client:         client,
+		config:         privilegedConfig,
 		lister:         lister,
 		createStrategy: projectregistry.Strategy,
 		updateStrategy: projectregistry.Strategy,
@@ -153,18 +160,43 @@ func (s *REST) Update(ctx kapi.Context, name string, objInfo rest.UpdatedObjectI
 	if !ok {
 		return nil, false, fmt.Errorf("not a project: %#v", obj)
 	}
+	namespace := projectutil.ConvertProject(project)
 
 	s.updateStrategy.PrepareForUpdate(ctx, obj, oldObj)
 	if errs := s.updateStrategy.ValidateUpdate(ctx, obj, oldObj); len(errs) > 0 {
-		return nil, false, kerrors.NewInvalid(projectapi.Kind("Project"), project.Name, errs)
+		namespace, err = s.tryImpersonatingNamespaceUpdateOnMetadataError(namespace, ctx, errs)
+	} else {
+		namespace, err = s.client.Update(namespace)
 	}
 
-	namespace, err := s.client.Update(projectutil.ConvertProject(project))
 	if err != nil {
 		return nil, false, err
 	}
 
 	return projectutil.ConvertNamespace(namespace), false, nil
+}
+
+func (s *REST) tryImpersonatingNamespaceUpdateOnMetadataError(namespace *kapi.Namespace, ctx kapi.Context, errs field.ErrorList) (*kapi.Namespace, error) {
+	// If the error is in the metadata's annotations or labels, we try to impersonate the user and update the namespace
+	if containsAnnotationOrLabelMetadataError(errs) {
+		if user, ok := kapi.UserFrom(ctx); ok {
+			if impersonatingClient, err := authenticationclient.NewImpersonatingKubernetesClient(user, s.config); err == nil {
+				if namespace, err := impersonatingClient.Namespaces().Update(namespace); err == nil {
+					return namespace, nil // There was no error updating the namespace so the user has the rights to do so
+				}
+			}
+		}
+	}
+	return nil, kerrors.NewInvalid(projectapi.Kind("Project"), namespace.Name, errs) // Namespace has the same name as the project
+}
+
+func containsAnnotationOrLabelMetadataError(errs field.ErrorList) bool {
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeInvalid && (strings.HasPrefix(err.Field, "metadata.annotations[") || strings.HasPrefix(err.Field, "metadata.labels[")) {
+			return true
+		}
+	}
+	return false
 }
 
 var _ = rest.Deleter(&REST{})
