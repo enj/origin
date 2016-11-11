@@ -35,7 +35,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 }
 
 func (s *storage) ClientAuthorizationName(userName, clientName string) string {
-	return userName + ":" + clientName
+	return getClientAuthorizationName(userName, clientName)
 }
 
 func (s *storage) ListClientAuthorizations(ctx kapi.Context, options *kapi.ListOptions) (*api.OAuthClientAuthorizationList, error) {

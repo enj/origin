@@ -29,7 +29,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
 	auth := obj.(*api.OAuthClientAuthorization)
-	auth.Name = fmt.Sprintf("%s:%s", auth.UserName, auth.ClientName)
+	auth.Name = getClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
 // NamespaceScoped is false for OAuth objects
@@ -43,7 +43,7 @@ func (strategy) GenerateName(base string) string {
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
 	auth := obj.(*api.OAuthClientAuthorization)
-	auth.Name = fmt.Sprintf("%s:%s", auth.UserName, auth.ClientName)
+	auth.Name = getClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -55,7 +55,7 @@ func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList
 	auth := obj.(*api.OAuthClientAuthorization)
 	validationErrors := validation.ValidateClientAuthorization(auth)
 
-	client, err := s.clientGetter.GetClient(ctx, auth.ClientName)
+	client, err := s.clientGetter.GetClient(ctx, auth.ClientName) // TODO validate user + uid?
 	if err != nil {
 		return append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
 	}
@@ -72,7 +72,7 @@ func (s strategy) ValidateUpdate(ctx kapi.Context, obj runtime.Object, old runti
 	oldClientAuth := old.(*api.OAuthClientAuthorization)
 	validationErrors := validation.ValidateClientAuthorizationUpdate(clientAuth, oldClientAuth)
 
-	client, err := s.clientGetter.GetClient(ctx, clientAuth.ClientName)
+	client, err := s.clientGetter.GetClient(ctx, clientAuth.ClientName) // TODO validate user + uid?
 	if err != nil {
 		return append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
 	}

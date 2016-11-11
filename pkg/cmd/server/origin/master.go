@@ -719,6 +719,8 @@ func (c *MasterConfig) GetRestStorage() map[string]rest.Storage {
 	checkStorageErr(err)
 	clientAuthorizationStorage, err := clientauthetcd.NewREST(c.RESTOptionsGetter, combinedOAuthClientGetter)
 	checkStorageErr(err)
+	selfClientAuthorizationStorage, err := clientauthetcd.NewSelfREST(c.RESTOptionsGetter, combinedOAuthClientGetter)
+	checkStorageErr(err)
 
 	templateStorage, err := templateetcd.NewREST(c.RESTOptionsGetter)
 	checkStorageErr(err)
@@ -764,10 +766,11 @@ func (c *MasterConfig) GetRestStorage() map[string]rest.Storage {
 		"identities":           identityStorage,
 		"userIdentityMappings": userIdentityMappingStorage,
 
-		"oAuthAuthorizeTokens":      authorizeTokenStorage,
-		"oAuthAccessTokens":         accessTokenStorage,
-		"oAuthClients":              clientStorage,
-		"oAuthClientAuthorizations": clientAuthorizationStorage,
+		"oAuthAuthorizeTokens":          authorizeTokenStorage,
+		"oAuthAccessTokens":             accessTokenStorage,
+		"oAuthClients":                  clientStorage,
+		"oAuthClientAuthorizations":     clientAuthorizationStorage,
+		"selfOAuthClientAuthorizations": selfClientAuthorizationStorage,
 
 		"resourceAccessReviews":      resourceAccessReviewStorage,
 		"subjectAccessReviews":       subjectAccessReviewStorage,

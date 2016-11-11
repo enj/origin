@@ -246,7 +246,7 @@ func (l *Grant) handleGrant(user user.Info, w http.ResponseWriter, req *http.Req
 
 	clientAuthID := l.authregistry.ClientAuthorizationName(user.GetName(), client.Name)
 
-	ctx := kapi.NewContext()
+	ctx := kapi.WithUser(kapi.NewContext(), user)
 	clientAuth, err := l.authregistry.GetClientAuthorization(ctx, clientAuthID)
 	if err == nil && clientAuth != nil {
 		// Add new scopes and update

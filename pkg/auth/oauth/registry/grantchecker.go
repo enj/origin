@@ -22,7 +22,7 @@ func NewClientAuthorizationGrantChecker(registry oauthclientauthorization.Regist
 
 func (c *ClientAuthorizationGrantChecker) HasAuthorizedClient(user user.Info, grant *api.Grant) (approved bool, err error) {
 	id := c.registry.ClientAuthorizationName(user.GetName(), grant.Client.GetId())
-	authorization, err := c.registry.GetClientAuthorization(kapi.NewContext(), id)
+	authorization, err := c.registry.GetClientAuthorization(kapi.WithUser(kapi.NewContext(), user), id)
 	if errors.IsNotFound(err) {
 		return false, nil
 	}
