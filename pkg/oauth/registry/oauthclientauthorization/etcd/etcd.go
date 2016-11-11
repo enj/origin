@@ -78,8 +78,8 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 	prefix := "/" + opts.ResourcePrefix
 
 	store := &registry.Store{
-		NewFunc:     func() runtime.Object { return &api.OAuthClientAuthorization{} },
-		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
+		NewFunc:     func() runtime.Object { return &api.SelfOAuthClientAuthorization{} },
+		NewListFunc: func() runtime.Object { return &api.SelfOAuthClientAuthorizationList{} },
 		KeyRootFunc: func(ctx kapi.Context) string {
 			user, ok := kapi.UserFrom(ctx)
 			if !ok {
@@ -100,7 +100,7 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+username, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.OAuthClientAuthorization).Name, nil
+			return obj.(*api.SelfOAuthClientAuthorization).Name, nil
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 			return oauthclientauthorization.Matcher(label, field)

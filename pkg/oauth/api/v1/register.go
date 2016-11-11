@@ -25,12 +25,17 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OAuthClient{},
 		&OAuthClientList{},
 		&OAuthClientAuthorization{},
+		&SelfOAuthClientAuthorization{},
 		&OAuthClientAuthorizationList{},
+		&SelfOAuthClientAuthorizationList{},
 		&OAuthRedirectReference{},
 	)
 	return nil
 }
 
+func (obj *SelfOAuthClientAuthorizationList) GetObjectKind() unversioned.ObjectKind {
+	return &obj.TypeMeta
+}
 func (obj *OAuthClientAuthorizationList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *OAuthClientAuthorization) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *OAuthClientList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }

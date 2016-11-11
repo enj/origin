@@ -109,7 +109,9 @@ func NewHumanReadablePrinter(printOptions kctl.PrintOptions) *kctl.HumanReadable
 	p.Handler(oauthClientColumns, printOAuthClient)
 	p.Handler(oauthClientColumns, printOAuthClientList)
 	p.Handler(oauthClientAuthorizationColumns, printOAuthClientAuthorization)
+	p.Handler(oauthClientAuthorizationColumns, printSelfOAuthClientAuthorization)
 	p.Handler(oauthClientAuthorizationColumns, printOAuthClientAuthorizationList)
+	p.Handler(oauthClientAuthorizationColumns, printSelfOAuthClientAuthorizationList)
 	p.Handler(oauthAccessTokenColumns, printOAuthAccessToken)
 	p.Handler(oauthAccessTokenColumns, printOAuthAccessTokenList)
 	p.Handler(oauthAuthorizeTokenColumns, printOAuthAuthorizeToken)
@@ -850,9 +852,22 @@ func printOAuthClientAuthorization(auth *oauthapi.OAuthClientAuthorization, w io
 	return err
 }
 
+func printSelfOAuthClientAuthorization(auth *oauthapi.SelfOAuthClientAuthorization, w io.Writer, opts kctl.PrintOptions) error {
+	return printOAuthClientAuthorization((*oauthapi.OAuthClientAuthorization)(auth), w, opts)
+}
+
 func printOAuthClientAuthorizationList(list *oauthapi.OAuthClientAuthorizationList, w io.Writer, opts kctl.PrintOptions) error {
 	for _, item := range list.Items {
 		if err := printOAuthClientAuthorization(&item, w, opts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printSelfOAuthClientAuthorizationList(list *oauthapi.SelfOAuthClientAuthorizationList, w io.Writer, opts kctl.PrintOptions) error {
+	for _, item := range list.Items {
+		if err := printSelfOAuthClientAuthorization(&item, w, opts); err != nil {
 			return err
 		}
 	}

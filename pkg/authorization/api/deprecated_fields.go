@@ -55,7 +55,7 @@ var (
 		sdnGroupName:         {"clusternetworks", "hostsubnets", "netnamespaces"},
 		templateGroupName:    {"templates", "templateconfigs", "processedtemplates"},
 		userGroupName:        {"identities", "users", "useridentitymappings", "groups"},
-		oauthGroupName:       {"oauthauthorizetokens", "oauthaccesstokens", "oauthclients", "oauthclientauthorizations"},
+		oauthGroupName:       {"oauthauthorizetokens", "oauthaccesstokens", "oauthclients", "oauthclientauthorizations", "selfoauthclientauthorizations"},
 		policyOwnerGroupName: {"policies", "policybindings"},
 
 		// RAR and SAR are in this list to support backwards compatibility with clients that expect access to those resource in a namespace scope and a cluster scope.

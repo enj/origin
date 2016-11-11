@@ -144,6 +144,8 @@ type OAuthClientAuthorization struct {
 	Scopes []string
 }
 
+type SelfOAuthClientAuthorization OAuthClientAuthorization
+
 type OAuthAccessTokenList struct {
 	unversioned.TypeMeta
 	unversioned.ListMeta
@@ -166,6 +168,12 @@ type OAuthClientAuthorizationList struct {
 	unversioned.TypeMeta
 	unversioned.ListMeta
 	Items []OAuthClientAuthorization
+}
+
+type SelfOAuthClientAuthorizationList struct {
+	unversioned.TypeMeta
+	unversioned.ListMeta
+	Items []SelfOAuthClientAuthorization
 }
 
 type OAuthRedirectReference struct {
