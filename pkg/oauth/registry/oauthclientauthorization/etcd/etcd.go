@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/origin/pkg/oauth/api"
 	"github.com/openshift/origin/pkg/oauth/registry/oauthclient"
 	"github.com/openshift/origin/pkg/oauth/registry/oauthclientauthorization"
+	oauthclientauthorizationhelpers "github.com/openshift/origin/pkg/oauth/registry/oauthclientauthorization/helpers"
 	"github.com/openshift/origin/pkg/util/restoptions"
 )
 
@@ -63,10 +64,10 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 }
 
 func userNameFromName(name string) string {
-	if !strings.Contains(name, oauthclientauthorization.NameSeparator) {
+	if !strings.Contains(name, oauthclientauthorizationhelpers.UserSpaceSeparator) {
 		return ""
 	}
-	return strings.SplitN(name, oauthclientauthorization.NameSeparator, 2)[0]
+	return strings.SplitN(name, oauthclientauthorizationhelpers.UserSpaceSeparator, 2)[0]
 }
 
 func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*REST, error) {
@@ -93,7 +94,7 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 				return "", kubeerr.NewBadRequest("User parameter required.")
 			}
 			username := user.GetName()
-			namePrefix := username + oauthclientauthorization.NameSeparator
+			namePrefix := username + oauthclientauthorizationhelpers.UserSpaceSeparator
 			if !strings.HasPrefix(name, namePrefix) {
 				return "", kubeerr.NewForbidden(resource, name, fmt.Errorf("Name parameter invalid: %q: must start with %s", name, namePrefix))
 			}

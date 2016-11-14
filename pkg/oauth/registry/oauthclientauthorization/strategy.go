@@ -14,6 +14,7 @@ import (
 
 	scopeauthorizer "github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	"github.com/openshift/origin/pkg/oauth/registry/oauthclient"
+	oauthclientauthorizationhelpers "github.com/openshift/origin/pkg/oauth/registry/oauthclientauthorization/helpers"
 )
 
 // strategy implements behavior for OAuthClientAuthorization objects
@@ -29,7 +30,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
 	auth := obj.(*api.OAuthClientAuthorization)
-	auth.Name = getClientAuthorizationName(auth.UserName, auth.ClientName)
+	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
 // NamespaceScoped is false for OAuth objects
@@ -43,7 +44,7 @@ func (strategy) GenerateName(base string) string {
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
 	auth := obj.(*api.OAuthClientAuthorization)
-	auth.Name = getClientAuthorizationName(auth.UserName, auth.ClientName)
+	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
 // Canonicalize normalizes the object after validation.

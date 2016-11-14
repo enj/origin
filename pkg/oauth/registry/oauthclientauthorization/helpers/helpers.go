@@ -1,7 +1,7 @@
-package oauthclientauthorization
+package helpers
 
-const NameSeparator = "::"
+const UserSpaceSeparator = "::"
 
-func getClientAuthorizationName(userName, clientName string) string {
-	return userName + NameSeparator + clientName
+func GetClientAuthorizationName(userName, clientName string) string {
+	return userName + UserSpaceSeparator + clientName
 }
