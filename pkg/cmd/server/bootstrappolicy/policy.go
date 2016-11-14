@@ -539,7 +539,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				Name: OAuthSelfClientAuthorizerRoleName,
 			},
 			Rules: []authorizationapi.PolicyRule{
-				authorizationapi.NewRule("get", "list", "create", "update", "delete").Groups(oauthGroup).Resources("selfoauthclientauthorizations").RuleOrDie(),
+				authorizationapi.NewRule(readWrite...).Groups(oauthGroup).Resources("selfoauthclientauthorizations").RuleOrDie(),
 			},
 		},
 		{

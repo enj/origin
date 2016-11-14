@@ -83,7 +83,7 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 
 func applyOAuthClientAuthorizationOptions(optsGetter restoptions.Getter, clientGetter oauthclient.Getter, store *registry.Store, resource *unversioned.GroupResource) (*REST, error) {
 	store.ObjectNameFunc = func(obj runtime.Object) (string, error) {
-		return obj.(*api.OAuthClientAuthorization).Name, nil
+		return oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj).Name, nil
 	}
 	store.PredicateFunc = func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 		return oauthclientauthorization.Matcher(label, field)

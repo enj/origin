@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/openshift/origin/pkg/oauth/api"
 	"github.com/openshift/origin/pkg/util/restoptions"
@@ -29,4 +30,22 @@ func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*
 		return nil, "", err
 	}
 	return &resource, "/" + opts.ResourcePrefix, nil
+}
+
+func ObjectToOAuthClientAuthorization(obj runtime.Object) *api.OAuthClientAuthorization {
+	if auth, ok := SafeObjectToOAuthClientAuthorization(obj); ok {
+		return auth
+	}
+	panic("not an OAuthClientAuthorization")
+}
+
+func SafeObjectToOAuthClientAuthorization(obj runtime.Object) (*api.OAuthClientAuthorization, bool) {
+	switch auth := obj.(type) {
+	case *api.OAuthClientAuthorization:
+		return auth, true
+	case *api.SelfOAuthClientAuthorization:
+		return (*api.OAuthClientAuthorization)(auth), true
+	default:
+		return nil, false
+	}
 }

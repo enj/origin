@@ -29,7 +29,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 }
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
-	auth := obj.(*api.OAuthClientAuthorization)
+	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
@@ -43,7 +43,7 @@ func (strategy) GenerateName(base string) string {
 }
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
-	auth := obj.(*api.OAuthClientAuthorization)
+	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
@@ -53,7 +53,7 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // Validate validates a new client
 func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList {
-	auth := obj.(*api.OAuthClientAuthorization)
+	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	validationErrors := validation.ValidateClientAuthorization(auth)
 
 	client, err := s.clientGetter.GetClient(ctx, auth.ClientName) // TODO validate user + uid?
@@ -69,8 +69,8 @@ func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList
 
 // ValidateUpdate validates a client auth update
 func (s strategy) ValidateUpdate(ctx kapi.Context, obj runtime.Object, old runtime.Object) field.ErrorList {
-	clientAuth := obj.(*api.OAuthClientAuthorization)
-	oldClientAuth := old.(*api.OAuthClientAuthorization)
+	clientAuth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
+	oldClientAuth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(old)
 	validationErrors := validation.ValidateClientAuthorizationUpdate(clientAuth, oldClientAuth)
 
 	client, err := s.clientGetter.GetClient(ctx, clientAuth.ClientName) // TODO validate user + uid?
@@ -98,9 +98,9 @@ func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPre
 		Label: label,
 		Field: field,
 		GetAttrs: func(o runtime.Object) (labels.Set, fields.Set, error) {
-			obj, ok := o.(*api.OAuthClientAuthorization)
+			obj, ok := oauthclientauthorizationhelpers.SafeObjectToOAuthClientAuthorization(o)
 			if !ok {
-				return nil, nil, fmt.Errorf("not a OAuthClientAuthorization")
+				return nil, nil, fmt.Errorf("not an OAuthClientAuthorization")
 			}
 			return labels.Set(obj.Labels), SelectableFields(obj), nil
 		},
