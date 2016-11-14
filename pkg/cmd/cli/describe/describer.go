@@ -57,6 +57,7 @@ func describerMap(c *client.Client, kclient kclient.Interface, host string) map[
 		authorizationapi.Kind("ClusterRoleBinding"):   &ClusterRoleBindingDescriber{c},
 		authorizationapi.Kind("ClusterRole"):          &ClusterRoleDescriber{c},
 		oauthapi.Kind("OAuthAccessToken"):             &OAuthAccessTokenDescriber{c},
+		oauthapi.Kind("SelfOAuthClientAuthorization"): &SelfOAuthClientAuthorizationDescriber{},
 		userapi.Kind("User"):                          &UserDescriber{c},
 		userapi.Kind("Group"):                         &GroupDescriber{c.Groups()},
 		userapi.Kind("UserIdentityMapping"):           &UserIdentityMappingDescriber{c},
@@ -496,6 +497,12 @@ func (d *OAuthAccessTokenDescriber) Describe(namespace, name string, settings kc
 
 		return nil
 	})
+}
+
+type SelfOAuthClientAuthorizationDescriber struct{}
+
+func (d *SelfOAuthClientAuthorizationDescriber) Describe(namespace, name string, settings kctl.DescriberSettings) (string, error) {
+	return "TODO", nil // TODO implement this
 }
 
 // ImageDescriber generates information about a Image
