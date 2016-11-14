@@ -6,6 +6,7 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -27,56 +28,31 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against oauth clients
 func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*REST, error) {
-	resource := api.Resource("oauthclientauthorizations")
-	opts, err := optsGetter.GetRESTOptions(resource)
+	resource, prefix, err := oauthclientauthorizationhelpers.GetResourceAndPrefix(optsGetter, "oauthclientauthorizations")
 	if err != nil {
 		return nil, fmt.Errorf("error building RESTOptions for %s store: %v", resource.String(), err)
 	}
-	prefix := "/" + opts.ResourcePrefix
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.OAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
-			username := userNameFromName(name)
+			username := oauthclientauthorizationhelpers.UserNameFromClientAuthorizationName(name)
 			if len(username) == 0 {
 				return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q", name))
 			}
 			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+username, name)
 		},
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.OAuthClientAuthorization).Name, nil
-		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-			return oauthclientauthorization.Matcher(label, field)
-		},
-		QualifiedResource: resource,
-
-		CreateStrategy: oauthclientauthorization.NewStrategy(clientGetter),
-		UpdateStrategy: oauthclientauthorization.NewStrategy(clientGetter),
 	}
 
-	if err := restoptions.ApplyOptions(optsGetter, store, false, storage.NoTriggerPublisher); err != nil {
-		return nil, err
-	}
-
-	return &REST{*store}, nil
-}
-
-func userNameFromName(name string) string {
-	if !strings.Contains(name, oauthclientauthorizationhelpers.UserSpaceSeparator) {
-		return ""
-	}
-	return strings.SplitN(name, oauthclientauthorizationhelpers.UserSpaceSeparator, 2)[0]
+	return applyOAuthClientAuthorizationOptions(optsGetter, clientGetter, store, resource)
 }
 
 func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*REST, error) {
-	resource := api.Resource("selfoauthclientauthorizations")
-	opts, err := optsGetter.GetRESTOptions(resource)
+	resource, prefix, err := oauthclientauthorizationhelpers.GetResourceAndPrefix(optsGetter, "selfoauthclientauthorizations")
 	if err != nil {
 		return nil, fmt.Errorf("error building RESTOptions for %s store: %v", resource.String(), err)
 	}
-	prefix := "/" + opts.ResourcePrefix
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.SelfOAuthClientAuthorization{} },
@@ -96,21 +72,25 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 			username := user.GetName()
 			namePrefix := username + oauthclientauthorizationhelpers.UserSpaceSeparator
 			if !strings.HasPrefix(name, namePrefix) {
-				return "", kubeerr.NewForbidden(resource, name, fmt.Errorf("Name parameter invalid: %q: must start with %s", name, namePrefix))
+				return "", kubeerr.NewForbidden(*resource, name, fmt.Errorf("Name parameter invalid: %q: must start with %s", name, namePrefix))
 			}
 			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+username, name)
 		},
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.SelfOAuthClientAuthorization).Name, nil
-		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-			return oauthclientauthorization.Matcher(label, field)
-		},
-		QualifiedResource: resource,
-
-		CreateStrategy: oauthclientauthorization.NewStrategy(clientGetter),
-		UpdateStrategy: oauthclientauthorization.NewStrategy(clientGetter),
 	}
+
+	return applyOAuthClientAuthorizationOptions(optsGetter, clientGetter, store, resource)
+}
+
+func applyOAuthClientAuthorizationOptions(optsGetter restoptions.Getter, clientGetter oauthclient.Getter, store *registry.Store, resource *unversioned.GroupResource) (*REST, error) {
+	store.ObjectNameFunc = func(obj runtime.Object) (string, error) {
+		return obj.(*api.OAuthClientAuthorization).Name, nil
+	}
+	store.PredicateFunc = func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+		return oauthclientauthorization.Matcher(label, field)
+	}
+	store.QualifiedResource = *resource
+	store.CreateStrategy = oauthclientauthorization.NewStrategy(clientGetter)
+	store.UpdateStrategy = oauthclientauthorization.NewStrategy(clientGetter)
 
 	if err := restoptions.ApplyOptions(optsGetter, store, false, storage.NoTriggerPublisher); err != nil {
 		return nil, err
