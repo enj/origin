@@ -21,13 +21,16 @@ func NewClientAuthorizationGrantChecker(registry oauthclientauthorization.Regist
 }
 
 func (c *ClientAuthorizationGrantChecker) HasAuthorizedClient(user user.Info, grant *api.Grant) (approved bool, err error) {
-	id := c.registry.ClientAuthorizationName(user.GetName(), grant.Client.GetId())
+	id := c.registry.ClientAuthorizationName(user.GetUID(), grant.Client.GetId())
 	authorization, err := c.registry.GetClientAuthorization(kapi.WithUser(kapi.NewContext(), user), id)
 	if errors.IsNotFound(err) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
+	}
+	if authorization.UserName != user.GetName() {
+		return false, fmt.Errorf("user UserName %s does not match stored client authorization value for UserName %s", user.GetName(), authorization.UserName)
 	}
 	if len(authorization.UserUID) != 0 && authorization.UserUID != user.GetUID() { // TODO length check doesn't make sense?
 		return false, fmt.Errorf("user %s UID %s does not match stored client authorization value for UID %s", user.GetName(), user.GetUID(), authorization.UserUID)

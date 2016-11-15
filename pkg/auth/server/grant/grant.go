@@ -157,7 +157,7 @@ func (l *Grant) handleForm(user user.Info, w http.ResponseWriter, req *http.Requ
 	grantedScopes := []Scope{}
 	requestedScopes := []Scope{}
 
-	clientAuthID := l.authregistry.ClientAuthorizationName(user.GetName(), client.Name)
+	clientAuthID := l.authregistry.ClientAuthorizationName(user.GetUID(), client.Name)
 	if clientAuth, err := l.authregistry.GetClientAuthorization(kapi.NewContext(), clientAuthID); err == nil {
 		grantedScopeNames = clientAuth.Scopes
 	}
@@ -244,7 +244,7 @@ func (l *Grant) handleGrant(user user.Info, w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	clientAuthID := l.authregistry.ClientAuthorizationName(user.GetName(), client.Name)
+	clientAuthID := l.authregistry.ClientAuthorizationName(user.GetUID(), client.Name)
 
 	ctx := kapi.WithUser(kapi.NewContext(), user)
 	clientAuth, err := l.authregistry.GetClientAuthorization(ctx, clientAuthID)

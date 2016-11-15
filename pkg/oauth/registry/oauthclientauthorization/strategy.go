@@ -30,7 +30,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
-	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
+	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserUID, auth.ClientName)
 }
 
 // NamespaceScoped is false for OAuth objects
@@ -44,43 +44,62 @@ func (strategy) GenerateName(base string) string {
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
-	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
+	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserUID, auth.ClientName)
 }
 
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 
-// Validate validates a new client
-func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList {
-	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
-	validationErrors := validation.ValidateClientAuthorization(auth)
+// validateSelfOAuthClientAuthorization must be run before any calls to `ObjectToOAuthClientAuthorization` as that loses the self type information
+func validateSelfOAuthClientAuthorization(ctx kapi.Context, obj runtime.Object) field.ErrorList {
+	validationErrors := field.ErrorList{}
+	if auth, isSelfObj := obj.(*api.SelfOAuthClientAuthorization); isSelfObj {
+		if user, ok := kapi.UserFrom(ctx); !ok {
+			validationErrors = append(validationErrors, field.InternalError(field.NewPath("user"), fmt.Errorf("User parameter required.")))
+		} else {
+			if name := user.GetName(); name != auth.UserName {
+				validationErrors = append(validationErrors, field.Invalid(field.NewPath("userName"), auth.UserName, "must equal "+name))
+			}
+			uid := user.GetUID()
+			if uid != auth.UserUID {
+				validationErrors = append(validationErrors, field.Invalid(field.NewPath("userUID"), auth.UserUID, "must equal "+uid))
+			}
+			if expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(uid, auth.ClientName); auth.Name != expectedName {
+				validationErrors = append(validationErrors, field.Invalid(field.NewPath("name"), auth.Name, "must equal "+expectedName))
+			}
+		}
+	}
+	return validationErrors
+}
 
-	client, err := s.clientGetter.GetClient(ctx, auth.ClientName) // TODO validate user + uid?
+func (s strategy) validateClientAndScopes(ctx kapi.Context, auth *api.OAuthClientAuthorization, validationErrors field.ErrorList) {
+	client, err := s.clientGetter.GetClient(ctx, auth.ClientName)
 	if err != nil {
-		return append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
+		validationErrors = append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
+		return
 	}
 	if err := scopeauthorizer.ValidateScopeRestrictions(client, auth.Scopes...); err != nil {
-		return append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
+		validationErrors = append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
 	}
+}
 
+// Validate validates a new client
+func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList {
+	validationErrors := validateSelfOAuthClientAuthorization(ctx, obj)
+	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
+	validationErrors = append(validationErrors, validation.ValidateClientAuthorization(auth)...)
+	s.validateClientAndScopes(ctx, auth, validationErrors)
 	return validationErrors
 }
 
 // ValidateUpdate validates a client auth update
 func (s strategy) ValidateUpdate(ctx kapi.Context, obj runtime.Object, old runtime.Object) field.ErrorList {
+	validationErrors := validateSelfOAuthClientAuthorization(ctx, obj)
 	clientAuth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	oldClientAuth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(old)
-	validationErrors := validation.ValidateClientAuthorizationUpdate(clientAuth, oldClientAuth)
-
-	client, err := s.clientGetter.GetClient(ctx, clientAuth.ClientName) // TODO validate user + uid?
-	if err != nil {
-		return append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
-	}
-	if err := scopeauthorizer.ValidateScopeRestrictions(client, clientAuth.Scopes...); err != nil {
-		return append(validationErrors, field.InternalError(field.NewPath("clientName"), err))
-	}
-
+	validationErrors = append(validationErrors, validation.ValidateClientAuthorizationUpdate(clientAuth, oldClientAuth)...)
+	s.validateClientAndScopes(ctx, clientAuth, validationErrors)
 	return validationErrors
 }
 

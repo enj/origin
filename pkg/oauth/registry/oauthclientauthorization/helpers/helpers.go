@@ -15,23 +15,25 @@ import (
 
 const UserSpaceSeparator = "::"
 
-func GetClientAuthorizationName(userName, clientName string) string {
-	return getHash(userName) + UserSpaceSeparator + getHash(clientName)
+func GetClientAuthorizationName(userUID, clientName string) string {
+	return getHash(userUID) + UserSpaceSeparator + getHash(clientName)
 }
 
-func UserNameHashFromClientAuthorizationName(clientAuthorizationName string) string {
-	if !strings.Contains(clientAuthorizationName, UserSpaceSeparator) {
+func UserUIDHashFromClientAuthorizationName(clientAuthorizationName string) string {
+	// Check for the regex equivalent to `.+::.+` if `::` is the separator
+	firstUserSpaceSeperatorIdx := strings.Index(clientAuthorizationName, UserSpaceSeparator)
+	if firstUserSpaceSeperatorIdx <= 0 || firstUserSpaceSeperatorIdx >= len(clientAuthorizationName)-len(UserSpaceSeparator) {
 		return ""
 	}
-	return strings.SplitN(clientAuthorizationName, UserSpaceSeparator, 2)[0]
+	return clientAuthorizationName[:firstUserSpaceSeperatorIdx]
 }
 
-func UserNameHashFromContext(ctx kapi.Context) string {
+func UserUIDHashFromContext(ctx kapi.Context) string {
 	user, ok := kapi.UserFrom(ctx)
 	if !ok {
 		return ""
 	}
-	return getHash(user.GetName())
+	return getHash(user.GetUID())
 }
 
 func getHash(data string) string {

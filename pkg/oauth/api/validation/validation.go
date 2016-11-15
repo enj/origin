@@ -187,16 +187,15 @@ func ValidateClientUpdate(client *api.OAuthClient, oldClient *api.OAuthClient) f
 	return allErrs
 }
 
-const clientAuthorizationNameFormat string = "must be in the format <userNameHash>" + oauthclientauthorizationhelpers.UserSpaceSeparator + "<clientNameHash>"
+const invalidClientAuthorizationName = "must be in the format <userUIDHash>" + oauthclientauthorizationhelpers.UserSpaceSeparator + "<clientNameHash>"
 
 func ValidateClientAuthorizationName(name string, prefix bool) []string {
 	if reasons := oapi.MinimalNameRequirements(name, prefix); len(reasons) != 0 {
 		return reasons
 	}
 
-	lastUserSpaceSeperator := strings.Index(name, oauthclientauthorizationhelpers.UserSpaceSeparator)
-	if lastUserSpaceSeperator <= 0 || lastUserSpaceSeperator >= len(name)-1 {
-		return []string{clientAuthorizationNameFormat}
+	if hash := oauthclientauthorizationhelpers.UserUIDHashFromClientAuthorizationName(name); len(hash) == 0 {
+		return []string{invalidClientAuthorizationName}
 	}
 
 	return nil
@@ -205,13 +204,11 @@ func ValidateClientAuthorizationName(name string, prefix bool) []string {
 func ValidateClientAuthorization(clientAuthorization *api.OAuthClientAuthorization) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(clientAuthorization.UserName, clientAuthorization.ClientName)
-
 	metadataErrs := validation.ValidateObjectMeta(&clientAuthorization.ObjectMeta, false, ValidateClientAuthorizationName, field.NewPath("metadata"))
 	if len(metadataErrs) > 0 {
 		allErrs = append(allErrs, metadataErrs...)
-	} else if clientAuthorization.Name != expectedName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, clientAuthorizationNameFormat))
+	} else if expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(clientAuthorization.UserUID, clientAuthorization.ClientName); clientAuthorization.Name != expectedName {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, invalidClientAuthorizationName))
 	}
 
 	allErrs = append(allErrs, ValidateClientNameField(clientAuthorization.ClientName, field.NewPath("clientName"))...)
