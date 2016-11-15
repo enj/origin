@@ -187,7 +187,7 @@ func ValidateClientUpdate(client *api.OAuthClient, oldClient *api.OAuthClient) f
 	return allErrs
 }
 
-const clientAuthorizationNameFormat string = "must be in the format <userName>" + oauthclientauthorizationhelpers.UserSpaceSeparator + "<clientName>"
+const clientAuthorizationNameFormat string = "must be in the format <userNameHash>" + oauthclientauthorizationhelpers.UserSpaceSeparator + "<clientNameHash>"
 
 func ValidateClientAuthorizationName(name string, prefix bool) []string {
 	if reasons := oapi.MinimalNameRequirements(name, prefix); len(reasons) != 0 {

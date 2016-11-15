@@ -1,8 +1,11 @@
 package helpers
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"strings"
 
+	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -13,14 +16,27 @@ import (
 const UserSpaceSeparator = "::"
 
 func GetClientAuthorizationName(userName, clientName string) string {
-	return userName + UserSpaceSeparator + clientName
+	return getHash(userName) + UserSpaceSeparator + getHash(clientName)
 }
 
-func UserNameFromClientAuthorizationName(clientAuthorizationName string) string {
+func UserNameHashFromClientAuthorizationName(clientAuthorizationName string) string {
 	if !strings.Contains(clientAuthorizationName, UserSpaceSeparator) {
 		return ""
 	}
 	return strings.SplitN(clientAuthorizationName, UserSpaceSeparator, 2)[0]
+}
+
+func UserNameHashFromContext(ctx kapi.Context) string {
+	user, ok := kapi.UserFrom(ctx)
+	if !ok {
+		return ""
+	}
+	return getHash(user.GetName())
+}
+
+func getHash(data string) string {
+	hash := sha256.Sum256([]byte(data))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
 func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*unversioned.GroupResource, string, error) {

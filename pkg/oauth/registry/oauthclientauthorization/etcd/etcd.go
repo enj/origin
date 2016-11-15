@@ -37,11 +37,11 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		NewFunc:     func() runtime.Object { return &api.OAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
-			username := oauthclientauthorizationhelpers.UserNameFromClientAuthorizationName(name)
-			if len(username) == 0 {
+			hash := oauthclientauthorizationhelpers.UserNameHashFromClientAuthorizationName(name)
+			if len(hash) == 0 {
 				return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q", name))
 			}
-			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+username, name)
+			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+hash, name)
 		},
 	}
 
@@ -58,23 +58,21 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 		NewFunc:     func() runtime.Object { return &api.SelfOAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.SelfOAuthClientAuthorizationList{} },
 		KeyRootFunc: func(ctx kapi.Context) string {
-			user, ok := kapi.UserFrom(ctx)
-			if !ok {
+			hash := oauthclientauthorizationhelpers.UserNameHashFromContext(ctx)
+			if len(hash) == 0 {
 				return prefix + "/" + "%invalid%" // Something invalid
 			}
-			return prefix + "/" + user.GetName()
+			return prefix + "/" + hash
 		},
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
-			user, ok := kapi.UserFrom(ctx)
-			if !ok {
+			hash := oauthclientauthorizationhelpers.UserNameHashFromContext(ctx)
+			if len(hash) == 0 {
 				return "", kubeerr.NewBadRequest("User parameter required.")
 			}
-			username := user.GetName()
-			namePrefix := username + oauthclientauthorizationhelpers.UserSpaceSeparator
-			if !strings.HasPrefix(name, namePrefix) {
-				return "", kubeerr.NewForbidden(*resource, name, fmt.Errorf("Name parameter invalid: %q: must start with %s", name, namePrefix))
+			if !strings.HasPrefix(name, hash+oauthclientauthorizationhelpers.UserSpaceSeparator) {
+				return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q.", name))
 			}
-			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+username, name)
+			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+hash, name)
 		},
 	}
 
