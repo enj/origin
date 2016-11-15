@@ -29,7 +29,7 @@ func (c *ClientAuthorizationGrantChecker) HasAuthorizedClient(user user.Info, gr
 	if err != nil {
 		return false, err
 	}
-	if len(authorization.UserUID) != 0 && authorization.UserUID != user.GetUID() {
+	if len(authorization.UserUID) != 0 && authorization.UserUID != user.GetUID() { // TODO length check doesn't make sense?
 		return false, fmt.Errorf("user %s UID %s does not match stored client authorization value for UID %s", user.GetName(), user.GetUID(), authorization.UserUID)
 	}
 	// TODO: improve this to allow the scope implementation to determine overlap
