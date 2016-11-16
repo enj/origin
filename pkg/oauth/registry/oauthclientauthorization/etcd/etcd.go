@@ -87,8 +87,9 @@ func applyOAuthClientAuthorizationOptions(optsGetter restoptions.Getter, clientG
 		return oauthclientauthorization.Matcher(label, field)
 	}
 	store.QualifiedResource = *resource
-	store.CreateStrategy = oauthclientauthorization.NewStrategy(clientGetter)
-	store.UpdateStrategy = oauthclientauthorization.NewStrategy(clientGetter)
+	strategy := oauthclientauthorization.NewStrategy(clientGetter)
+	store.CreateStrategy = strategy
+	store.UpdateStrategy = strategy
 
 	if err := restoptions.ApplyOptions(optsGetter, store, false, storage.NoTriggerPublisher); err != nil {
 		return nil, err
