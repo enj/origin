@@ -194,12 +194,12 @@ type OAuthClientAuthorizationList struct {
 	Items []OAuthClientAuthorization `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// SelfOAuthClientAuthorizationList is a collection of OAuth client authorizations
+// SelfOAuthClientAuthorizationList is a collection of self OAuth client authorizations
 type SelfOAuthClientAuthorizationList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Items is the list of Self OAuth client authorizations
+	// Items is the list of self OAuth client authorizations
 	Items []SelfOAuthClientAuthorization `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 

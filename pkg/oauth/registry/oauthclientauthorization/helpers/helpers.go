@@ -44,6 +44,10 @@ func getUserHash(userName, userUID string) string {
 	return getHash(userName + "/" + userUID)
 }
 
+func GetPrefixWithHash(prefix, hash string) string {
+	return prefix + "/" + hash
+}
+
 func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*unversioned.GroupResource, string, error) {
 	resource := api.Resource(resourceName)
 	opts, err := optsGetter.GetRESTOptions(resource)

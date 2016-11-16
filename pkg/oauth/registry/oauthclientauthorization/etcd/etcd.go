@@ -41,7 +41,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 			if len(hash) == 0 {
 				return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q", name))
 			}
-			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+hash, name)
+			return registry.NoNamespaceKeyFunc(ctx, oauthclientauthorizationhelpers.GetPrefixWithHash(prefix, hash), name)
 		},
 	}
 
@@ -60,9 +60,9 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 		KeyRootFunc: func(ctx kapi.Context) string {
 			hash := oauthclientauthorizationhelpers.UserHashFromContext(ctx)
 			if len(hash) == 0 {
-				return prefix + "/" + "%invalid%" // Something invalid
+				hash = "%invalid%" // Something invalid
 			}
-			return prefix + "/" + hash
+			return oauthclientauthorizationhelpers.GetPrefixWithHash(prefix, hash)
 		},
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
 			hash := oauthclientauthorizationhelpers.UserHashFromContext(ctx)
@@ -72,7 +72,7 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 			if !strings.HasPrefix(name, hash+oauthclientauthorizationhelpers.UserSpaceSeparator) {
 				return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q.", name))
 			}
-			return registry.NoNamespaceKeyFunc(ctx, prefix+"/"+hash, name)
+			return registry.NoNamespaceKeyFunc(ctx, oauthclientauthorizationhelpers.GetPrefixWithHash(prefix, hash), name)
 		},
 	}
 
