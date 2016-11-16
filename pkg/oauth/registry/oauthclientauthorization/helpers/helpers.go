@@ -15,30 +15,33 @@ import (
 
 const UserSpaceSeparator = "::"
 
-func GetClientAuthorizationName(userUID, clientName string) string {
-	return getHash(userUID) + UserSpaceSeparator + getHash(clientName)
+func GetClientAuthorizationName(userName, userUID, clientName string) string {
+	return getUserHash(userName, userUID) + UserSpaceSeparator + getHash(clientName)
 }
 
-func UserUIDHashFromClientAuthorizationName(clientAuthorizationName string) string {
-	// Check for the regex equivalent to `.+::.+` if `::` is the separator
-	firstUserSpaceSeperatorIdx := strings.Index(clientAuthorizationName, UserSpaceSeparator)
-	if firstUserSpaceSeperatorIdx <= 0 || firstUserSpaceSeperatorIdx >= len(clientAuthorizationName)-len(UserSpaceSeparator) {
+func UserHashFromClientAuthorizationName(clientAuthorizationName string) string {
+	data := strings.Split(clientAuthorizationName, UserSpaceSeparator)
+	if len(data) != 2 {
 		return ""
 	}
-	return clientAuthorizationName[:firstUserSpaceSeperatorIdx]
+	return data[0]
 }
 
-func UserUIDHashFromContext(ctx kapi.Context) string {
+func UserHashFromContext(ctx kapi.Context) string {
 	user, ok := kapi.UserFrom(ctx)
 	if !ok {
 		return ""
 	}
-	return getHash(user.GetUID())
+	return getUserHash(user.GetName(), user.GetUID())
 }
 
 func getHash(data string) string {
 	hash := sha256.Sum256([]byte(data))
 	return base64.RawURLEncoding.EncodeToString(hash[:])
+}
+
+func getUserHash(userName, userUID string) string {
+	return getHash(userName + "/" + userUID)
 }
 
 func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*unversioned.GroupResource, string, error) {

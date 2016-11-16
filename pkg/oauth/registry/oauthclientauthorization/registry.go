@@ -10,8 +10,8 @@ import (
 
 // Registry is an interface for things that know how to store OAuthClientAuthorization objects.
 type Registry interface {
-	// ClientAuthorizationName returns the name of the OAuthClientAuthorization for the given user UID and client name
-	ClientAuthorizationName(userUID, clientName string) string
+	// ClientAuthorizationName returns the name of the OAuthClientAuthorization for the given username, user UID and client name
+	ClientAuthorizationName(userName, userUID, clientName string) string
 	// ListClientAuthorizations obtains a list of client auths that match a selector.
 	ListClientAuthorizations(ctx kapi.Context, options *kapi.ListOptions) (*api.OAuthClientAuthorizationList, error)
 	// GetClientAuthorization retrieves a specific client auth.
@@ -35,8 +35,8 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ClientAuthorizationName(userUID, clientName string) string {
-	return oauthclientauthorizationhelpers.GetClientAuthorizationName(userUID, clientName)
+func (s *storage) ClientAuthorizationName(userName, userUID, clientName string) string {
+	return oauthclientauthorizationhelpers.GetClientAuthorizationName(userName, userUID, clientName)
 }
 
 func (s *storage) ListClientAuthorizations(ctx kapi.Context, options *kapi.ListOptions) (*api.OAuthClientAuthorizationList, error) {

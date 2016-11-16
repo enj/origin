@@ -30,7 +30,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
-	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserUID, auth.ClientName)
+	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.UserUID, auth.ClientName)
 }
 
 // NamespaceScoped is false for OAuth objects
@@ -44,7 +44,7 @@ func (strategy) GenerateName(base string) string {
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
-	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserUID, auth.ClientName)
+	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.UserUID, auth.ClientName)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -58,14 +58,15 @@ func validateSelfOAuthClientAuthorization(ctx kapi.Context, obj runtime.Object) 
 		if user, ok := kapi.UserFrom(ctx); !ok {
 			validationErrors = append(validationErrors, field.InternalError(field.NewPath("user"), fmt.Errorf("User parameter required.")))
 		} else {
-			if name := user.GetName(); name != auth.UserName {
+			name := user.GetName()
+			if name != auth.UserName {
 				validationErrors = append(validationErrors, field.Invalid(field.NewPath("userName"), auth.UserName, "must equal "+name))
 			}
 			uid := user.GetUID()
 			if uid != auth.UserUID {
 				validationErrors = append(validationErrors, field.Invalid(field.NewPath("userUID"), auth.UserUID, "must equal "+uid))
 			}
-			if expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(uid, auth.ClientName); auth.Name != expectedName {
+			if expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(name, uid, auth.ClientName); auth.Name != expectedName {
 				validationErrors = append(validationErrors, field.Invalid(field.NewPath("name"), auth.Name, "must equal "+expectedName))
 			}
 		}

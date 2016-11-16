@@ -187,14 +187,14 @@ func ValidateClientUpdate(client *api.OAuthClient, oldClient *api.OAuthClient) f
 	return allErrs
 }
 
-const invalidClientAuthorizationName = "must be in the format <userUIDHash>" + oauthclientauthorizationhelpers.UserSpaceSeparator + "<clientNameHash>"
+const invalidClientAuthorizationName = "must be in the format <userHash>" + oauthclientauthorizationhelpers.UserSpaceSeparator + "<clientNameHash>"
 
 func ValidateClientAuthorizationName(name string, prefix bool) []string {
 	if reasons := oapi.MinimalNameRequirements(name, prefix); len(reasons) != 0 {
 		return reasons
 	}
 
-	if hash := oauthclientauthorizationhelpers.UserUIDHashFromClientAuthorizationName(name); len(hash) == 0 {
+	if hash := oauthclientauthorizationhelpers.UserHashFromClientAuthorizationName(name); len(hash) == 0 {
 		return []string{invalidClientAuthorizationName}
 	}
 
@@ -207,7 +207,7 @@ func ValidateClientAuthorization(clientAuthorization *api.OAuthClientAuthorizati
 	metadataErrs := validation.ValidateObjectMeta(&clientAuthorization.ObjectMeta, false, ValidateClientAuthorizationName, field.NewPath("metadata"))
 	if len(metadataErrs) > 0 {
 		allErrs = append(allErrs, metadataErrs...)
-	} else if expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(clientAuthorization.UserUID, clientAuthorization.ClientName); clientAuthorization.Name != expectedName {
+	} else if expectedName := oauthclientauthorizationhelpers.GetClientAuthorizationName(clientAuthorization.UserName, clientAuthorization.UserUID, clientAuthorization.ClientName); clientAuthorization.Name != expectedName {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, invalidClientAuthorizationName))
 	}
 

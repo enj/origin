@@ -37,7 +37,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		NewFunc:     func() runtime.Object { return &api.OAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
-			hash := oauthclientauthorizationhelpers.UserUIDHashFromClientAuthorizationName(name)
+			hash := oauthclientauthorizationhelpers.UserHashFromClientAuthorizationName(name)
 			if len(hash) == 0 {
 				return "", kubeerr.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q", name))
 			}
@@ -58,14 +58,14 @@ func NewSelfREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter)
 		NewFunc:     func() runtime.Object { return &api.SelfOAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.SelfOAuthClientAuthorizationList{} },
 		KeyRootFunc: func(ctx kapi.Context) string {
-			hash := oauthclientauthorizationhelpers.UserUIDHashFromContext(ctx)
+			hash := oauthclientauthorizationhelpers.UserHashFromContext(ctx)
 			if len(hash) == 0 {
 				return prefix + "/" + "%invalid%" // Something invalid
 			}
 			return prefix + "/" + hash
 		},
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
-			hash := oauthclientauthorizationhelpers.UserUIDHashFromContext(ctx)
+			hash := oauthclientauthorizationhelpers.UserHashFromContext(ctx)
 			if len(hash) == 0 {
 				return "", kubeerr.NewBadRequest("User parameter required.")
 			}
