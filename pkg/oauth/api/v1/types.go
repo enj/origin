@@ -155,6 +155,7 @@ type OAuthClientAuthorization struct {
 	Scopes []string `json:"scopes,omitempty" protobuf:"bytes,5,rep,name=scopes"`
 }
 
+// SelfOAuthClientAuthorization describes an authorization created by a user for an OAuth client
 type SelfOAuthClientAuthorization OAuthClientAuthorization
 
 // OAuthAccessTokenList is a collection of OAuth access tokens

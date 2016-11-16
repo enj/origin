@@ -29,6 +29,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 }
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
+	defaultSelfOAuthClientAuthorization(ctx, obj) // do not move this
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.UserUID, auth.ClientName)
 }
@@ -43,12 +44,25 @@ func (strategy) GenerateName(base string) string {
 }
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
+	defaultSelfOAuthClientAuthorization(ctx, obj) // do not move this
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	auth.Name = oauthclientauthorizationhelpers.GetClientAuthorizationName(auth.UserName, auth.UserUID, auth.ClientName)
 }
 
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
+}
+
+// defaultSelfOAuthClientAuthorization must be run before any calls to `ObjectToOAuthClientAuthorization` as that loses the self type information
+func defaultSelfOAuthClientAuthorization(ctx kapi.Context, obj runtime.Object) {
+	if auth, isSelfObj := obj.(*api.SelfOAuthClientAuthorization); isSelfObj {
+		if user, ok := kapi.UserFrom(ctx); ok {
+			if len(auth.UserName) == 0 && len(auth.UserUID) == 0 {
+				auth.UserName = user.GetName()
+				auth.UserUID = user.GetUID()
+			}
+		}
+	}
 }
 
 // validateSelfOAuthClientAuthorization must be run before any calls to `ObjectToOAuthClientAuthorization` as that loses the self type information
@@ -87,7 +101,7 @@ func (s strategy) validateClientAndScopes(ctx kapi.Context, auth *api.OAuthClien
 
 // Validate validates a new client
 func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList {
-	validationErrors := validateSelfOAuthClientAuthorization(ctx, obj)
+	validationErrors := validateSelfOAuthClientAuthorization(ctx, obj) // do not move this
 	auth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	validationErrors = append(validationErrors, validation.ValidateClientAuthorization(auth)...)
 	s.validateClientAndScopes(ctx, auth, validationErrors)
@@ -96,7 +110,7 @@ func (s strategy) Validate(ctx kapi.Context, obj runtime.Object) field.ErrorList
 
 // ValidateUpdate validates a client auth update
 func (s strategy) ValidateUpdate(ctx kapi.Context, obj runtime.Object, old runtime.Object) field.ErrorList {
-	validationErrors := validateSelfOAuthClientAuthorization(ctx, obj)
+	validationErrors := validateSelfOAuthClientAuthorization(ctx, obj) // do not move this
 	clientAuth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(obj)
 	oldClientAuth := oauthclientauthorizationhelpers.ObjectToOAuthClientAuthorization(old)
 	validationErrors = append(validationErrors, validation.ValidateClientAuthorizationUpdate(clientAuth, oldClientAuth)...)
