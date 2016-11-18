@@ -13,6 +13,7 @@ import (
 	oapi "github.com/openshift/origin/pkg/api"
 	authorizerscopes "github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	"github.com/openshift/origin/pkg/oauth/api"
+	oauthregistryhelpers "github.com/openshift/origin/pkg/oauth/registry/helpers"
 	uservalidation "github.com/openshift/origin/pkg/user/api/validation"
 )
 
@@ -186,14 +187,15 @@ func ValidateClientUpdate(client *api.OAuthClient, oldClient *api.OAuthClient) f
 	return allErrs
 }
 
+const invalidClientAuthorizationName = "must be in the format <userName>" + oauthregistryhelpers.UserSpaceSeparator + "<clientName>"
+
 func ValidateClientAuthorizationName(name string, prefix bool) []string {
 	if reasons := oapi.MinimalNameRequirements(name, prefix); len(reasons) != 0 {
 		return reasons
 	}
 
-	lastColon := strings.Index(name, ":")
-	if lastColon <= 0 || lastColon >= len(name)-1 {
-		return []string{"must be in the format <userName>:<clientName>"}
+	if username := oauthregistryhelpers.UserNameFromClientAuthorizationName(name); len(username) == 0 {
+		return []string{invalidClientAuthorizationName}
 	}
 
 	return nil
@@ -202,13 +204,13 @@ func ValidateClientAuthorizationName(name string, prefix bool) []string {
 func ValidateClientAuthorization(clientAuthorization *api.OAuthClientAuthorization) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	expectedName := fmt.Sprintf("%s:%s", clientAuthorization.UserName, clientAuthorization.ClientName)
+	expectedName := oauthregistryhelpers.GetClientAuthorizationName(clientAuthorization.UserName, clientAuthorization.ClientName)
 
 	metadataErrs := validation.ValidateObjectMeta(&clientAuthorization.ObjectMeta, false, ValidateClientAuthorizationName, field.NewPath("metadata"))
 	if len(metadataErrs) > 0 {
 		allErrs = append(allErrs, metadataErrs...)
 	} else if clientAuthorization.Name != expectedName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, "must be in the format <userName>:<clientName>"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, invalidClientAuthorizationName))
 	}
 
 	allErrs = append(allErrs, ValidateClientNameField(clientAuthorization.ClientName, field.NewPath("clientName"))...)
