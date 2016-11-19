@@ -45,5 +45,6 @@ func SelfOAuthClientAuthorizationToSelectableFields(obj *SelfOAuthClientAuthoriz
 	return fields.Set{
 		"metadata.name": obj.Name,
 		"clientName":    obj.ClientName,
+		"userUID":       obj.UserUID,
 	}
 }

@@ -20,7 +20,7 @@ import (
 
 // rest implements a RESTStorage for self oauth client authorizations against etcd
 type REST struct {
-	registry.Store
+	helpers.UIDEnforcer
 }
 
 // NewREST returns a RESTStorage object that will work against self oauth client authorizations
@@ -48,7 +48,8 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 			return registry.NoNamespaceKeyFunc(ctx, helpers.GetKeyWithUsername(prefix, user.GetName()), name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*api.SelfOAuthClientAuthorization).Name, nil
+			_, clientname, err := helpers.SplitClientAuthorizationName(obj.(*api.SelfOAuthClientAuthorization).Name)
+			return clientname, err
 		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 			return &generic.SelectionPredicate{
@@ -68,7 +69,9 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 			auth := obj.(*api.SelfOAuthClientAuthorization)
 			auth.UserName = ""
 			auth.UserUID = ""
-			return nil
+			_, clientname, err := helpers.SplitClientAuthorizationName(obj.(*api.SelfOAuthClientAuthorization).Name) // TODO is this needed?
+			auth.Name = clientname
+			return err
 		},
 
 		CreateStrategy: helpers.ReadDeleteStrategy,
@@ -79,5 +82,5 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		return nil, err
 	}
 
-	return &REST{*store}, nil
+	return &REST{{*store}}, nil
 }
