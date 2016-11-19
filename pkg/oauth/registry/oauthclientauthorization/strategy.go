@@ -30,7 +30,7 @@ func NewStrategy(clientGetter oauthclient.Getter) strategy {
 
 func (strategy) PrepareForUpdate(ctx kapi.Context, obj, old runtime.Object) {
 	auth := obj.(*api.OAuthClientAuthorization)
-	auth.Name = helpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
+	auth.Name = helpers.MakeClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
 // NamespaceScoped is false for OAuth objects
@@ -44,7 +44,7 @@ func (strategy) GenerateName(base string) string {
 
 func (strategy) PrepareForCreate(ctx kapi.Context, obj runtime.Object) {
 	auth := obj.(*api.OAuthClientAuthorization)
-	auth.Name = helpers.GetClientAuthorizationName(auth.UserName, auth.ClientName)
+	auth.Name = helpers.MakeClientAuthorizationName(auth.UserName, auth.ClientName)
 }
 
 // Canonicalize normalizes the object after validation.

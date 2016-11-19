@@ -29,17 +29,17 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 	if err != nil {
 		return nil, fmt.Errorf("error building RESTOptions for %s store: %v", resource.String(), err)
 	}
+	strategy := oauthclientauthorization.NewStrategy(clientGetter)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.OAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
 		KeyFunc: func(ctx kapi.Context, name string) (string, error) {
-			base := prefix
 			// Check to see if the name has the new format and thus is stored per user instead of a flat list
-			if username := helpers.UserNameFromClientAuthorizationName(name); len(username) > 0 {
-				base = base + "/" + username
+			if username, clientname, err := helpers.SplitClientAuthorizationName(name); err == nil {
+				return registry.NoNamespaceKeyFunc(ctx, helpers.GetKeyWithUsername(prefix, username), clientname)
 			}
-			return registry.NoNamespaceKeyFunc(ctx, base, name)
+			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.OAuthClientAuthorization).Name, nil
@@ -49,8 +49,8 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		},
 		QualifiedResource: *resource,
 
-		CreateStrategy: oauthclientauthorization.NewStrategy(clientGetter),
-		UpdateStrategy: oauthclientauthorization.NewStrategy(clientGetter),
+		CreateStrategy: strategy,
+		UpdateStrategy: strategy,
 	}
 
 	if err := restoptions.ApplyOptions(optsGetter, store, false, storage.NoTriggerPublisher); err != nil {

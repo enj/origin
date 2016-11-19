@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -11,8 +12,22 @@ import (
 
 const UserSpaceSeparator = "::"
 
-func GetClientAuthorizationName(userName, clientName string) string {
+var InvalidClientAuthorizationNameErr = fmt.Errorf("ClientAuthorizationName must be in the format %s", MakeClientAuthorizationName("<userName>", "<clientName>"))
+
+func MakeClientAuthorizationName(userName, clientName string) string {
 	return userName + UserSpaceSeparator + clientName
+}
+
+func SplitClientAuthorizationName(clientAuthorizationName string) (string, string, error) {
+	parts := strings.Split(clientAuthorizationName, UserSpaceSeparator)
+	if len(parts) != 2 {
+		return "", "", InvalidClientAuthorizationNameErr
+	}
+	return parts[0], parts[1], nil
+}
+
+func GetKeyWithUsername(prefix, userName string) string {
+	return prefix + "/" + userName
 }
 
 func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*unversioned.GroupResource, string, error) {
@@ -22,12 +37,4 @@ func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*
 		return nil, "", err
 	}
 	return &resource, "/" + opts.ResourcePrefix, nil
-}
-
-func UserNameFromClientAuthorizationName(clientAuthorizationName string) string {
-	data := strings.Split(clientAuthorizationName, UserSpaceSeparator)
-	if len(data) != 2 {
-		return ""
-	}
-	return data[0]
 }

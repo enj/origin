@@ -187,15 +187,13 @@ func ValidateClientUpdate(client *api.OAuthClient, oldClient *api.OAuthClient) f
 	return allErrs
 }
 
-const invalidClientAuthorizationName = "must be in the format <userName>" + oauthregistryhelpers.UserSpaceSeparator + "<clientName>"
-
 func ValidateClientAuthorizationName(name string, prefix bool) []string {
 	if reasons := oapi.MinimalNameRequirements(name, prefix); len(reasons) != 0 {
 		return reasons
 	}
 
-	if username := oauthregistryhelpers.UserNameFromClientAuthorizationName(name); len(username) == 0 {
-		return []string{invalidClientAuthorizationName}
+	if _, _, err := oauthregistryhelpers.SplitClientAuthorizationName(name); err != nil {
+		return []string{err.Error()}
 	}
 
 	return nil
@@ -204,13 +202,13 @@ func ValidateClientAuthorizationName(name string, prefix bool) []string {
 func ValidateClientAuthorization(clientAuthorization *api.OAuthClientAuthorization) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	expectedName := oauthregistryhelpers.GetClientAuthorizationName(clientAuthorization.UserName, clientAuthorization.ClientName)
+	expectedName := oauthregistryhelpers.MakeClientAuthorizationName(clientAuthorization.UserName, clientAuthorization.ClientName)
 
 	metadataErrs := validation.ValidateObjectMeta(&clientAuthorization.ObjectMeta, false, ValidateClientAuthorizationName, field.NewPath("metadata"))
 	if len(metadataErrs) > 0 {
 		allErrs = append(allErrs, metadataErrs...)
 	} else if clientAuthorization.Name != expectedName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, invalidClientAuthorizationName))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), clientAuthorization.Name, oauthregistryhelpers.InvalidClientAuthorizationNameErr.Error()))
 	}
 
 	allErrs = append(allErrs, ValidateClientNameField(clientAuthorization.ClientName, field.NewPath("clientName"))...)
