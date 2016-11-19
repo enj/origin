@@ -75,7 +75,6 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		},
 
 		CreateStrategy: helpers.ReadDeleteStrategy,
-		UpdateStrategy: helpers.ReadDeleteStrategy,
 	}
 
 	if err := restoptions.ApplyOptions(optsGetter, store, false, storage.NoTriggerPublisher); err != nil {
