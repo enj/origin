@@ -81,5 +81,5 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		return nil, err
 	}
 
-	return &REST{{*store}}, nil
+	return &REST{helpers.UIDEnforcer{Store: *store}}, nil
 }
