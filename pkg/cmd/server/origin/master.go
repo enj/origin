@@ -78,6 +78,7 @@ import (
 	clientregistry "github.com/openshift/origin/pkg/oauth/registry/oauthclient"
 	clientetcd "github.com/openshift/origin/pkg/oauth/registry/oauthclient/etcd"
 	clientauthetcd "github.com/openshift/origin/pkg/oauth/registry/oauthclientauthorization/etcd"
+	selfclientauthetcd "github.com/openshift/origin/pkg/oauth/registry/selfoauthclientauthorization/etcd"
 	projectproxy "github.com/openshift/origin/pkg/project/registry/project/proxy"
 	projectrequeststorage "github.com/openshift/origin/pkg/project/registry/projectrequest/delegated"
 	routeallocationcontroller "github.com/openshift/origin/pkg/route/controller/allocation"
@@ -719,6 +720,8 @@ func (c *MasterConfig) GetRestStorage() map[string]rest.Storage {
 	checkStorageErr(err)
 	clientAuthorizationStorage, err := clientauthetcd.NewREST(c.RESTOptionsGetter, combinedOAuthClientGetter)
 	checkStorageErr(err)
+	selfClientAuthorizationStorage, err := selfclientauthetcd.NewREST(c.RESTOptionsGetter)
+	checkStorageErr(err)
 
 	templateStorage, err := templateetcd.NewREST(c.RESTOptionsGetter)
 	checkStorageErr(err)
@@ -764,10 +767,11 @@ func (c *MasterConfig) GetRestStorage() map[string]rest.Storage {
 		"identities":           identityStorage,
 		"userIdentityMappings": userIdentityMappingStorage,
 
-		"oAuthAuthorizeTokens":      authorizeTokenStorage,
-		"oAuthAccessTokens":         accessTokenStorage,
-		"oAuthClients":              clientStorage,
-		"oAuthClientAuthorizations": clientAuthorizationStorage,
+		"oAuthAuthorizeTokens":          authorizeTokenStorage,
+		"oAuthAccessTokens":             accessTokenStorage,
+		"oAuthClients":                  clientStorage,
+		"oAuthClientAuthorizations":     clientAuthorizationStorage,
+		"selfOAuthClientAuthorizations": selfClientAuthorizationStorage,
 
 		"resourceAccessReviews":      resourceAccessReviewStorage,
 		"subjectAccessReviews":       subjectAccessReviewStorage,

@@ -69,7 +69,7 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 			auth := obj.(*api.SelfOAuthClientAuthorization)
 			auth.UserName = ""
 			auth.UserUID = ""
-			_, clientname, err := helpers.SplitClientAuthorizationName(obj.(*api.SelfOAuthClientAuthorization).Name) // TODO is this needed?
+			_, clientname, err := helpers.SplitClientAuthorizationName(auth.Name) // TODO is this needed?
 			auth.Name = clientname
 			return err
 		},

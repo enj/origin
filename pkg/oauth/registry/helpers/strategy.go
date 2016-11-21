@@ -2,7 +2,7 @@ package helpers
 
 import "k8s.io/kubernetes/pkg/api/rest"
 
-var CannotCreateStrategy = rest.RESTCreateStrategy(nil) //readOnly{kapi.Scheme}
+var CannotCreateStrategy = (*rest.RESTCreateStrategy)(nil) //readOnly{kapi.Scheme}
 
 //type readOnly struct{ runtime.ObjectTyper }
 //
