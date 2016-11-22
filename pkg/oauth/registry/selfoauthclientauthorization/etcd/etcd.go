@@ -75,5 +75,5 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		return nil, err
 	}
 
-	return &REST{helpers.UIDEnforcer{Store: *store, ListDecoratorFunc: toSelfList}}, nil
+	return &REST{helpers.UIDEnforcer{Store: *store, ListDecoratorFunc: toSelfList, UserUIDField: "userUID"}}, nil
 }

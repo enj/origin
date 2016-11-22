@@ -10,13 +10,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const userUIDField = "userUID"
-
 type ListDecoratorFunc func(obj runtime.Object) runtime.Object
 
 type UIDEnforcer struct {
 	registry.Store
 	ListDecoratorFunc
+	UserUIDField string
 }
 
 func (s *UIDEnforcer) Get(ctx kapi.Context, name string) (runtime.Object, error) {
@@ -30,7 +29,7 @@ func (s *UIDEnforcer) Get(ctx kapi.Context, name string) (runtime.Object, error)
 	}
 	uid := user.GetUID()
 	if len(uid) != 0 {
-		if matched, err := s.Store.PredicateFunc(labels.Everything(), fields.OneTermEqualSelector(userUIDField, uid)).Matches(obj); !matched || err != nil {
+		if matched, err := s.Store.PredicateFunc(labels.Everything(), fields.OneTermEqualSelector(s.UserUIDField, uid)).Matches(obj); !matched || err != nil {
 			return nil, kubeerr.NewNotFound(s.QualifiedResource, name)
 		}
 	}
@@ -42,7 +41,7 @@ func (s *UIDEnforcer) NewList() runtime.Object {
 }
 
 func (s *UIDEnforcer) List(ctx kapi.Context, options *kapi.ListOptions) (runtime.Object, error) {
-	if err := forceUID(ctx, options); err != nil {
+	if err := s.forceUID(ctx, options); err != nil {
 		return nil, err
 	}
 	list, err := s.Store.List(ctx, options)
@@ -61,20 +60,24 @@ func (s *UIDEnforcer) Delete(ctx kapi.Context, name string, options *kapi.Delete
 }
 
 func (s *UIDEnforcer) DeleteCollection(ctx kapi.Context, options *kapi.DeleteOptions, listOptions *kapi.ListOptions) (runtime.Object, error) {
-	if err := forceUID(ctx, listOptions); err != nil {
+	if err := s.forceUID(ctx, listOptions); err != nil {
 		return nil, err
 	}
-	return s.Store.DeleteCollection(ctx, options, listOptions)
+	list, err := s.Store.DeleteCollection(ctx, options, listOptions)
+	if err != nil {
+		return nil, err
+	}
+	return s.ListDecoratorFunc(list), nil
 }
 
 func (s *UIDEnforcer) Watch(ctx kapi.Context, options *kapi.ListOptions) (watch.Interface, error) {
-	if err := forceUID(ctx, options); err != nil {
+	if err := s.forceUID(ctx, options); err != nil {
 		return nil, err
 	}
-	return s.Store.Watch(ctx, options)
+	return s.Store.Watch(ctx, options) //TODO use ListDecoratorFunc ?
 }
 
-func forceUID(ctx kapi.Context, options *kapi.ListOptions) error {
+func (s *UIDEnforcer) forceUID(ctx kapi.Context, options *kapi.ListOptions) error {
 	user, ok := kapi.UserFrom(ctx)
 	if !ok {
 		return kubeerr.NewBadRequest("User parameter required.")
@@ -87,10 +90,10 @@ func forceUID(ctx kapi.Context, options *kapi.ListOptions) error {
 		options = &kapi.ListOptions{}
 	}
 	if options.FieldSelector == nil {
-		options.FieldSelector = fields.OneTermEqualSelector(userUIDField, uid)
+		options.FieldSelector = fields.OneTermEqualSelector(s.UserUIDField, uid)
 	} else {
 		options.FieldSelector, _ = options.FieldSelector.Transform(func(string, string) (string, string, error) {
-			return userUIDField, uid, nil
+			return s.UserUIDField, uid, nil
 		})
 	}
 	return nil
