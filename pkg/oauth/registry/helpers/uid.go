@@ -4,6 +4,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -11,8 +12,11 @@ import (
 
 const userUIDField = "userUID"
 
+type ListDecoratorFunc func(obj runtime.Object) runtime.Object
+
 type UIDEnforcer struct {
 	registry.Store
+	ListDecoratorFunc
 }
 
 func (s *UIDEnforcer) Get(ctx kapi.Context, name string) (runtime.Object, error) {
@@ -26,7 +30,7 @@ func (s *UIDEnforcer) Get(ctx kapi.Context, name string) (runtime.Object, error)
 	}
 	uid := user.GetUID()
 	if len(uid) != 0 {
-		if matched, err := s.Store.PredicateFunc(nil, fields.OneTermEqualSelector(userUIDField, uid)).Matches(obj); !matched || err != nil {
+		if matched, err := s.Store.PredicateFunc(labels.Everything(), fields.OneTermEqualSelector(userUIDField, uid)).Matches(obj); !matched || err != nil {
 			return nil, kubeerr.NewNotFound(s.QualifiedResource, name)
 		}
 	}
@@ -41,7 +45,11 @@ func (s *UIDEnforcer) List(ctx kapi.Context, options *kapi.ListOptions) (runtime
 	if err := forceUID(ctx, options); err != nil {
 		return nil, err
 	}
-	return s.Store.List(ctx, options)
+	list, err := s.Store.List(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return s.ListDecoratorFunc(list), nil
 }
 
 func (s *UIDEnforcer) Delete(ctx kapi.Context, name string, options *kapi.DeleteOptions) (runtime.Object, error) {

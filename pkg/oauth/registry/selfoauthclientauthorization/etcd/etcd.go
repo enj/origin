@@ -32,7 +32,7 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.SelfOAuthClientAuthorization{} },
-		NewListFunc: func() runtime.Object { return &api.SelfOAuthClientAuthorizationList{} },
+		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
 		KeyRootFunc: func(ctx kapi.Context) string {
 			user, ok := kapi.UserFrom(ctx)
 			if !ok {
@@ -47,16 +47,12 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 			}
 			return registry.NoNamespaceKeyFunc(ctx, helpers.GetKeyWithUsername(prefix, user.GetName()), name)
 		},
-		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			_, clientname, err := helpers.SplitClientAuthorizationName(obj.(*api.SelfOAuthClientAuthorization).Name)
-			return clientname, err
-		},
 		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 			return &generic.SelectionPredicate{
 				Label: label,
 				Field: field,
 				GetAttrs: func(o runtime.Object) (labels.Set, fields.Set, error) {
-					obj, ok := o.(*api.SelfOAuthClientAuthorization)
+					obj, ok := safeObjectToSelfOAuthClientAuthorization(o)
 					if !ok { // TODO do I need this check?
 						return nil, nil, errors.New("not a SelfOAuthClientAuthorization")
 					}
@@ -66,12 +62,10 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		},
 		QualifiedResource: *resource,
 		Decorator: func(obj runtime.Object) error {
-			auth := obj.(*api.SelfOAuthClientAuthorization)
+			auth := objectToSelfOAuthClientAuthorization(obj)
 			auth.UserName = ""
-			auth.UserUID = ""
-			_, clientname, err := helpers.SplitClientAuthorizationName(auth.Name) // TODO is this needed?
-			auth.Name = clientname
-			return err
+			auth.Name = auth.ClientName
+			return nil
 		},
 
 		CreateStrategy: helpers.CannotCreateStrategy,
@@ -81,5 +75,5 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		return nil, err
 	}
 
-	return &REST{helpers.UIDEnforcer{Store: *store}}, nil
+	return &REST{helpers.UIDEnforcer{Store: *store, ListDecoratorFunc: toSelfList}}, nil
 }
