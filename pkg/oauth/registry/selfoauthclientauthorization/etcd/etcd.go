@@ -36,7 +36,7 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		KeyRootFunc: func(ctx kapi.Context) string {
 			user, ok := kapi.UserFrom(ctx)
 			if !ok {
-				return helpers.GetKeyWithUsername(prefix, "%invalid%") // Something invalid
+				panic("User parameter required.")
 			}
 			return helpers.GetKeyWithUsername(prefix, user.GetName())
 		},
@@ -75,5 +75,5 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		return nil, err
 	}
 
-	return &REST{helpers.UIDEnforcer{Store: *store, ListDecoratorFunc: toSelfList, UserUIDField: "userUID"}}, nil
+	return &REST{helpers.UIDEnforcer{Store: *store, ObjFn: toSelfObject, ListFn: toSelfList, UserUIDField: "userUID"}}, nil
 }

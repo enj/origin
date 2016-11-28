@@ -872,7 +872,7 @@ func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, r
 
 	if name, ok := m.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			if err != nil {
+			if err != nil { // TODO Dead code?
 				return nil, err
 			}
 			return e.Storage.Watch(ctx, key, resourceVersion, filter)

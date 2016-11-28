@@ -10,11 +10,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+type ObjectDecoratorFunc func(obj runtime.Object) runtime.Object
 type ListDecoratorFunc func(obj runtime.Object) runtime.Object
-
 type UIDEnforcer struct {
 	registry.Store
-	ListDecoratorFunc
+	ObjFn        ObjectDecoratorFunc
+	ListFn       ListDecoratorFunc
 	UserUIDField string
 }
 
@@ -33,7 +34,7 @@ func (s *UIDEnforcer) Get(ctx kapi.Context, name string) (runtime.Object, error)
 			return nil, kubeerr.NewNotFound(s.QualifiedResource, name)
 		}
 	}
-	return obj, nil
+	return s.ObjFn(obj), nil
 }
 
 func (s *UIDEnforcer) NewList() runtime.Object {
@@ -48,15 +49,18 @@ func (s *UIDEnforcer) List(ctx kapi.Context, options *kapi.ListOptions) (runtime
 	if err != nil {
 		return nil, err
 	}
-	return s.ListDecoratorFunc(list), nil
+	return s.ListFn(list), nil
 }
 
 func (s *UIDEnforcer) Delete(ctx kapi.Context, name string, options *kapi.DeleteOptions) (runtime.Object, error) {
 	if _, err := s.Get(ctx, name); err != nil {
 		return nil, err
 	}
-	return s.Store.Delete(ctx, name, options)
-
+	obj, err := s.Store.Delete(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	return s.ObjFn(obj), nil
 }
 
 func (s *UIDEnforcer) DeleteCollection(ctx kapi.Context, options *kapi.DeleteOptions, listOptions *kapi.ListOptions) (runtime.Object, error) {
@@ -67,14 +71,23 @@ func (s *UIDEnforcer) DeleteCollection(ctx kapi.Context, options *kapi.DeleteOpt
 	if err != nil {
 		return nil, err
 	}
-	return s.ListDecoratorFunc(list), nil
+	return s.ListFn(list), nil
 }
 
 func (s *UIDEnforcer) Watch(ctx kapi.Context, options *kapi.ListOptions) (watch.Interface, error) {
 	if err := s.forceUID(ctx, options); err != nil {
 		return nil, err
 	}
-	return s.Store.Watch(ctx, options) //TODO use ListDecoratorFunc ?
+	w, err := s.Store.Watch(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return watch.Filter(w, func(in watch.Event) (watch.Event, bool) {
+		if in.Type != watch.Error {
+			in.Object = s.ObjFn(in.Object)
+		}
+		return in, true
+	}), nil
 }
 
 func (s *UIDEnforcer) forceUID(ctx kapi.Context, options *kapi.ListOptions) error {
