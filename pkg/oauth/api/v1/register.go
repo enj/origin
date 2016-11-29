@@ -36,6 +36,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 func (obj *SelfOAuthClientAuthorizationList) GetObjectKind() unversioned.ObjectKind {
 	return &obj.TypeMeta
 }
+func (obj *SelfOAuthClientAuthorization) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *OAuthClientAuthorizationList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 func (obj *OAuthClientAuthorization) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
 func (obj *OAuthClientList) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }

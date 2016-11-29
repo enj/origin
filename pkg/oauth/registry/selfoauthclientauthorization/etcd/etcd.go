@@ -31,7 +31,7 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 	}
 
 	store := &registry.Store{
-		NewFunc:     func() runtime.Object { return &api.SelfOAuthClientAuthorization{} },
+		NewFunc:     func() runtime.Object { return &api.OAuthClientAuthorization{} },
 		NewListFunc: func() runtime.Object { return &api.OAuthClientAuthorizationList{} },
 		KeyRootFunc: func(ctx kapi.Context) string {
 			user, ok := kapi.UserFrom(ctx)
@@ -61,14 +61,7 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 			}
 		},
 		QualifiedResource: *resource,
-		Decorator: func(obj runtime.Object) error {
-			auth := objectToSelfOAuthClientAuthorization(obj)
-			auth.UserName = ""
-			auth.Name = auth.ClientName
-			return nil
-		},
-
-		CreateStrategy: helpers.CannotCreateStrategy,
+		CreateStrategy:    helpers.CannotCreateStrategy,
 	}
 
 	if err := restoptions.ApplyOptions(optsGetter, store, false, storage.NoTriggerPublisher); err != nil {
@@ -76,4 +69,8 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 	}
 
 	return &REST{helpers.UIDEnforcer{Store: *store, ObjFn: toSelfObject, ListFn: toSelfList, UserUIDField: "userUID"}}, nil
+}
+
+func (s *REST) New() runtime.Object {
+	return &api.SelfOAuthClientAuthorization{} // Hack for apiserver.APIInstaller.getResourceKind
 }
