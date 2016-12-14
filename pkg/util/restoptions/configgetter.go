@@ -8,11 +8,8 @@ import (
 
 	apiserveroptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	genericrest "k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -32,7 +29,7 @@ type configRESTOptionsGetter struct {
 	masterOptions configapi.MasterConfig
 
 	restOptionsLock sync.Mutex
-	restOptionsMap  map[unversioned.GroupResource]genericrest.RESTOptions
+	restOptionsMap  map[unversioned.GroupResource]RESTOptions
 
 	storageFactory        genericapiserver.StorageFactory
 	defaultResourceConfig *genericapiserver.ResourceConfig
@@ -53,7 +50,7 @@ func NewConfigGetter(masterOptions configapi.MasterConfig, defaultResourceConfig
 		cacheEnabled:            true,
 		defaultCacheSize:        1000,
 		cacheSizes:              map[unversioned.GroupResource]int{},
-		restOptionsMap:          map[unversioned.GroupResource]genericrest.RESTOptions{},
+		restOptionsMap:          map[unversioned.GroupResource]RESTOptions{},
 		defaultResourceConfig:   defaultResourceConfig,
 		quorumResources:         quorumResources,
 		defaultResourcePrefixes: defaultResourcePrefixes,
@@ -120,7 +117,7 @@ func (g *configRESTOptionsGetter) loadSettings() error {
 	return kerrors.NewAggregate(errs)
 }
 
-func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResource) (genericrest.RESTOptions, error) {
+func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResource) (RESTOptions, error) {
 	g.restOptionsLock.Lock()
 	defer g.restOptionsLock.Unlock()
 	if resourceOptions, ok := g.restOptionsMap[resource]; ok {
@@ -129,7 +126,7 @@ func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResou
 
 	config, err := g.storageFactory.NewConfig(resource)
 	if err != nil {
-		return genericrest.RESTOptions{}, err
+		return RESTOptions{}, err
 	}
 
 	if _, ok := g.quorumResources[resource]; ok {
@@ -141,7 +138,7 @@ func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResou
 		configuredCacheSize = g.defaultCacheSize
 	}
 
-	decorator := func(s *storagebackend.Config, requestedSize int, objectType runtime.Object, resourcePrefix string, scopeStrategy rest.NamespaceScopedStrategy, newListFn func() runtime.Object, triggerFn storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+	decorator := func(s *storagebackend.Config, requestedSize int, objectType runtime.Object, resourcePrefix string, keyFunc func(obj runtime.Object) (string, error), newListFn func() runtime.Object, triggerFn storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 		capacity := requestedSize
 		if capacity == UseConfiguredCacheSize {
 			capacity = configuredCacheSize
@@ -149,14 +146,14 @@ func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResou
 
 		if capacity == 0 || !g.cacheEnabled {
 			glog.V(5).Infof("using uncached watch storage for %s", resource.String())
-			return genericrest.UndecoratedStorage(s, capacity, objectType, resourcePrefix, scopeStrategy, newListFn, triggerFn)
+			return undecoratedStorage(s, capacity, objectType, resourcePrefix, keyFunc, newListFn, triggerFn)
 		}
 
 		glog.V(5).Infof("using watch cache storage (capacity=%d) for %s %#v", capacity, resource.String(), s)
-		return registry.StorageWithCacher(s, capacity, objectType, resourcePrefix, scopeStrategy, newListFn, triggerFn)
+		return storageWithCacher(s, capacity, objectType, resourcePrefix, keyFunc, newListFn, triggerFn)
 	}
 
-	resourceOptions := genericrest.RESTOptions{
+	resourceOptions := RESTOptions{
 		StorageConfig:           config,
 		Decorator:               decorator,
 		DeleteCollectionWorkers: 1,

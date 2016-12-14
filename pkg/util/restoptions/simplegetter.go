@@ -2,7 +2,6 @@ package restoptions
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	genericrest "k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
@@ -14,10 +13,10 @@ func NewSimpleGetter(storage *storagebackend.Config) Getter {
 	return &simpleGetter{storage: storage}
 }
 
-func (s *simpleGetter) GetRESTOptions(resource unversioned.GroupResource) (genericrest.RESTOptions, error) {
-	return genericrest.RESTOptions{
+func (s *simpleGetter) GetRESTOptions(resource unversioned.GroupResource) (RESTOptions, error) {
+	return RESTOptions{
 		StorageConfig:           s.storage,
-		Decorator:               genericrest.UndecoratedStorage,
+		Decorator:               undecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          resource.Resource,
 	}, nil
