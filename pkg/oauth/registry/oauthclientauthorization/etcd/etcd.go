@@ -61,7 +61,6 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 	}
 
 	selfStore := *store
-	//selfStore.PredicateFunc = oauthclientauthorization.SelfMatcher
 	selfStore.QualifiedResource = api.Resource("selfoauthclientauthorizations")
 	selfStore.CreateStrategy = helpers.CannotCreateStrategy
 	selfStore.UpdateStrategy = nil

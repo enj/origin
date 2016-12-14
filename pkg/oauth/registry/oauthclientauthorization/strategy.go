@@ -106,17 +106,3 @@ func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPre
 		},
 	}
 }
-
-func SelfMatcher(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(o runtime.Object) (labels.Set, fields.Set, error) {
-			obj, ok := o.(*api.OAuthClientAuthorization)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a OAuthClientAuthorization")
-			}
-			return labels.Set(obj.Labels), api.SelfOAuthClientAuthorizationToSelectableFields(obj), nil
-		},
-	}
-}

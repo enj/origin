@@ -41,8 +41,7 @@ func OAuthClientAuthorizationToSelectableFields(obj *OAuthClientAuthorization) f
 }
 
 // SelfOAuthClientAuthorizationToSelectableFields returns a label set that represents the object
-// This must take an OAuthClientAuthorization even though it is for the Self object
-func SelfOAuthClientAuthorizationToSelectableFields(obj *OAuthClientAuthorization) fields.Set {
+func SelfOAuthClientAuthorizationToSelectableFields(obj *SelfOAuthClientAuthorization) fields.Set {
 	return fields.Set{
 		"metadata.name": obj.Name,
 		"clientName":    obj.ClientName,
