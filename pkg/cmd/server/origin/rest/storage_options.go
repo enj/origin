@@ -21,11 +21,10 @@ func StorageOptions(options configapi.MasterConfig) restoptions.Getter {
 			{Resource: "policies"}:              "authorization/local/policies",
 			{Resource: "policybindings"}:        "authorization/local/policybindings",
 
-			{Resource: "oauthaccesstokens"}:             "oauth/accesstokens",
-			{Resource: "oauthauthorizetokens"}:          "oauth/authorizetokens",
-			{Resource: "oauthclients"}:                  "oauth/clients",
-			{Resource: "oauthclientauthorizations"}:     "oauth/clientauthorizations",
-			{Resource: "selfoauthclientauthorizations"}: "oauth/clientauthorizations",
+			{Resource: "oauthaccesstokens"}:         "oauth/accesstokens",
+			{Resource: "oauthauthorizetokens"}:      "oauth/authorizetokens",
+			{Resource: "oauthclients"}:              "oauth/clients",
+			{Resource: "oauthclientauthorizations"}: "oauth/clientauthorizations",
 
 			{Resource: "clusterresourcequotas"}: quotaapi.GroupName + "/clusterresourcequotas",
 

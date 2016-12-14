@@ -1,19 +1,19 @@
 package helpers
 
 import (
-	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 type ObjectDecoratorFunc func(obj runtime.Object) runtime.Object
-type ObjectFilterFunc func(ctx kapi.Context, obj runtime.Object) error
+type ObjectFilterFunc func(ctx api.Context, obj runtime.Object) error
 
 type ListDecoratorFunc func(obj runtime.Object) runtime.Object
-type ListFilterFunc func(ctx kapi.Context, options *kapi.ListOptions) error
+type ListFilterFunc func(ctx api.Context, options *api.ListOptions) error
 
-type ObjectNameMutatorFunc func(ctx kapi.Context, name string) (string, error)
+type ObjectNameMutatorFunc func(ctx api.Context, name string) (string, error)
 
 type filterConverter struct {
 	storage ReadAndDeleteStorage
@@ -25,6 +25,7 @@ type filterConverter struct {
 }
 
 type ReadAndDeleteStorage interface {
+	rest.Storage
 	rest.Getter
 	rest.Lister
 	rest.GracefulDeleter
@@ -52,7 +53,12 @@ func NewFilterConverter(
 	}
 }
 
-func (s *filterConverter) Get(ctx kapi.Context, name string) (runtime.Object, error) {
+// Implement rest.Storage using ObjectDecoratorFunc so that apiserver.APIInstaller.getResourceKind sees a new type
+func (s *filterConverter) New() runtime.Object {
+	return s.objDec(s.storage.New())
+}
+
+func (s *filterConverter) Get(ctx api.Context, name string) (runtime.Object, error) {
 	name, err := s.namer(ctx, name)
 	if err != nil {
 		return nil, err
@@ -68,10 +74,10 @@ func (s *filterConverter) Get(ctx kapi.Context, name string) (runtime.Object, er
 }
 
 func (s *filterConverter) NewList() runtime.Object {
-	return s.storage.NewList() // needed to implement rest.Lister (NewList + List)
+	return s.listDec(s.storage.NewList()) // needed to implement rest.Lister (NewList + List)
 }
 
-func (s *filterConverter) List(ctx kapi.Context, options *kapi.ListOptions) (runtime.Object, error) {
+func (s *filterConverter) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
 	if err := s.listFil(ctx, options); err != nil {
 		return nil, err
 	}
@@ -82,7 +88,7 @@ func (s *filterConverter) List(ctx kapi.Context, options *kapi.ListOptions) (run
 	return s.listDec(list), nil
 }
 
-func (s *filterConverter) Delete(ctx kapi.Context, name string, options *kapi.DeleteOptions) (runtime.Object, error) {
+func (s *filterConverter) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
 	name, err := s.namer(ctx, name)
 	if err != nil {
 		return nil, err
@@ -97,7 +103,7 @@ func (s *filterConverter) Delete(ctx kapi.Context, name string, options *kapi.De
 	return s.objDec(obj), nil
 }
 
-func (s *filterConverter) DeleteCollection(ctx kapi.Context, options *kapi.DeleteOptions, listOptions *kapi.ListOptions) (runtime.Object, error) {
+func (s *filterConverter) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
 	if err := s.listFil(ctx, listOptions); err != nil {
 		return nil, err
 	}
@@ -108,7 +114,7 @@ func (s *filterConverter) DeleteCollection(ctx kapi.Context, options *kapi.Delet
 	return s.listDec(list), nil
 }
 
-func (s *filterConverter) Watch(ctx kapi.Context, options *kapi.ListOptions) (watch.Interface, error) {
+func (s *filterConverter) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	if err := s.listFil(ctx, options); err != nil {
 		return nil, err
 	}

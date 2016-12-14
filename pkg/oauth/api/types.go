@@ -144,7 +144,16 @@ type OAuthClientAuthorization struct {
 	Scopes []string
 }
 
-type SelfOAuthClientAuthorization OAuthClientAuthorization
+type SelfOAuthClientAuthorization struct {
+	unversioned.TypeMeta
+	kapi.ObjectMeta
+
+	// ClientName references the client that created this authorization
+	ClientName string
+
+	// Scopes is an array of the granted scopes.
+	Scopes []string
+}
 
 type OAuthAccessTokenList struct {
 	unversioned.TypeMeta

@@ -61,7 +61,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 	}
 
 	selfStore := *store
-	selfStore.PredicateFunc = oauthclientauthorization.SelfMatcher
+	//selfStore.PredicateFunc = oauthclientauthorization.SelfMatcher
 	selfStore.QualifiedResource = api.Resource("selfoauthclientauthorizations")
 	selfStore.CreateStrategy = helpers.CannotCreateStrategy
 	selfStore.UpdateStrategy = nil
@@ -76,18 +76,32 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		return helpers.GetKeyWithUsername(prefix, user.GetName())
 	}
 
-	toSelfObject := func(obj runtime.Object) runtime.Object { // TODO fix
-		return (*api.SelfOAuthClientAuthorization)(obj.(*api.OAuthClientAuthorization))
+	toSelfObject := func(obj runtime.Object) runtime.Object {
+		in := obj.(*api.OAuthClientAuthorization)
+		out := &api.SelfOAuthClientAuthorization{
+			ObjectMeta: in.ObjectMeta, // TODO: do we want to be more specific here?
+			ClientName: in.ClientName,
+			Scopes:     in.Scopes,
+		}
+		out.Name = in.ClientName
+		fmt.Printf("\n\n\n\nYOYO %#v\n\n\n", in)
+		fmt.Printf("\n\n\n\nNONO %#v\n\n\n", out)
+		return out
 	}
 
 	toSelfList := func(obj runtime.Object) runtime.Object {
-		list := obj.(*api.OAuthClientAuthorizationList)
-		newlist := &api.SelfOAuthClientAuthorizationList{Items: make([]api.SelfOAuthClientAuthorization, len(list.Items))}
-		newlist.ResourceVersion = list.ResourceVersion
-		for _, item := range list.Items {
-			newlist.Items = append(newlist.Items, *(toSelfObject(&item).(*api.SelfOAuthClientAuthorization)))
+		in := obj.(*api.OAuthClientAuthorizationList)
+		out := &api.SelfOAuthClientAuthorizationList{}
+		if len(in.Items) != 0 {
+			out.Items = make([]api.SelfOAuthClientAuthorization, 0, len(in.Items))
+			for _, item := range in.Items {
+				out.Items = append(out.Items, *(toSelfObject(&item).(*api.SelfOAuthClientAuthorization)))
+			}
 		}
-		return newlist
+		out.ResourceVersion = in.ResourceVersion
+		fmt.Printf("\n\n\n\nZOO %#v\n\n\n", in)
+		fmt.Printf("\n\n\n\nXOO %#v\n\n\n", out)
+		return out
 	}
 
 	selfObjectUIDFilter := func(ctx kapi.Context, obj runtime.Object) error {
@@ -149,9 +163,4 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 	)
 
 	return &REST{*store}, &SelfREST{selfFilterConverter}, nil
-}
-
-// Implement rest.Storage
-func (s *SelfREST) New() runtime.Object {
-	return &api.SelfOAuthClientAuthorization{} // Hack for apiserver.APIInstaller.getResourceKind
 }

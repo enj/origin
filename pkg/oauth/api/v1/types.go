@@ -156,7 +156,17 @@ type OAuthClientAuthorization struct {
 }
 
 // SelfOAuthClientAuthorization describes an authorization created by a user for an OAuth client
-type SelfOAuthClientAuthorization OAuthClientAuthorization
+type SelfOAuthClientAuthorization struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	kapi.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// ClientName references the client that created this authorization
+	ClientName string `json:"clientName,omitempty" protobuf:"bytes,2,opt,name=clientName"`
+
+	// Scopes is an array of the granted scopes.
+	Scopes []string `json:"scopes,omitempty" protobuf:"bytes,3,rep,name=scopes"`
+}
 
 // OAuthAccessTokenList is a collection of OAuth access tokens
 type OAuthAccessTokenList struct {
