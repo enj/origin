@@ -62,7 +62,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 
 	selfStore := *store
 	selfStore.QualifiedResource = api.Resource("selfoauthclientauthorizations")
-	selfStore.CreateStrategy = helpers.CannotCreateStrategy
+	selfStore.CreateStrategy = helpers.CannotCreateStrategy // TODO maybe just set this to nil?
 	selfStore.UpdateStrategy = nil
 
 	// We cannot override KeyFunc because the cacher does not provide the user in the context
@@ -76,30 +76,30 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 	}
 
 	toSelfObject := func(obj runtime.Object) runtime.Object {
-		in := obj.(*api.OAuthClientAuthorization)
+		in, ok := obj.(*api.OAuthClientAuthorization)
+		if !ok { // Handle cases where we are passed other objects such as during Delete
+			return obj
+		}
 		out := &api.SelfOAuthClientAuthorization{
 			ObjectMeta: in.ObjectMeta, // TODO: do we want to be more specific here?
 			ClientName: in.ClientName,
 			Scopes:     in.Scopes,
 		}
 		out.Name = in.ClientName
-		fmt.Printf("\n\n\n\nYOYO %#v\n\n\n", in)
-		fmt.Printf("\n\n\n\nNONO %#v\n\n\n", out)
 		return out
 	}
 
 	toSelfList := func(obj runtime.Object) runtime.Object {
 		in := obj.(*api.OAuthClientAuthorizationList)
 		out := &api.SelfOAuthClientAuthorizationList{}
-		if len(in.Items) != 0 {
-			out.Items = make([]api.SelfOAuthClientAuthorization, 0, len(in.Items))
-			for _, item := range in.Items {
-				out.Items = append(out.Items, *(toSelfObject(&item).(*api.SelfOAuthClientAuthorization)))
-			}
-		}
 		out.ResourceVersion = in.ResourceVersion
-		fmt.Printf("\n\n\n\nZOO %#v\n\n\n", in)
-		fmt.Printf("\n\n\n\nXOO %#v\n\n\n", out)
+		if len(in.Items) == 0 {
+			return out
+		}
+		out.Items = make([]api.SelfOAuthClientAuthorization, 0, len(in.Items))
+		for _, item := range in.Items {
+			out.Items = append(out.Items, *(toSelfObject(&item).(*api.SelfOAuthClientAuthorization)))
+		}
 		return out
 	}
 
@@ -109,12 +109,13 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 			return kubeerr.NewBadRequest("User parameter required.")
 		}
 		uid := user.GetUID()
-		if len(uid) != 0 {
-			selector := fields.OneTermEqualSelector("userUID", uid)
-			if matched, err := selfStore.PredicateFunc(labels.Everything(), selector).
-				Matches(obj); !matched || err != nil {
-				return kubeerr.NewNotFound(selfStore.QualifiedResource, obj.(*api.OAuthClientAuthorization).ClientName)
-			}
+		if len(uid) == 0 {
+			return nil
+		}
+		selector := fields.OneTermEqualSelector("userUID", uid)
+		if matched, err := selfStore.PredicateFunc(labels.Everything(), selector).
+			Matches(obj); !matched || err != nil {
+			return kubeerr.NewNotFound(selfStore.QualifiedResource, obj.(*api.OAuthClientAuthorization).ClientName)
 		}
 		return nil
 	}

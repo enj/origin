@@ -134,9 +134,7 @@ func (s *filterConverter) Watch(ctx api.Context, options *api.ListOptions) (watc
 		return nil, err
 	}
 	return watch.Filter(w, func(in watch.Event) (watch.Event, bool) {
-		if in.Type != watch.Error {
-			in.Object = s.objDec(in.Object)
-		}
+		in.Object = s.objDec(in.Object)
 		return in, true
 	}), nil
 }
