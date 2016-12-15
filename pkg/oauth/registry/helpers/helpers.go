@@ -30,11 +30,11 @@ func GetKeyWithUsername(prefix, userName string) string {
 	return prefix + "/" + userName
 }
 
-func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (*unversioned.GroupResource, string, error) {
+func GetResourceAndPrefix(optsGetter restoptions.Getter, resourceName string) (unversioned.GroupResource, string, error) {
 	resource := api.Resource(resourceName)
 	opts, err := optsGetter.GetRESTOptions(resource)
 	if err != nil {
-		return nil, "", err
+		return unversioned.GroupResource{}, "", err
 	}
-	return &resource, "/" + opts.ResourcePrefix, nil
+	return resource, "/" + opts.ResourcePrefix, nil
 }

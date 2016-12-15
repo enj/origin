@@ -2,7 +2,9 @@ package helpers
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -16,12 +18,13 @@ type ListFilterFunc func(ctx api.Context, options *api.ListOptions) error
 type ObjectNameMutatorFunc func(ctx api.Context, name string) (string, error)
 
 type filterConverter struct {
-	storage ReadAndDeleteStorage
-	objDec  ObjectDecoratorFunc
-	objFil  ObjectFilterFunc
-	listDec ListDecoratorFunc
-	listFil ListFilterFunc
-	namer   ObjectNameMutatorFunc
+	storage  ReadAndDeleteStorage
+	objDec   ObjectDecoratorFunc
+	objFil   ObjectFilterFunc
+	listDec  ListDecoratorFunc
+	listFil  ListFilterFunc
+	namer    ObjectNameMutatorFunc
+	resource unversioned.GroupResource
 }
 
 type ReadAndDeleteStorage interface {
@@ -42,14 +45,16 @@ func NewFilterConverter(
 	listDec ListDecoratorFunc,
 	listFil ListFilterFunc,
 	namer ObjectNameMutatorFunc,
+	resource unversioned.GroupResource,
 ) *filterConverter {
 	return &filterConverter{
-		storage: storage,
-		objDec:  objDec,
-		objFil:  objFil,
-		listDec: listDec,
-		listFil: listFil,
-		namer:   namer,
+		storage:  storage,
+		objDec:   objDec,
+		objFil:   objFil,
+		listDec:  listDec,
+		listFil:  listFil,
+		namer:    namer,
+		resource: resource,
 	}
 }
 
@@ -59,12 +64,15 @@ func (s *filterConverter) New() runtime.Object {
 }
 
 func (s *filterConverter) Get(ctx api.Context, name string) (runtime.Object, error) {
-	name, err := s.namer(ctx, name)
+	newName, err := s.namer(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	obj, err := s.storage.Get(ctx, name)
+	obj, err := s.storage.Get(ctx, newName)
 	if err != nil {
+		if kubeerr.IsNotFound(err) {
+			return nil, kubeerr.NewNotFound(s.resource, name)
+		}
 		return nil, err
 	}
 	if err := s.objFil(ctx, obj); err != nil {
@@ -89,15 +97,18 @@ func (s *filterConverter) List(ctx api.Context, options *api.ListOptions) (runti
 }
 
 func (s *filterConverter) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
-	name, err := s.namer(ctx, name)
-	if err != nil {
-		return nil, err
-	}
 	if _, err := s.Get(ctx, name); err != nil {
 		return nil, err
 	}
-	obj, err := s.storage.Delete(ctx, name, options)
+	newName, err := s.namer(ctx, name)
 	if err != nil {
+		return nil, err
+	}
+	obj, err := s.storage.Delete(ctx, newName, options)
+	if err != nil {
+		if kubeerr.IsNotFound(err) {
+			return nil, kubeerr.NewNotFound(s.resource, name)
+		}
 		return nil, err
 	}
 	return s.objDec(obj), nil

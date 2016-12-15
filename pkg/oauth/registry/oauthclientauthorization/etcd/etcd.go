@@ -50,7 +50,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 			return obj.(*api.OAuthClientAuthorization).Name, nil
 		},
 		PredicateFunc:     oauthclientauthorization.Matcher,
-		QualifiedResource: *resource,
+		QualifiedResource: resource,
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
@@ -159,6 +159,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		toSelfList,
 		selfListUIDFilter,
 		selfNamer,
+		selfStore.QualifiedResource,
 	)
 
 	return &REST{*store}, &SelfREST{selfFilterConverter}, nil
