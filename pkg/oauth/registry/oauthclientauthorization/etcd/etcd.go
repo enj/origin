@@ -110,10 +110,10 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		}
 		uid := user.GetUID()
 		if len(uid) != 0 {
-			if matched, err := selfStore.PredicateFunc(labels.Everything(), fields.OneTermEqualSelector("userUID", uid)).
+			selector := fields.OneTermEqualSelector("userUID", uid)
+			if matched, err := selfStore.PredicateFunc(labels.Everything(), selector).
 				Matches(obj); !matched || err != nil {
-				name, _ := selfStore.ObjectNameFunc(obj)
-				return kubeerr.NewNotFound(selfStore.QualifiedResource, name)
+				return kubeerr.NewNotFound(selfStore.QualifiedResource, obj.(*api.OAuthClientAuthorization).ClientName)
 			}
 		}
 		return nil
@@ -131,12 +131,11 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		if options == nil {
 			options = &kapi.ListOptions{}
 		}
-		if options.FieldSelector == nil {
-			options.FieldSelector = fields.OneTermEqualSelector("userUID", uid)
+		selector := fields.OneTermEqualSelector("userUID", uid)
+		if options.FieldSelector == nil || options.FieldSelector.Empty() {
+			options.FieldSelector = selector
 		} else {
-			options.FieldSelector, _ = options.FieldSelector.Transform(func(string, string) (string, string, error) {
-				return "userUID", uid, nil
-			})
+			options.FieldSelector = fields.AndSelectors(options.FieldSelector, selector)
 		}
 		return nil
 	}
