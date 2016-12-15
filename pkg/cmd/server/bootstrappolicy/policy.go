@@ -401,6 +401,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				authorizationapi.NewRule("list", "watch").Groups(projectGroup).Resources("projects").RuleOrDie(),
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("selfsubjectrulesreviews").RuleOrDie(),
 				{Verbs: sets.NewString("create"), APIGroups: []string{authzGroup}, Resources: sets.NewString("subjectaccessreviews", "localsubjectaccessreviews"), AttributeRestrictions: &authorizationapi.IsPersonalSubjectAccessReview{}},
+				authorizationapi.NewRule("get", "list", "watch", "delete", "deletecollection").Groups(oauthGroup).Resources("selfoauthclientauthorizations").RuleOrDie(),
 			},
 		},
 		{
@@ -532,14 +533,6 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			},
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("delete").Groups(oauthGroup).Resources("oauthaccesstokens", "oauthauthorizetokens").RuleOrDie(),
-			},
-		},
-		{
-			ObjectMeta: kapi.ObjectMeta{
-				Name: OAuthSelfClientAuthorizerRoleName,
-			},
-			Rules: []authorizationapi.PolicyRule{
-				authorizationapi.NewRule("get", "list", "watch", "delete", "deletecollection").Groups(oauthGroup).Resources("selfoauthclientauthorizations").RuleOrDie(),
 			},
 		},
 		{
@@ -879,15 +872,6 @@ func GetBootstrapClusterRoleBindings() []authorizationapi.ClusterRoleBinding {
 				Name: OAuthTokenDeleterRoleName,
 			},
 			Subjects: []kapi.ObjectReference{{Kind: authorizationapi.SystemGroupKind, Name: AuthenticatedGroup}, {Kind: authorizationapi.SystemGroupKind, Name: UnauthenticatedGroup}},
-		},
-		{
-			ObjectMeta: kapi.ObjectMeta{
-				Name: OAuthSelfClientAuthorizerRoleBindingName,
-			},
-			RoleRef: kapi.ObjectReference{
-				Name: OAuthSelfClientAuthorizerRoleName,
-			},
-			Subjects: []kapi.ObjectReference{{Kind: authorizationapi.SystemGroupKind, Name: AuthenticatedGroup}},
 		},
 		{
 			ObjectMeta: kapi.ObjectMeta{
