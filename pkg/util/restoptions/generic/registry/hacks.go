@@ -1,4 +1,4 @@
-package restoptions
+package registry
 
 import (
 	genericrest "k8s.io/kubernetes/pkg/registry/generic"
@@ -11,28 +11,8 @@ import (
 
 // Temporary hack until rebase of upstream PR 37770 ///////////////////////////////////////////////
 
-// RESTOptions is set of configuration options to generic registries.
-type RESTOptions struct {
-	StorageConfig           *storagebackend.Config
-	Decorator               StorageDecorator
-	DeleteCollectionWorkers int
-
-	ResourcePrefix string
-}
-
-// StorageDecorator is a function signature for producing
-// a storage.Interface from given parameters.
-type StorageDecorator func(
-	config *storagebackend.Config,
-	capacity int,
-	objectType runtime.Object,
-	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
-	newListFunc func() runtime.Object,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
-
 // Creates a cacher based given storageConfig.
-func storageWithCacher(
+func StorageWithCacher(
 	storageConfig *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,
@@ -62,18 +42,6 @@ func storageWithCacher(
 	}
 
 	return cacher, destroyFunc
-}
-
-// Returns given 'storageInterface' without any decoration.
-func undecoratedStorage(
-	config *storagebackend.Config,
-	capacity int,
-	objectType runtime.Object,
-	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
-	newListFunc func() runtime.Object,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
-	return genericrest.NewRawStorage(config)
 }
 
 // End temporary hack /////////////////////////////////////////////////////////////////////////////

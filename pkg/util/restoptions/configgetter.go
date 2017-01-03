@@ -10,6 +10,8 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericrest "github.com/openshift/origin/pkg/util/restoptions/generic" // Temporary hack replacement for "k8s.io/kubernetes/pkg/registry/generic"
+	"github.com/openshift/origin/pkg/util/restoptions/generic/registry" // Temporary hack replacement for "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -29,7 +31,7 @@ type configRESTOptionsGetter struct {
 	masterOptions configapi.MasterConfig
 
 	restOptionsLock sync.Mutex
-	restOptionsMap  map[unversioned.GroupResource]RESTOptions
+	restOptionsMap  map[unversioned.GroupResource]genericrest.RESTOptions
 
 	storageFactory        genericapiserver.StorageFactory
 	defaultResourceConfig *genericapiserver.ResourceConfig
@@ -50,7 +52,7 @@ func NewConfigGetter(masterOptions configapi.MasterConfig, defaultResourceConfig
 		cacheEnabled:            true,
 		defaultCacheSize:        1000,
 		cacheSizes:              map[unversioned.GroupResource]int{},
-		restOptionsMap:          map[unversioned.GroupResource]RESTOptions{},
+		restOptionsMap:          map[unversioned.GroupResource]genericrest.RESTOptions{},
 		defaultResourceConfig:   defaultResourceConfig,
 		quorumResources:         quorumResources,
 		defaultResourcePrefixes: defaultResourcePrefixes,
@@ -117,7 +119,7 @@ func (g *configRESTOptionsGetter) loadSettings() error {
 	return kerrors.NewAggregate(errs)
 }
 
-func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResource) (RESTOptions, error) {
+func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResource) (genericrest.RESTOptions, error) {
 	g.restOptionsLock.Lock()
 	defer g.restOptionsLock.Unlock()
 	if resourceOptions, ok := g.restOptionsMap[resource]; ok {
@@ -126,7 +128,7 @@ func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResou
 
 	config, err := g.storageFactory.NewConfig(resource)
 	if err != nil {
-		return RESTOptions{}, err
+		return genericrest.RESTOptions{}, err
 	}
 
 	if _, ok := g.quorumResources[resource]; ok {
@@ -146,14 +148,14 @@ func (g *configRESTOptionsGetter) GetRESTOptions(resource unversioned.GroupResou
 
 		if capacity == 0 || !g.cacheEnabled {
 			glog.V(5).Infof("using uncached watch storage for %s", resource.String())
-			return undecoratedStorage(s, capacity, objectType, resourcePrefix, keyFunc, newListFn, triggerFn)
+			return genericrest.UndecoratedStorage(s, capacity, objectType, resourcePrefix, keyFunc, newListFn, triggerFn)
 		}
 
 		glog.V(5).Infof("using watch cache storage (capacity=%d) for %s %#v", capacity, resource.String(), s)
-		return storageWithCacher(s, capacity, objectType, resourcePrefix, keyFunc, newListFn, triggerFn)
+		return registry.StorageWithCacher(s, capacity, objectType, resourcePrefix, keyFunc, newListFn, triggerFn)
 	}
 
-	resourceOptions := RESTOptions{
+	resourceOptions := genericrest.RESTOptions{
 		StorageConfig:           config,
 		Decorator:               decorator,
 		DeleteCollectionWorkers: 1,
