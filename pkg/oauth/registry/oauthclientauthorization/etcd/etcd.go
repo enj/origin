@@ -67,7 +67,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 
 	// We cannot override KeyFunc because the cacher does not provide the user in the context
 	// The cacher does not use the KeyRootFunc so it is safe to override
-	selfStore.KeyRootFunc = func(ctx kapi.Context) string { // This makes watches more efficient
+	selfStore.KeyRootFunc = func(ctx kapi.Context) string { // This makes watches more efficient by making them user specific (but not UID specific)
 		user, ok := kapi.UserFrom(ctx)
 		if !ok {
 			panic("User parameter required.")
@@ -85,7 +85,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 			ClientName: in.ClientName,
 			Scopes:     in.Scopes,
 		}
-		out.Name = in.ClientName
+		out.Name = in.ClientName // The user sees the name as the ClientName so they do not have to see their own username repeated
 		return out
 	}
 
