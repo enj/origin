@@ -13,7 +13,7 @@ type ObjectDecoratorFunc func(obj runtime.Object) runtime.Object
 type ObjectFilterFunc func(ctx api.Context, obj runtime.Object) error
 
 type ListDecoratorFunc func(obj runtime.Object) runtime.Object
-type ListFilterFunc func(ctx api.Context, options *api.ListOptions) error
+type ListFilterFunc func(ctx api.Context, options *api.ListOptions) (*api.ListOptions, error)
 
 type ObjectNameMutatorFunc func(ctx api.Context, name string) (string, error)
 
@@ -86,7 +86,8 @@ func (s *filterConverter) NewList() runtime.Object {
 }
 
 func (s *filterConverter) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
-	if err := s.listFil(ctx, options); err != nil {
+	options, err := s.listFil(ctx, options)
+	if err != nil {
 		return nil, err
 	}
 	list, err := s.storage.List(ctx, options)
@@ -115,7 +116,8 @@ func (s *filterConverter) Delete(ctx api.Context, name string, options *api.Dele
 }
 
 func (s *filterConverter) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
-	if err := s.listFil(ctx, listOptions); err != nil {
+	listOptions, err := s.listFil(ctx, listOptions)
+	if err != nil {
 		return nil, err
 	}
 	list, err := s.storage.DeleteCollection(ctx, options, listOptions)
@@ -126,7 +128,8 @@ func (s *filterConverter) DeleteCollection(ctx api.Context, options *api.DeleteO
 }
 
 func (s *filterConverter) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
-	if err := s.listFil(ctx, options); err != nil {
+	options, err := s.listFil(ctx, options)
+	if err != nil {
 		return nil, err
 	}
 	w, err := s.storage.Watch(ctx, options)

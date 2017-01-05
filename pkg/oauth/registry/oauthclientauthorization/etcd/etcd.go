@@ -120,14 +120,14 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		return nil
 	}
 
-	selfListUIDFilter := func(ctx kapi.Context, options *kapi.ListOptions) error {
+	selfListUIDFilter := func(ctx kapi.Context, options *kapi.ListOptions) (*kapi.ListOptions, error) {
 		user, ok := kapi.UserFrom(ctx)
 		if !ok {
-			return kubeerr.NewBadRequest("User parameter required.")
+			return nil, kubeerr.NewBadRequest("User parameter required.")
 		}
 		uid := user.GetUID()
 		if len(uid) == 0 {
-			return nil
+			return options, nil
 		}
 		if options == nil {
 			options = &kapi.ListOptions{}
@@ -138,7 +138,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		} else {
 			options.FieldSelector = fields.AndSelectors(options.FieldSelector, selector)
 		}
-		return nil
+		return options, nil
 	}
 
 	// This simulates overriding the KeyFunc
