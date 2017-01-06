@@ -75,34 +75,6 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		return helpers.GetKeyWithUsername(prefix, user.GetName())
 	}
 
-	toSelfObject := func(obj runtime.Object) runtime.Object {
-		in, ok := obj.(*api.OAuthClientAuthorization)
-		if !ok { // Handle cases where we are passed other objects such as during Delete
-			return obj
-		}
-		out := &api.SelfOAuthClientAuthorization{
-			ObjectMeta: in.ObjectMeta, // TODO: do we want to be more specific here?
-			ClientName: in.ClientName,
-			Scopes:     in.Scopes,
-		}
-		out.Name = in.ClientName // The user sees the name as the ClientName so they do not have to see their own username repeated
-		return out
-	}
-
-	toSelfList := func(obj runtime.Object) runtime.Object {
-		in := obj.(*api.OAuthClientAuthorizationList)
-		out := &api.SelfOAuthClientAuthorizationList{}
-		out.ResourceVersion = in.ResourceVersion
-		if len(in.Items) == 0 {
-			return out
-		}
-		out.Items = make([]api.SelfOAuthClientAuthorization, 0, len(in.Items))
-		for _, item := range in.Items {
-			out.Items = append(out.Items, *(toSelfObject(&item).(*api.SelfOAuthClientAuthorization)))
-		}
-		return out
-	}
-
 	selfObjectUIDFilter := func(ctx kapi.Context, obj runtime.Object) error {
 		user, ok := kapi.UserFrom(ctx)
 		if !ok {
@@ -157,11 +129,40 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 		&selfStore,
 		toSelfObject,
 		selfObjectUIDFilter,
-		toSelfList,
+		ToSelfList,
 		selfListUIDFilter,
 		selfNamer,
 		selfStore.QualifiedResource,
 	)
 
 	return &REST{*store}, &SelfREST{selfFilterConverter}, nil
+}
+
+func toSelfObject(obj runtime.Object) runtime.Object {
+	in, ok := obj.(*api.OAuthClientAuthorization)
+	if !ok { // Handle cases where we are passed other objects such as during Delete
+		return obj
+	}
+	out := &api.SelfOAuthClientAuthorization{
+		ObjectMeta: in.ObjectMeta, // TODO: do we want to be more specific here?
+		ClientName: in.ClientName,
+		Scopes:     in.Scopes,
+	}
+	out.Name = in.ClientName // The user sees the name as the ClientName so they do not have to see their own username repeated
+	return out
+}
+
+// export for testing
+func ToSelfList(obj runtime.Object) runtime.Object {
+	in := obj.(*api.OAuthClientAuthorizationList)
+	out := &api.SelfOAuthClientAuthorizationList{}
+	out.ResourceVersion = in.ResourceVersion
+	if len(in.Items) == 0 {
+		return out
+	}
+	out.Items = make([]api.SelfOAuthClientAuthorization, 0, len(in.Items))
+	for _, item := range in.Items {
+		out.Items = append(out.Items, *(toSelfObject(&item).(*api.SelfOAuthClientAuthorization)))
+	}
+	return out
 }
