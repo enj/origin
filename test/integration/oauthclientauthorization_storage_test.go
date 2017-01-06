@@ -89,7 +89,7 @@ func (o *clientAuthorizationTester) createSA(name string) *kapi.ServiceAccount {
 	return serviceAccount
 }
 
-func (o *clientAuthorizationTester) getUser(userName string) (*userapi.User, osclient.SelfOAuthClientAuthorizationInterface) {
+func (o *clientAuthorizationTester) createUser(userName string) (*userapi.User, osclient.SelfOAuthClientAuthorizationInterface) {
 	userClient, _, _, err := testutil.GetClientForUser(*o.rc, userName)
 	if err != nil {
 		o.t.Fatalf("error getting user client for %s: %#v", userName, err)
@@ -231,7 +231,7 @@ func newOAuthClientAuthorizationHandler(t *testing.T) *clientAuthorizationTester
 	}
 }
 
-func getOAuthClientAuthorization(sa *kapi.ServiceAccount, user *userapi.User, scopes ...string) *oauthapi.OAuthClientAuthorization {
+func newOAuthClientAuthorization(sa *kapi.ServiceAccount, user *userapi.User, scopes ...string) *oauthapi.OAuthClientAuthorization {
 	client := &oauthapi.OAuthClientAuthorization{
 		ClientName: getSAName(sa),
 		UserName:   user.GetName(),
@@ -245,7 +245,7 @@ func getSAName(sa *kapi.ServiceAccount) string {
 	return serviceaccount.MakeUsername(sa.Namespace, sa.Name)
 }
 
-func getOAuthClientAuthorizationList(in ...*oauthapi.OAuthClientAuthorization) *oauthapi.OAuthClientAuthorizationList {
+func newOAuthClientAuthorizationList(in ...*oauthapi.OAuthClientAuthorization) *oauthapi.OAuthClientAuthorizationList {
 	out := []oauthapi.OAuthClientAuthorization{}
 	for _, client := range in {
 		out = append(out, *client)
@@ -293,10 +293,10 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 	sa5 := clientTester.createSA("sa5")
 
 	// Create some users to use in tests
-	alice, aliceAuth := clientTester.getUser("alice")
-	bob, bobAuth := clientTester.getUser("bob")
-	chuck, chuckAuth := clientTester.getUser("chuck")
-	david, davidAuth := clientTester.getUser("david")
+	alice, aliceAuth := clientTester.createUser("alice")
+	bob, bobAuth := clientTester.createUser("bob")
+	chuck, chuckAuth := clientTester.createUser("chuck")
+	david, davidAuth := clientTester.createUser("david")
 
 	// Check get and list (no UID checks)
 	{
@@ -304,17 +304,17 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 
 		// create old data
 		clientTester.oldLocationEtcdCreate(
-			getOAuthClientAuthorization(sa1, alice),
-			getOAuthClientAuthorization(sa1, bob),
-			getOAuthClientAuthorization(sa2, chuck),
+			newOAuthClientAuthorization(sa1, alice),
+			newOAuthClientAuthorization(sa1, bob),
+			newOAuthClientAuthorization(sa2, chuck),
 		)
 
 		// create new data
 		clientTester.createClientAuthorizations(
-			getOAuthClientAuthorization(sa3, david, scope.UserInfo),
-			getOAuthClientAuthorization(sa4, alice, scope.UserInfo),
-			getOAuthClientAuthorization(sa5, bob, scope.UserInfo),
-			getOAuthClientAuthorization(sa2, bob, scope.UserInfo),
+			newOAuthClientAuthorization(sa3, david, scope.UserInfo),
+			newOAuthClientAuthorization(sa4, alice, scope.UserInfo),
+			newOAuthClientAuthorization(sa5, bob, scope.UserInfo),
+			newOAuthClientAuthorization(sa2, bob, scope.UserInfo),
 		)
 
 		// wait for cache to sync
@@ -326,14 +326,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		}
 
 		// cluster admin should see everything, new and old
-		expected = getOAuthClientAuthorizationList(
-			getOAuthClientAuthorization(sa1, alice),
-			getOAuthClientAuthorization(sa1, bob),
-			getOAuthClientAuthorization(sa2, chuck),
-			getOAuthClientAuthorization(sa3, david, scope.UserInfo),
-			getOAuthClientAuthorization(sa4, alice, scope.UserInfo),
-			getOAuthClientAuthorization(sa5, bob, scope.UserInfo),
-			getOAuthClientAuthorization(sa2, bob, scope.UserInfo),
+		expected = newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, alice),
+			newOAuthClientAuthorization(sa1, bob),
+			newOAuthClientAuthorization(sa2, chuck),
+			newOAuthClientAuthorization(sa3, david, scope.UserInfo),
+			newOAuthClientAuthorization(sa4, alice, scope.UserInfo),
+			newOAuthClientAuthorization(sa5, bob, scope.UserInfo),
+			newOAuthClientAuthorization(sa2, bob, scope.UserInfo),
 		)
 		clientTester.assertEqualList("cluster admin sees all", expected, actual)
 
@@ -343,8 +343,8 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		if actualSelf, err = aliceAuth.List(opts); err != nil {
 			t.Fatalf("error listing self client auths: %#v", err)
 		}
-		expected = getOAuthClientAuthorizationList(
-			getOAuthClientAuthorization(sa4, alice, scope.UserInfo),
+		expected = newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa4, alice, scope.UserInfo),
 		)
 		clientTester.assertEqualSelfList("alice list", expected, actualSelf)
 		clientTester.assertGetSuccess("alice get", aliceAuth, expected, sa4)
@@ -354,9 +354,9 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		if actualSelf, err = bobAuth.List(opts); err != nil {
 			t.Fatalf("error listing self client auths: %#v", err)
 		}
-		expected = getOAuthClientAuthorizationList(
-			getOAuthClientAuthorization(sa5, bob, scope.UserInfo),
-			getOAuthClientAuthorization(sa2, bob, scope.UserInfo),
+		expected = newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa5, bob, scope.UserInfo),
+			newOAuthClientAuthorization(sa2, bob, scope.UserInfo),
 		)
 		clientTester.assertEqualSelfList("bob list", expected, actualSelf)
 		clientTester.assertGetSuccess("bob get", bobAuth, expected, sa2, sa5)
@@ -366,7 +366,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		if actualSelf, err = chuckAuth.List(opts); err != nil {
 			t.Fatalf("error listing self client auths: %#v", err)
 		}
-		expected = getOAuthClientAuthorizationList(
+		expected = newOAuthClientAuthorizationList(
 		// should be empty
 		)
 		clientTester.assertEqualSelfList("chuck list", expected, actualSelf)
@@ -377,8 +377,8 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		if actualSelf, err = davidAuth.List(opts); err != nil {
 			t.Fatalf("error listing self client auths: %#v", err)
 		}
-		expected = getOAuthClientAuthorizationList(
-			getOAuthClientAuthorization(sa3, david, scope.UserInfo),
+		expected = newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa3, david, scope.UserInfo),
 		)
 		clientTester.assertEqualSelfList("david list", expected, actualSelf)
 		clientTester.assertGetSuccess("david get", davidAuth, expected, sa3)
