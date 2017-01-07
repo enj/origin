@@ -321,7 +321,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 	david, davidAuth := clientTester.createUser("david")
 
 	// Check get and list (no UID checks)
-	{
+	func() {
 		defer clientTester.cleanUp()
 
 		// create old data
@@ -412,7 +412,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		})
 		clientTester.backoffAssert(func() (bool, string) { return assertGetSuccess("david get", davidAuth, expected, sa3) })
 		clientTester.backoffAssert(func() (bool, string) { return assertGetFailure("david not get", davidAuth, sa1, sa2, sa4, sa5) })
-	}
+	}()
 
 	// Check delete and deletecollection
 	{
