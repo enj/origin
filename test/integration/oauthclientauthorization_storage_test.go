@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	osclient "github.com/openshift/origin/pkg/client"
@@ -101,13 +103,14 @@ func (o *clientAuthorizationTester) createUser(userName string) (*userapi.User, 
 	return self, userClient.SelfOAuthClientAuthorizations()
 }
 
-func (o *clientAuthorizationTester) assertEqualList(testName string, expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.OAuthClientAuthorizationList) {
+func assertEqualList(testName string, expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.OAuthClientAuthorizationList) (bool, string) {
 	zeroIgnoredFields(actual)
 	sort.Sort(sortList(*expected))
 	sort.Sort(sortList(*actual))
 	if !reflect.DeepEqual(expected, actual) {
-		o.t.Errorf("%s failed\nexpected:\n%#v\ngot:\n%#v", testName, expected, actual)
+		return false, fmt.Sprintf("%s failed\nexpected:\n%#v\ngot:\n%#v", testName, expected, actual)
 	}
+	return true, ""
 }
 
 func zeroIgnoredFields(list *oauthapi.OAuthClientAuthorizationList) {
@@ -123,7 +126,7 @@ func zeroIgnoredFields(list *oauthapi.OAuthClientAuthorizationList) {
 	}
 }
 
-func (o *clientAuthorizationTester) assertEqualSelfList(testName string, expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.SelfOAuthClientAuthorizationList) {
+func assertEqualSelfList(testName string, expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.SelfOAuthClientAuthorizationList) (bool, string) {
 	zeroSelfIgnoredFields(actual)
 	e := clientauthetcd.ToSelfList(expected).(*oauthapi.SelfOAuthClientAuthorizationList)
 	sort.Sort(sortSelfList(*e))
@@ -132,8 +135,9 @@ func (o *clientAuthorizationTester) assertEqualSelfList(testName string, expecte
 		e.Items = []oauthapi.SelfOAuthClientAuthorization{} // don't want this to be nil for comparision with actual
 	}
 	if !reflect.DeepEqual(e, actual) {
-		o.t.Errorf("%s failed\nexpected:\n%#v\ngot:\n%#v", testName, e, actual)
+		return false, fmt.Sprintf("%s failed\nexpected:\n%#v\ngot:\n%#v", testName, e, actual)
 	}
+	return true, ""
 }
 
 func zeroSelfIgnoredFields(list *oauthapi.SelfOAuthClientAuthorizationList) {
@@ -148,24 +152,25 @@ func zeroSelfIgnoredFields(list *oauthapi.SelfOAuthClientAuthorizationList) {
 	}
 }
 
-func (o *clientAuthorizationTester) assertGetSuccess(testName string, auth osclient.SelfOAuthClientAuthorizationInterface, expected *oauthapi.OAuthClientAuthorizationList, saList ...*kapi.ServiceAccount) {
+func assertGetSuccess(testName string, auth osclient.SelfOAuthClientAuthorizationInterface, expected *oauthapi.OAuthClientAuthorizationList, saList ...*kapi.ServiceAccount) (bool, string) {
 	actual := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{}}
 	for _, sa := range saList {
 		data, err := auth.Get(getSAName(sa))
 		if err != nil {
-			o.t.Fatalf("%s failed: error getting self client auth: %#v", testName, err)
+			return false, fmt.Sprintf("%s failed: error getting self client auth: %#v", testName, err)
 		}
 		actual.Items = append(actual.Items, *data)
 	}
-	o.assertEqualSelfList(testName, expected, actual)
+	return assertEqualSelfList(testName, expected, actual)
 }
 
-func (o *clientAuthorizationTester) assertGetFailure(testName string, auth osclient.SelfOAuthClientAuthorizationInterface, saList ...*kapi.ServiceAccount) {
+func assertGetFailure(testName string, auth osclient.SelfOAuthClientAuthorizationInterface, saList ...*kapi.ServiceAccount) (bool, string) {
 	for _, sa := range saList {
 		if _, err := auth.Get(getSAName(sa)); err == nil || !kubeerr.IsNotFound(err) {
-			o.t.Errorf("%s failed: did NOT return NotFound error when getting self client auth: %#v", testName, err)
+			return false, fmt.Sprintf("%s failed: did NOT return NotFound error when getting self client auth: %#v", testName, err)
 		}
 	}
+	return true, ""
 }
 
 func (o *clientAuthorizationTester) cleanUp() {
@@ -177,6 +182,23 @@ func (o *clientAuthorizationTester) cleanUp() {
 		if err := o.asClusterAdmin.Delete(auth.Name); err != nil {
 			o.t.Fatalf("cleanup failed to delete auth %#v: %#v", auth, err)
 		}
+	}
+}
+
+func (o *clientAuthorizationTester) backoffAssert(assert func() (bool, string)) {
+	backoff := wait.Backoff{
+		Steps:    5,
+		Duration: 2 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+	}
+	reason := ""
+	status := false
+	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		status, reason = assert()
+		return status, nil
+	}); err != nil {
+		o.t.Errorf("%s %#v", reason, err)
 	}
 }
 
@@ -317,14 +339,6 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			newOAuthClientAuthorization(sa2, bob, scope.UserInfo),
 		)
 
-		// wait for cache to sync
-		time.Sleep(3 * time.Second)
-
-		actual, err = clientTester.asClusterAdmin.List(opts)
-		if err != nil {
-			t.Fatalf("error listing client auths: %#v", err)
-		}
-
 		// cluster admin should see everything, new and old
 		expected = newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa1, alice),
@@ -335,54 +349,69 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			newOAuthClientAuthorization(sa5, bob, scope.UserInfo),
 			newOAuthClientAuthorization(sa2, bob, scope.UserInfo),
 		)
-		clientTester.assertEqualList("cluster admin sees all", expected, actual)
+
+		clientTester.backoffAssert(func() (bool, string) {
+			actual, err = clientTester.asClusterAdmin.List(opts)
+			if err != nil {
+				t.Fatalf("error listing client auths: %#v", err)
+			}
+			return assertEqualList("cluster admin sees all", expected, actual)
+		})
 
 		// normal users should only see their new clients
 
 		// alice
-		if actualSelf, err = aliceAuth.List(opts); err != nil {
-			t.Fatalf("error listing self client auths: %#v", err)
-		}
 		expected = newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa4, alice, scope.UserInfo),
 		)
-		clientTester.assertEqualSelfList("alice list", expected, actualSelf)
-		clientTester.assertGetSuccess("alice get", aliceAuth, expected, sa4)
-		clientTester.assertGetFailure("alice not get", aliceAuth, sa1, sa2, sa3, sa5)
+		clientTester.backoffAssert(func() (bool, string) {
+			if actualSelf, err = aliceAuth.List(opts); err != nil {
+				t.Fatalf("error listing self client auths: %#v", err)
+			}
+			return assertEqualSelfList("alice list", expected, actualSelf)
+		})
+		clientTester.backoffAssert(func() (bool, string) { return assertGetSuccess("alice get", aliceAuth, expected, sa4) })
+		clientTester.backoffAssert(func() (bool, string) { return assertGetFailure("alice not get", aliceAuth, sa1, sa2, sa3, sa5) })
 
 		// bob
-		if actualSelf, err = bobAuth.List(opts); err != nil {
-			t.Fatalf("error listing self client auths: %#v", err)
-		}
 		expected = newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa5, bob, scope.UserInfo),
 			newOAuthClientAuthorization(sa2, bob, scope.UserInfo),
 		)
-		clientTester.assertEqualSelfList("bob list", expected, actualSelf)
-		clientTester.assertGetSuccess("bob get", bobAuth, expected, sa2, sa5)
-		clientTester.assertGetFailure("bob not get", bobAuth, sa1, sa3, sa4)
+		clientTester.backoffAssert(func() (bool, string) {
+			if actualSelf, err = bobAuth.List(opts); err != nil {
+				t.Fatalf("error listing self client auths: %#v", err)
+			}
+			return assertEqualSelfList("bob list", expected, actualSelf)
+		})
+		clientTester.backoffAssert(func() (bool, string) { return assertGetSuccess("bob get", bobAuth, expected, sa2, sa5) })
+		clientTester.backoffAssert(func() (bool, string) { return assertGetFailure("bob not get", bobAuth, sa1, sa3, sa4) })
 
 		// chuck
-		if actualSelf, err = chuckAuth.List(opts); err != nil {
-			t.Fatalf("error listing self client auths: %#v", err)
-		}
 		expected = newOAuthClientAuthorizationList(
 		// should be empty
 		)
-		clientTester.assertEqualSelfList("chuck list", expected, actualSelf)
-		clientTester.assertGetSuccess("chuck get", chuckAuth, expected) // no SAs
-		clientTester.assertGetFailure("chuck not get", chuckAuth, sa1, sa2, sa3, sa4, sa5)
+		clientTester.backoffAssert(func() (bool, string) {
+			if actualSelf, err = chuckAuth.List(opts); err != nil {
+				t.Fatalf("error listing self client auths: %#v", err)
+			}
+			return assertEqualSelfList("chuck list", expected, actualSelf)
+		})
+		clientTester.backoffAssert(func() (bool, string) { return assertGetSuccess("chuck get", chuckAuth, expected) }) // no SAs
+		clientTester.backoffAssert(func() (bool, string) { return assertGetFailure("chuck not get", chuckAuth, sa1, sa2, sa3, sa4, sa5) })
 
 		// david
-		if actualSelf, err = davidAuth.List(opts); err != nil {
-			t.Fatalf("error listing self client auths: %#v", err)
-		}
 		expected = newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa3, david, scope.UserInfo),
 		)
-		clientTester.assertEqualSelfList("david list", expected, actualSelf)
-		clientTester.assertGetSuccess("david get", davidAuth, expected, sa3)
-		clientTester.assertGetFailure("david not get", davidAuth, sa1, sa2, sa4, sa5)
+		clientTester.backoffAssert(func() (bool, string) {
+			if actualSelf, err = davidAuth.List(opts); err != nil {
+				t.Fatalf("error listing self client auths: %#v", err)
+			}
+			return assertEqualSelfList("david list", expected, actualSelf)
+		})
+		clientTester.backoffAssert(func() (bool, string) { return assertGetSuccess("david get", davidAuth, expected, sa3) })
+		clientTester.backoffAssert(func() (bool, string) { return assertGetFailure("david not get", davidAuth, sa1, sa2, sa4, sa5) })
 	}
 
 	// Check delete and deletecollection
