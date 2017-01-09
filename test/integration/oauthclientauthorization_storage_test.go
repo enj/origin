@@ -40,6 +40,7 @@ type clientAuthorizationTester struct {
 	ns          string
 	sa          kclient.ServiceAccountsInterface
 	sc          kclient.SecretsInterface
+	user        osclient.UserInterface
 	rc          *restclient.Config
 	t           *testing.T
 }
@@ -183,6 +184,29 @@ func (o *clientAuthorizationTester) cleanUp() {
 			o.t.Fatalf("cleanup failed to delete auth %#v: %#v", auth, err)
 		}
 	}
+	allSAs, err := o.sa.List(kapi.ListOptions{})
+	if err != nil {
+		o.t.Fatalf("cleanup failed to list SAs: %#v", err)
+	}
+	for _, sa := range allSAs.Items {
+		for _, secret := range sa.Secrets {
+			if err := o.sc.Delete(secret.Name); err != nil {
+				o.t.Fatalf("cleanup failed to delete secret %#v: %#v", secret, err)
+			}
+		}
+		if err := o.sa.Delete(sa.Name); err != nil {
+			o.t.Fatalf("cleanup failed to delete SA %#v: %#v", sa, err)
+		}
+	}
+	allUsers, err := o.user.List(kapi.ListOptions{})
+	if err != nil {
+		o.t.Fatalf("cleanup failed to list users: %#v", err)
+	}
+	for _, user := range allUsers.Items {
+		if err := o.user.Delete(user.Name); err != nil {
+			o.t.Fatalf("cleanup failed to delete user %#v: %#v", user, err)
+		}
+	}
 }
 
 func (o *clientAuthorizationTester) backoffAssert(assert func() (bool, string)) {
@@ -247,6 +271,7 @@ func newOAuthClientAuthorizationHandler(t *testing.T) *clientAuthorizationTester
 		rawPrefix:   opts.ResourcePrefix,
 		ns:          ns.Name,
 		rc:          clusterAdminConfig,
+		user:        openshiftClient.Users(),
 		sa:          kubeClient.ServiceAccounts(ns.Name),
 		sc:          kubeClient.Secrets(ns.Name),
 		t:           t,
