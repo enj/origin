@@ -47,13 +47,14 @@ type clientAuthorizationTester struct {
 	user        osclient.UserInterface
 	identity    osclient.IdentityInterface
 	rc          *restclient.Config
+	currentTest string
 	t           *testing.T
 }
 
 func (o *clientAuthorizationTester) createClientAuthorizations(clients ...*oauthapi.OAuthClientAuthorization) {
 	for _, client := range clients {
 		if _, err := o.asClusterAdmin.Create(client); err != nil {
-			o.t.Fatalf("error creating client auth: %#v", err)
+			o.t.Fatalf("%s failed: error creating client auth: %#v", o.currentTest, err)
 		}
 	}
 }
@@ -65,10 +66,10 @@ func (o *clientAuthorizationTester) oldLocationEtcdCreate(clients ...*oauthapi.O
 		client.Name = client.UserName + ":" + client.ClientName
 		key, err := registry.NoNamespaceKeyFunc(ctx, o.rawPrefix, client.Name)
 		if err != nil {
-			o.t.Fatalf("unexpected key error: %#v", err)
+			o.t.Fatalf("%s failed: unexpected key error: %#v", o.currentTest, err)
 		}
 		if err = o.rawStorage.Create(ctx, key, client, nil, 0); err != nil {
-			o.t.Fatalf("unexpected create error: %#v", err)
+			o.t.Fatalf("%s failed: unexpected create error: %#v", o.currentTest, err)
 		}
 	}
 }
@@ -82,7 +83,7 @@ func (o *clientAuthorizationTester) createSA(name string) *kapi.ServiceAccount {
 	}
 	serviceAccount, err := o.sa.Create(serviceAccount)
 	if err != nil {
-		o.t.Fatalf("error creating SA: %#v", err)
+		o.t.Fatalf("%s failed: error creating SA: %#v", o.currentTest, err)
 	}
 	secret := &kapi.Secret{
 		ObjectMeta: kapi.ObjectMeta{
@@ -92,7 +93,7 @@ func (o *clientAuthorizationTester) createSA(name string) *kapi.ServiceAccount {
 		Type: kapi.SecretTypeServiceAccountToken,
 	}
 	if _, err := o.sc.Create(secret); err != nil {
-		o.t.Fatalf("error creating secret: %#v", err)
+		o.t.Fatalf("%s failed: error creating secret: %#v", o.currentTest, err)
 	}
 	return serviceAccount
 }
@@ -100,21 +101,21 @@ func (o *clientAuthorizationTester) createSA(name string) *kapi.ServiceAccount {
 func (o *clientAuthorizationTester) createUser(userName string) (*userapi.User, osclient.SelfOAuthClientAuthorizationInterface) {
 	userClient, _, _, err := testutil.GetClientForUser(*o.rc, userName)
 	if err != nil {
-		o.t.Fatalf("error getting user client for %s: %#v", userName, err)
+		o.t.Fatalf("%s failed: error getting user client for %s: %#v", o.currentTest, userName, err)
 	}
 	self, err := userClient.Users().Get("~")
 	if err != nil {
-		o.t.Fatalf("error getting user UID for %s: %#v", userName, err)
+		o.t.Fatalf("%s failed: error getting user UID for %s: %#v", o.currentTest, userName, err)
 	}
 	return self, userClient.SelfOAuthClientAuthorizations()
 }
 
-func assertEqualList(testName string, expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.OAuthClientAuthorizationList) error {
+func (o *clientAuthorizationTester) assertEqualList(expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.OAuthClientAuthorizationList) error {
 	zeroIgnoredFields(actual)
 	sort.Sort(sortList(*expected))
 	sort.Sort(sortList(*actual))
 	if !reflect.DeepEqual(expected, actual) {
-		return fmt.Errorf("%s EqualList failed\nexpected:\n%#v\ngot:\n%#v", testName, expected, actual)
+		return fmt.Errorf("%s EqualList failed\nexpected:\n%#v\ngot:\n%#v", o.currentTest, expected, actual)
 	}
 	return nil
 }
@@ -132,7 +133,7 @@ func zeroIgnoredFields(list *oauthapi.OAuthClientAuthorizationList) {
 	}
 }
 
-func assertEqualSelfList(testName string, expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.SelfOAuthClientAuthorizationList) error {
+func (o *clientAuthorizationTester) assertEqualSelfList(expected *oauthapi.OAuthClientAuthorizationList, actual *oauthapi.SelfOAuthClientAuthorizationList) error {
 	zeroSelfIgnoredFields(actual)
 	e := clientauthetcd.ToSelfList(expected).(*oauthapi.SelfOAuthClientAuthorizationList)
 	sort.Sort(sortSelfList(*e))
@@ -141,7 +142,7 @@ func assertEqualSelfList(testName string, expected *oauthapi.OAuthClientAuthoriz
 		e.Items = []oauthapi.SelfOAuthClientAuthorization{} // don't want this to be nil for comparision with actual
 	}
 	if !reflect.DeepEqual(e, actual) {
-		return fmt.Errorf("%s EqualSelfList failed\nexpected:\n%#v\ngot:\n%#v", testName, e, actual)
+		return fmt.Errorf("%s EqualSelfList failed\nexpected:\n%#v\ngot:\n%#v", o.currentTest, e, actual)
 	}
 	return nil
 }
@@ -158,22 +159,22 @@ func zeroSelfIgnoredFields(list *oauthapi.SelfOAuthClientAuthorizationList) {
 	}
 }
 
-func assertGetSuccess(testName string, auth osclient.SelfOAuthClientAuthorizationInterface, expected *oauthapi.OAuthClientAuthorizationList, saList ...*kapi.ServiceAccount) error {
+func (o *clientAuthorizationTester) assertGetSuccess(auth osclient.SelfOAuthClientAuthorizationInterface, expected *oauthapi.OAuthClientAuthorizationList, saList ...*kapi.ServiceAccount) error {
 	actual := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{}}
 	for _, sa := range saList {
 		data, err := auth.Get(getSAName(sa))
 		if err != nil {
-			return fmt.Errorf("%s GetSuccess failed: error getting self client auth: %#v", testName, err)
+			return fmt.Errorf("%s GetSuccess failed: error getting self client auth: %#v", o.currentTest, err)
 		}
 		actual.Items = append(actual.Items, *data)
 	}
-	return assertEqualSelfList(testName, expected, actual)
+	return o.assertEqualSelfList(expected, actual)
 }
 
-func assertGetFailure(testName string, auth osclient.SelfOAuthClientAuthorizationInterface, saList ...*kapi.ServiceAccount) error {
+func (o *clientAuthorizationTester) assertGetFailure(auth osclient.SelfOAuthClientAuthorizationInterface, saList ...*kapi.ServiceAccount) error {
 	for _, sa := range saList {
 		if _, err := auth.Get(getSAName(sa)); err == nil || !kubeerr.IsNotFound(err) {
-			return fmt.Errorf("%s GetFailure failed: did NOT return NotFound error when getting self client auth: %#v", testName, err)
+			return fmt.Errorf("%s GetFailure failed: did NOT return NotFound error when getting self client auth: %#v", o.currentTest, err)
 		}
 	}
 	return nil
@@ -185,39 +186,39 @@ func (o *clientAuthorizationTester) cleanUp() {
 	}
 	allAuths, err := o.asClusterAdmin.List(kapi.ListOptions{})
 	if err != nil {
-		o.t.Fatalf("cleanup failed to list auths: %#v", err)
+		o.t.Fatalf("%s failed: cleanup failed to list auths: %#v", o.currentTest, err)
 	}
 	for _, auth := range allAuths.Items {
 		if err := o.asClusterAdmin.Delete(auth.Name); err != nil {
-			o.t.Fatalf("cleanup failed to delete auth %#v: %#v", auth, err)
+			o.t.Fatalf("%s failed: cleanup failed to delete auth %#v: %#v", o.currentTest, auth, err)
 		}
 	}
 	allSAs, err := o.sa.List(kapi.ListOptions{})
 	if err != nil {
-		o.t.Fatalf("cleanup failed to list SAs: %#v", err)
+		o.t.Fatalf("%s failed: cleanup failed to list SAs: %#v", o.currentTest, err)
 	}
 	for _, sa := range allSAs.Items {
 		for _, secret := range sa.Secrets {
 			if err := o.sc.Delete(secret.Name); err != nil {
-				o.t.Fatalf("cleanup failed to delete secret %#v: %#v", secret, err)
+				o.t.Fatalf("%s failed: cleanup failed to delete secret %#v: %#v", o.currentTest, secret, err)
 			}
 		}
 		if err := o.sa.Delete(sa.Name); err != nil {
-			o.t.Fatalf("cleanup failed to delete SA %#v: %#v", sa, err)
+			o.t.Fatalf("%s failed: cleanup failed to delete SA %#v: %#v", o.currentTest, sa, err)
 		}
 	}
 	allUsers, err := o.user.List(kapi.ListOptions{})
 	if err != nil {
-		o.t.Fatalf("cleanup failed to list users: %#v", err)
+		o.t.Fatalf("%s failed: cleanup failed to list users: %#v", o.currentTest, err)
 	}
 	for _, user := range allUsers.Items {
 		for _, identity := range user.Identities {
 			if err := o.identity.Delete(identity); err != nil {
-				o.t.Fatalf("cleanup failed to delete identity %s: %#v", identity, err)
+				o.t.Fatalf("%s failed: cleanup failed to delete identity %s: %#v", o.currentTest, identity, err)
 			}
 		}
 		if err := o.user.Delete(user.Name); err != nil {
-			o.t.Fatalf("cleanup failed to delete user %#v: %#v", user, err)
+			o.t.Fatalf("%s failed: cleanup failed to delete user %#v: %#v", o.currentTest, user, err)
 		}
 	}
 }
@@ -236,7 +237,7 @@ func (o *clientAuthorizationTester) backoffAssert(assert func() error) {
 		}
 		return true, nil
 	}); err != nil {
-		o.t.Errorf("%#v\n%#v", assertErr, err)
+		o.t.Errorf("%s failed\n%#v\n%#v", o.currentTest, assertErr, err)
 	}
 }
 
@@ -248,9 +249,15 @@ func (o *clientAuthorizationTester) asImpersonatingUser(user *userapi.User) oscl
 	}
 	client, err := osclient.New(&privilegedConfig)
 	if err != nil {
-		o.t.Fatalf("error getting impersonating user client for %#v: %#v", user, err)
+		o.t.Fatalf("%s failed: error getting impersonating user client for %#v: %#v", o.currentTest, user, err)
 	}
 	return client.SelfOAuthClientAuthorizations()
+}
+
+func (o *clientAuthorizationTester) runTest(testName string, test func()) {
+	defer o.cleanUp()
+	o.currentTest = testName
+	test()
 }
 
 func newOAuthClientAuthorizationHandler(t *testing.T) *clientAuthorizationTester {
@@ -302,6 +309,7 @@ func newOAuthClientAuthorizationHandler(t *testing.T) *clientAuthorizationTester
 		identity:    openshiftClient.Identities(),
 		sa:          kubeClient.ServiceAccounts(ns.Name),
 		sc:          kubeClient.Secrets(ns.Name),
+		currentTest: "ran newOAuthClientAuthorizationHandler",
 		t:           t,
 	}
 }
@@ -354,9 +362,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 	clientTester := newOAuthClientAuthorizationHandler(t)
 	defer clientTester.destroyFunc()
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("user can get and list their new client authorizations", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		user1, user1Auth := clientTester.createUser("user1")
@@ -374,16 +380,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expected, actual)
+			return clientTester.assertEqualSelfList(expected, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expected, sa1, sa2) })
-	}("user can get and list their new client authorizations")
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expected, sa1, sa2) })
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("user can delete their new client authorizations", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		sa3 := clientTester.createSA("sa3")
@@ -404,15 +408,15 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedBeforeDelete, actual)
+			return clientTester.assertEqualSelfList(expectedBeforeDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expectedBeforeDelete, sa1, sa2, sa3) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1Auth) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedBeforeDelete, sa1, sa2, sa3) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth) })
 
 		if err := user1Auth.Delete(getSAName(sa1)); err != nil {
-			t.Errorf("%s failed during delete: %#v", testName, err)
+			t.Errorf("%s failed during delete: %#v", clientTester.currentTest, err)
 		}
 
 		expectedAfterDelete := newOAuthClientAuthorizationList(
@@ -423,17 +427,15 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedAfterDelete, actual)
+			return clientTester.assertEqualSelfList(expectedAfterDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expectedAfterDelete, sa2, sa3) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1Auth, sa1) })
-	}("user can delete their new client authorizations")
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedAfterDelete, sa2, sa3) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("user cannot see other user's client authorizations", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		sa3 := clientTester.createSA("sa3")
@@ -454,12 +456,12 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedUser1, actual)
+			return clientTester.assertEqualSelfList(expectedUser1, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expectedUser1, sa1, sa3) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1Auth, sa2) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedUser1, sa1, sa3) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2) })
 
 		expectedUser2 := newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa2, user2, scope.UserInfo),
@@ -468,17 +470,15 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user2Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedUser2, actual)
+			return clientTester.assertEqualSelfList(expectedUser2, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user2Auth, expectedUser2, sa2) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user2Auth, sa1, sa3) })
-	}("user cannot see other user's client authorizations")
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user2Auth, expectedUser2, sa2) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user2Auth, sa1, sa3) })
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("user cannot see client authorizations stored in the old location", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		sa3 := clientTester.createSA("sa3")
@@ -502,17 +502,15 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expected, actual)
+			return clientTester.assertEqualSelfList(expected, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expected, sa1, sa3) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1Auth, sa2, sa4) })
-	}("user cannot see client authorizations stored in the old location")
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expected, sa1, sa3) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2, sa4) })
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("cluster admin can see client authorizations stored in the both old and new location", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		sa3 := clientTester.createSA("sa3")
@@ -546,15 +544,13 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := clientTester.asClusterAdmin.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualList(testName, expected, actual)
+			return clientTester.assertEqualList(expected, actual)
 		})
-	}("cluster admin can see client authorizations stored in the both old and new location")
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("cluster admin deletes are reflected to the user", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		sa3 := clientTester.createSA("sa3")
@@ -578,17 +574,19 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedBeforeDelete, actual)
+			return clientTester.assertEqualSelfList(expectedBeforeDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expectedBeforeDelete, sa1, sa2, sa3, sa4) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1Auth) })
+		clientTester.backoffAssert(func() error {
+			return clientTester.assertGetSuccess(user1Auth, expectedBeforeDelete, sa1, sa2, sa3, sa4)
+		})
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth) })
 
 		for _, sa := range []*kapi.ServiceAccount{sa2, sa3} {
 			name := helpers.MakeClientAuthorizationName(user1.GetName(), getSAName(sa))
 			if err := clientTester.asClusterAdmin.Delete(name); err != nil {
-				t.Errorf("%s failed during delete of %s: %#v", testName, name, err)
+				t.Errorf("%s failed during delete of %s: %#v", clientTester.currentTest, name, err)
 			}
 		}
 
@@ -600,17 +598,15 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedAfterDelete, actual)
+			return clientTester.assertEqualSelfList(expectedAfterDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expectedAfterDelete, sa1, sa4) })
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1Auth, sa2, sa3) })
-	}("cluster admin deletes are reflected to the user")
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedAfterDelete, sa1, sa4) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2, sa3) })
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("user cannot see client authorizations for a different UID + their name but cluster admin can see all via non-self and impersonation", func() {
 		sa1 := clientTester.createSA("sa1")
 		user1, user1Auth := clientTester.createUser("user1")
 
@@ -625,32 +621,32 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedOldUID, actual)
+			return clientTester.assertEqualSelfList(expectedOldUID, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1Auth, expectedOldUID, sa1) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedOldUID, sa1) })
 
 		clientTester.backoffAssert(func() error {
 			actual, err := clientTester.asClusterAdmin.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualList(testName, expectedOldUID, actual)
+			return clientTester.assertEqualList(expectedOldUID, actual)
 		})
 
 		// delete and recreate user1 so he has a different UID
 		for _, identity := range user1.Identities {
 			if err := clientTester.identity.Delete(identity); err != nil {
-				t.Errorf("%s failed to delete identity %s: %#v", testName, identity, err)
+				t.Errorf("%s failed to delete identity %s: %#v", clientTester.currentTest, identity, err)
 			}
 		}
 		if err := clientTester.user.Delete(user1.GetName()); err != nil {
-			t.Errorf("%s failed to delete user %#v: %#v", testName, user1, err)
+			t.Errorf("%s failed to delete user %#v: %#v", clientTester.currentTest, user1, err)
 		}
 		user1New, user1AuthNew := clientTester.createUser("user1")
 		if user1.GetUID() == user1New.GetUID() {
-			t.Errorf("%s failed to create user with new UID: %#v", testName, user1New)
+			t.Errorf("%s failed to create user with new UID: %#v", clientTester.currentTest, user1New)
 		}
 
 		expectedNewUID := newOAuthClientAuthorizationList(
@@ -660,49 +656,47 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error {
 			actual, err := user1AuthNew.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedNewUID, actual)
+			return clientTester.assertEqualSelfList(expectedNewUID, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetFailure(testName, user1AuthNew, sa1) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1AuthNew, sa1) })
 
 		clientTester.backoffAssert(func() error {
 			actual, err := clientTester.asClusterAdmin.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualList(testName, expectedOldUID, actual)
+			return clientTester.assertEqualList(expectedOldUID, actual)
 		})
 
 		user1AuthImpersonate := clientTester.asImpersonatingUser(user1)
 		clientTester.backoffAssert(func() error {
 			actual, err := user1AuthImpersonate.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualSelfList(testName, expectedOldUID, actual)
+			return clientTester.assertEqualSelfList(expectedOldUID, actual)
 		})
-		clientTester.backoffAssert(func() error { return assertGetSuccess(testName, user1AuthImpersonate, expectedOldUID, sa1) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1AuthImpersonate, expectedOldUID, sa1) })
 
 		clientTester.backoffAssert(func() error {
 			actual, err := clientTester.asClusterAdmin.List(kapi.ListOptions{})
 			if err != nil {
-				return fmt.Errorf("%s failed: error listing client auths: %#v", testName, err)
+				return fmt.Errorf("%s failed: error listing client auths: %#v", clientTester.currentTest, err)
 			}
-			return assertEqualList(testName, expectedOldUID, actual)
+			return clientTester.assertEqualList(expectedOldUID, actual)
 		})
-	}("user cannot see client authorizations for a different UID + their name but cluster admin can see all via non-self and impersonation")
+	})
 
-	func(testName string) {
-		defer clientTester.cleanUp()
-
+	clientTester.runTest("user can watch their own client autorizations", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
 		user1, user1Auth := clientTester.createUser("user1")
 
 		w, err := user1Auth.Watch(kapi.ListOptions{})
 		if err != nil {
-			t.Errorf("%s failed to watch: %#v", testName, err)
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
 		}
 		defer w.Stop()
 		recorder := watch.NewRecorder(w)
@@ -720,37 +714,36 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.backoffAssert(func() error { // TODO fix
 			events := recorder.Events()
 			if len(events) != len(expected.Items) {
-				return fmt.Errorf("%s failed incorrect number of events: %#v\n%#v", testName, events, expected)
+				return fmt.Errorf("%s failed incorrect number of events: %#v\n%#v", clientTester.currentTest, events, expected)
 			}
 			actual := []oauthapi.SelfOAuthClientAuthorization{}
 			for _, event := range events {
 				if event.Type != watch.Added {
-					return fmt.Errorf("%s failed incorrect event type: %#v", testName, event)
+					return fmt.Errorf("%s failed incorrect event type: %#v", clientTester.currentTest, event)
 				}
 				actual = append(actual, *(event.Object.(*oauthapi.SelfOAuthClientAuthorization)))
 			}
-			return assertEqualSelfList(testName, expected, &oauthapi.SelfOAuthClientAuthorizationList{Items: actual})
+			return clientTester.assertEqualSelfList(expected, &oauthapi.SelfOAuthClientAuthorizationList{Items: actual})
 		})
-	}("user can watch their own client autorizations")
+	})
 
-	func(testName string) {
+	clientTester.runTest("user cannot see other users' client autorizations during a watch", func() {
 		// TODO
-	}("user cannot see other users' client autorizations during a watch")
+	})
 
-	func(testName string) {
+	clientTester.runTest("cluster admin watch sees all", func() {
 		// TODO
-	}("cluster admin watch sees all")
+	})
 
-	func(testName string) {
+	clientTester.runTest("watch with uid stuff", func() {
 		// TODO
-	}("watch with uid stuff")
+	})
 
-	func(testName string) {
+	clientTester.runTest("delete with uid stuff", func() {
 		// TODO
-	}("delete with uid stuff")
+	})
 
-	func(testName string) {
+	clientTester.runTest("watch from resource version 0", func() {
 		// TODO
-	}("watch from resource version 0")
-
+	})
 }
