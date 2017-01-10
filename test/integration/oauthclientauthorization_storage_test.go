@@ -808,8 +808,36 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		// TODO
 	})
 
-	clientTester.runTest("delete with uid stuff", func() {
-		// TODO
+	clientTester.runTest("impersonation allows get and delete on self auth with different UID", func() {
+		sa1 := clientTester.createSA("sa1")
+		user1, user1Auth := clientTester.createUser("user1")
+		user1WithDifferentUID := *user1
+		user1WithDifferentUID.UID = "foo"
+
+		clientTester.createClientAuthorizations(
+			newOAuthClientAuthorization(sa1, &user1WithDifferentUID, scope.UserListAllProjects),
+		)
+
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
+		clientTester.backoffAssert(func() error {
+			if err := user1Auth.Delete(getSAName(sa1)); err == nil || !kubeerr.IsNotFound(err) {
+				return fmt.Errorf("%s failed: did NOT return NotFound error when deleting self client auth: %#v", clientTester.currentTest, err)
+			}
+			return nil
+		})
+
+		expected := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, &user1WithDifferentUID, scope.UserListAllProjects),
+		)
+
+		user1AuthImpersonate := clientTester.asImpersonatingUser(user1)
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1AuthImpersonate, expected, sa1) })
+		clientTester.backoffAssert(func() error {
+			if err := user1AuthImpersonate.Delete(getSAName(sa1)); err != nil {
+				return fmt.Errorf("%s failed: error when deleting self client auth: %#v", clientTester.currentTest, err)
+			}
+			return nil
+		})
 	})
 
 	clientTester.runTest("user can see watch events from resource version 0", func() {
