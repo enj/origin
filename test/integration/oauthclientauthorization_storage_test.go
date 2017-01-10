@@ -141,6 +141,9 @@ func (o *clientAuthorizationTester) assertEqualSelfList(expected *oauthapi.OAuth
 	if e.Items == nil {
 		e.Items = []oauthapi.SelfOAuthClientAuthorization{} // don't want this to be nil for comparision with actual
 	}
+	if actual.Items == nil {
+		actual.Items = []oauthapi.SelfOAuthClientAuthorization{} // don't want this to be nil for comparision with expected
+	}
 	if !reflect.DeepEqual(e, actual) {
 		return fmt.Errorf("%s EqualSelfList failed\nexpected:\n%#v\ngot:\n%#v", o.currentTest, e, actual)
 	}
@@ -160,7 +163,7 @@ func zeroSelfIgnoredFields(list *oauthapi.SelfOAuthClientAuthorizationList) {
 }
 
 func (o *clientAuthorizationTester) assertGetSuccess(auth osclient.SelfOAuthClientAuthorizationInterface, expected *oauthapi.OAuthClientAuthorizationList, saList ...*kapi.ServiceAccount) error {
-	actual := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{}}
+	actual := &oauthapi.SelfOAuthClientAuthorizationList{}
 	for _, sa := range saList {
 		data, err := auth.Get(getSAName(sa))
 		if err != nil {
@@ -258,6 +261,30 @@ func (o *clientAuthorizationTester) runTest(testName string, test func()) {
 	defer o.cleanUp()
 	o.currentTest = testName
 	test()
+}
+
+func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientAuthorizationList, w watch.Interface, eventTypes ...watch.EventType) error {
+	if len(eventTypes) != len(expected.Items) {
+		return fmt.Errorf("%s failed: invalid test data %#v %#v", o.currentTest, eventTypes, expected)
+	}
+	for i, eventType := range eventTypes {
+		select {
+		case event := <-w.ResultChan():
+			if event.Type != eventType {
+				return fmt.Errorf("%s failed with wrong event type in %#v, exptected %s", o.currentTest, event, eventType)
+			}
+			auth := event.Object.(*oauthapi.SelfOAuthClientAuthorization)
+			actualSingle := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{*auth}}
+			expectedSingle := &oauthapi.OAuthClientAuthorizationList{Items: []oauthapi.OAuthClientAuthorization{expected.Items[i]}}
+			if err := o.assertEqualSelfList(expectedSingle, actualSingle); err != nil {
+				return fmt.Errorf("%s failed: watch expected %#v does not match %#v", o.currentTest, expectedSingle, actualSingle)
+			}
+
+		case <-time.After(30 * time.Second):
+			return fmt.Errorf("%s failed: timeout during watch", o.currentTest)
+		}
+	}
+	return nil
 }
 
 func newOAuthClientAuthorizationHandler(t *testing.T) *clientAuthorizationTester {
@@ -694,37 +721,43 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		sa2 := clientTester.createSA("sa2")
 		user1, user1Auth := clientTester.createUser("user1")
 
-		w, err := user1Auth.Watch(kapi.ListOptions{})
+		user1Watch, err := user1Auth.Watch(kapi.ListOptions{})
 		if err != nil {
 			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
 		}
-		defer w.Stop()
-		recorder := watch.NewRecorder(w)
+		defer user1Watch.Stop()
 
 		clientTester.createClientAuthorizations(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
 			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
 		)
+		if err := user1Auth.Delete(getSAName(sa2)); err != nil {
+			t.Errorf("%s failed during delete: %#v", clientTester.currentTest, err)
+		}
+		newSA1User1Auth, err := clientTester.asClusterAdmin.Get(helpers.MakeClientAuthorizationName(user1.GetName(), getSAName(sa1)))
+		if err != nil {
+			t.Errorf("%s failed during get: %#v", clientTester.currentTest, err)
+		}
+		newSA1User1Auth.Scopes = []string{scope.UserInfo}
+		if _, err := clientTester.asClusterAdmin.Update(newSA1User1Auth); err != nil {
+			t.Errorf("%s failed during update: %#v", clientTester.currentTest, err)
+		}
 
 		expected := newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
 			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
+			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
+			newOAuthClientAuthorization(sa1, user1, scope.UserInfo),
 		)
 
-		clientTester.backoffAssert(func() error { // TODO fix
-			events := recorder.Events()
-			if len(events) != len(expected.Items) {
-				return fmt.Errorf("%s failed incorrect number of events: %#v\n%#v", clientTester.currentTest, events, expected)
-			}
-			actual := []oauthapi.SelfOAuthClientAuthorization{}
-			for _, event := range events {
-				if event.Type != watch.Added {
-					return fmt.Errorf("%s failed incorrect event type: %#v", clientTester.currentTest, event)
-				}
-				actual = append(actual, *(event.Object.(*oauthapi.SelfOAuthClientAuthorization)))
-			}
-			return clientTester.assertEqualSelfList(expected, &oauthapi.SelfOAuthClientAuthorizationList{Items: actual})
-		})
+		if err := clientTester.assertEvents(expected, user1Watch,
+			watch.Added,
+			watch.Added,
+			watch.Deleted,
+			watch.Modified,
+		); err != nil {
+			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
+		}
 	})
 
 	clientTester.runTest("user cannot see other users' client autorizations during a watch", func() {
