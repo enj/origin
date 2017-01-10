@@ -797,8 +797,46 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		// TODO
 	})
 
-	clientTester.runTest("watch with uid stuff", func() {
-		// TODO
+	clientTester.runTest("impersonation allows watch on self auth with different UID", func() {
+		sa1 := clientTester.createSA("sa1")
+		sa2 := clientTester.createSA("sa2")
+		user1, user1Auth := clientTester.createUser("user1")
+		user1WithDifferentUID := *user1
+		user1WithDifferentUID.UID = "foo"
+
+		user1Watch, err := user1Auth.Watch(kapi.ListOptions{})
+		if err != nil {
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
+		}
+		defer user1Watch.Stop()
+
+		user1AuthImpersonate := clientTester.asImpersonatingUser(user1)
+		user1ImpersonateWatch, err := user1AuthImpersonate.Watch(kapi.ListOptions{})
+		if err != nil {
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
+		}
+		defer user1ImpersonateWatch.Stop()
+
+		clientTester.createClientAuthorizations(
+			newOAuthClientAuthorization(sa1, &user1WithDifferentUID, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
+		)
+
+		expectedUser1 := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
+		)
+		clientTester.assertEvents(expectedUser1, user1Watch,
+			watch.Added,
+		)
+
+		expectedUser1Impersonate := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, &user1WithDifferentUID, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
+		)
+		clientTester.assertEvents(expectedUser1Impersonate, user1ImpersonateWatch,
+			watch.Added,
+			watch.Added,
+		)
 	})
 
 	clientTester.runTest("impersonation allows get and delete on self auth with different UID", func() {
