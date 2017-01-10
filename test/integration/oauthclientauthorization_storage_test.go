@@ -273,11 +273,20 @@ func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientA
 			if event.Type != eventType {
 				o.t.Errorf("%s failed with wrong event type in %#v, exptected %s", o.currentTest, event, eventType)
 			}
-			auth := event.Object.(*oauthapi.SelfOAuthClientAuthorization)
-			actualSingle := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{*auth}}
 			expectedSingle := &oauthapi.OAuthClientAuthorizationList{Items: []oauthapi.OAuthClientAuthorization{expected.Items[i]}}
-			if err := o.assertEqualSelfList(expectedSingle, actualSingle); err != nil {
-				o.t.Errorf("%s failed: watch at index %d does not match %#v", o.currentTest, i, err)
+			switch auth := event.Object.(type) {
+			case *oauthapi.SelfOAuthClientAuthorization:
+				actualSingle := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{*auth}}
+				if err := o.assertEqualSelfList(expectedSingle, actualSingle); err != nil {
+					o.t.Errorf("%s failed: watch event at index %d does not match %#v", o.currentTest, event, i, err)
+				}
+			case *oauthapi.OAuthClientAuthorization:
+				actualSingle := &oauthapi.OAuthClientAuthorizationList{Items: []oauthapi.OAuthClientAuthorization{*auth}}
+				if err := o.assertEqualList(expectedSingle, actualSingle); err != nil {
+					o.t.Errorf("%s failed: watch event at index %d does not match %#v", o.currentTest, event, i, err)
+				}
+			default:
+				o.t.Errorf("%s failed: watch event %#v at index %d has unexpected type", o.currentTest, event, i)
 			}
 
 		case <-time.After(30 * time.Second):
@@ -793,8 +802,41 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		)
 	})
 
-	clientTester.runTest("cluster admin watch sees all", func() {
-		// TODO
+	clientTester.runTest("cluster admin watch sees all events", func() {
+		sa1 := clientTester.createSA("sa1")
+		user1, user1Auth := clientTester.createUser("user1")
+		user2, user2Auth := clientTester.createUser("user2")
+
+		clusterAdminWatch, err := clientTester.asClusterAdmin.Watch(kapi.ListOptions{})
+		if err != nil {
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
+		}
+		defer clusterAdminWatch.Stop()
+
+		clientTester.createClientAuthorizations(
+			newOAuthClientAuthorization(sa1, user1, scope.UserInfo),
+			newOAuthClientAuthorization(sa1, user2, scope.UserInfo),
+		)
+		if err := user1Auth.Delete(getSAName(sa1)); err != nil {
+			t.Errorf("%s failed during delete: %#v", clientTester.currentTest, err)
+		}
+		if err := user2Auth.Delete(getSAName(sa1)); err != nil {
+			t.Errorf("%s failed during delete: %#v", clientTester.currentTest, err)
+		}
+
+		expected := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, user1, scope.UserInfo),
+			newOAuthClientAuthorization(sa1, user2, scope.UserInfo),
+			newOAuthClientAuthorization(sa1, user1, scope.UserInfo),
+			newOAuthClientAuthorization(sa1, user2, scope.UserInfo),
+		)
+
+		clientTester.assertEvents(expected, clusterAdminWatch,
+			watch.Added,
+			watch.Added,
+			watch.Deleted,
+			watch.Deleted,
+		)
 	})
 
 	clientTester.runTest("impersonation allows watch on self auth with different UID", func() {
