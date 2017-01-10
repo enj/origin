@@ -263,28 +263,27 @@ func (o *clientAuthorizationTester) runTest(testName string, test func()) {
 	test()
 }
 
-func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientAuthorizationList, w watch.Interface, eventTypes ...watch.EventType) error {
+func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientAuthorizationList, w watch.Interface, eventTypes ...watch.EventType) {
 	if len(eventTypes) != len(expected.Items) || len(eventTypes) == 0 {
-		return fmt.Errorf("%s failed: invalid test data %#v %#v", o.currentTest, eventTypes, expected)
+		o.t.Errorf("%s failed: invalid test data %#v %#v", o.currentTest, eventTypes, expected)
 	}
 	for i, eventType := range eventTypes {
 		select {
 		case event := <-w.ResultChan():
 			if event.Type != eventType {
-				return fmt.Errorf("%s failed with wrong event type in %#v, exptected %s", o.currentTest, event, eventType)
+				o.t.Errorf("%s failed with wrong event type in %#v, exptected %s", o.currentTest, event, eventType)
 			}
 			auth := event.Object.(*oauthapi.SelfOAuthClientAuthorization)
 			actualSingle := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{*auth}}
 			expectedSingle := &oauthapi.OAuthClientAuthorizationList{Items: []oauthapi.OAuthClientAuthorization{expected.Items[i]}}
 			if err := o.assertEqualSelfList(expectedSingle, actualSingle); err != nil {
-				return fmt.Errorf("%s failed: watch at index %d does not match %#v", o.currentTest, i, err)
+				o.t.Errorf("%s failed: watch at index %d does not match %#v", o.currentTest, i, err)
 			}
 
 		case <-time.After(30 * time.Second):
-			return fmt.Errorf("%s failed: timeout during watch", o.currentTest)
+			o.t.Errorf("%s failed: timeout during watch", o.currentTest)
 		}
 	}
-	return nil
 }
 
 func newOAuthClientAuthorizationHandler(t *testing.T) *clientAuthorizationTester {
@@ -750,14 +749,12 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			newOAuthClientAuthorization(sa1, user1, scope.UserInfo),
 		)
 
-		if err := clientTester.assertEvents(expected, user1Watch,
+		clientTester.assertEvents(expected, user1Watch,
 			watch.Added,
 			watch.Added,
 			watch.Deleted,
 			watch.Modified,
-		); err != nil {
-			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
-		}
+		)
 	})
 
 	clientTester.runTest("user cannot see other users' client autorizations during a watch", func() {
@@ -788,16 +785,12 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			newOAuthClientAuthorization(sa1, user2, scope.UserInfo),
 		)
 
-		if err := clientTester.assertEvents(expectedUser1, user1Watch,
+		clientTester.assertEvents(expectedUser1, user1Watch,
 			watch.Added,
-		); err != nil {
-			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
-		}
-		if err := clientTester.assertEvents(expectedUser2, user2Watch,
+		)
+		clientTester.assertEvents(expectedUser2, user2Watch,
 			watch.Added,
-		); err != nil {
-			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
-		}
+		)
 	})
 
 	clientTester.runTest("cluster admin watch sees all", func() {
@@ -859,10 +852,8 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		}
 		defer user1Watch.Stop()
 
-		if err := clientTester.assertEvents(expected, user1Watch,
+		clientTester.assertEvents(expected, user1Watch,
 			watch.Added,
-		); err != nil {
-			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
-		}
+		)
 	})
 }
