@@ -264,7 +264,7 @@ func (o *clientAuthorizationTester) runTest(testName string, test func()) {
 }
 
 func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientAuthorizationList, w watch.Interface, eventTypes ...watch.EventType) error {
-	if len(eventTypes) != len(expected.Items) {
+	if len(eventTypes) != len(expected.Items) || len(eventTypes) == 0 {
 		return fmt.Errorf("%s failed: invalid test data %#v %#v", o.currentTest, eventTypes, expected)
 	}
 	for i, eventType := range eventTypes {
@@ -277,7 +277,7 @@ func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientA
 			actualSingle := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{*auth}}
 			expectedSingle := &oauthapi.OAuthClientAuthorizationList{Items: []oauthapi.OAuthClientAuthorization{expected.Items[i]}}
 			if err := o.assertEqualSelfList(expectedSingle, actualSingle); err != nil {
-				return fmt.Errorf("%s failed: watch expected %#v does not match %#v", o.currentTest, expectedSingle, actualSingle)
+				return fmt.Errorf("%s failed: watch at index %d does not match %#v", o.currentTest, i, err)
 			}
 
 		case <-time.After(30 * time.Second):
@@ -761,7 +761,43 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 	})
 
 	clientTester.runTest("user cannot see other users' client autorizations during a watch", func() {
-		// TODO
+		sa1 := clientTester.createSA("sa1")
+		user1, user1Auth := clientTester.createUser("user1")
+		user2, user2Auth := clientTester.createUser("user2")
+
+		user1Watch, err := user1Auth.Watch(kapi.ListOptions{})
+		if err != nil {
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
+		}
+		defer user1Watch.Stop()
+		user2Watch, err := user2Auth.Watch(kapi.ListOptions{})
+		if err != nil {
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
+		}
+		defer user2Watch.Stop()
+
+		clientTester.createClientAuthorizations(
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa1, user2, scope.UserInfo),
+		)
+
+		expectedUser1 := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
+		)
+		expectedUser2 := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, user2, scope.UserInfo),
+		)
+
+		if err := clientTester.assertEvents(expectedUser1, user1Watch,
+			watch.Added,
+		); err != nil {
+			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
+		}
+		if err := clientTester.assertEvents(expectedUser2, user2Watch,
+			watch.Added,
+		); err != nil {
+			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
+		}
 	})
 
 	clientTester.runTest("cluster admin watch sees all", func() {
@@ -776,7 +812,29 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		// TODO
 	})
 
-	clientTester.runTest("watch from resource version 0", func() {
-		// TODO
+	clientTester.runTest("user can see watch events from resource version 0", func() {
+		sa1 := clientTester.createSA("sa1")
+		user1, user1Auth := clientTester.createUser("user1")
+
+		// only do a single add because order is undefined with ResourceVersion 0
+		clientTester.createClientAuthorizations(
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
+		)
+
+		expected := newOAuthClientAuthorizationList(
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
+		)
+
+		user1Watch, err := user1Auth.Watch(kapi.ListOptions{ResourceVersion: "0"})
+		if err != nil {
+			t.Errorf("%s failed to watch: %#v", clientTester.currentTest, err)
+		}
+		defer user1Watch.Stop()
+
+		if err := clientTester.assertEvents(expected, user1Watch,
+			watch.Added,
+		); err != nil {
+			t.Errorf("%s failed to assert events: %#v", clientTester.currentTest, err)
+		}
 	})
 }
