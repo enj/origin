@@ -250,6 +250,12 @@ func (o *clientAuthorizationTester) backoffAssert(assert func() error) {
 	}
 }
 
+func (o *clientAuthorizationTester) assert(assert func() error) {
+	if err := assert(); err != nil {
+		o.t.Errorf("%s failed: %#v", o.currentTest, err)
+	}
+}
+
 func (o *clientAuthorizationTester) asImpersonatingUser(user *userapi.User) osclient.SelfOAuthClientAuthorizationInterface {
 	privilegedConfig := *o.rc
 	oldWrapTransport := privilegedConfig.WrapTransport
@@ -490,7 +496,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			return clientTester.assertEqualSelfList(expectedUser1, actual)
 		})
 		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedUser1, sa1) })
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2) })
+		clientTester.assert(func() error { return clientTester.assertGetFailure(user1Auth, sa2) })
 	})
 
 	clientTester.runTest("user cannot see client authorizations stored in the old location", func() {
@@ -505,14 +511,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		// should be empty
 		)
 
-		clientTester.backoffAssert(func() error {
+		clientTester.assert(func() error {
 			actual, err := user1Auth.List(kapi.ListOptions{})
 			if err != nil {
 				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
 			return clientTester.assertEqualSelfList(expected, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
+		clientTester.assert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
 	})
 
 	clientTester.runTest("cluster admin can see client authorizations stored in the both old and new location", func() {
@@ -628,14 +634,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		// should be empty
 		)
 
-		clientTester.backoffAssert(func() error {
+		clientTester.assert(func() error {
 			actual, err := user1AuthNew.List(kapi.ListOptions{})
 			if err != nil {
 				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
 			}
 			return clientTester.assertEqualSelfList(expectedNewUID, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1AuthNew, sa1) })
+		clientTester.assert(func() error { return clientTester.assertGetFailure(user1AuthNew, sa1) })
 
 		user1AuthImpersonate := clientTester.asImpersonatingUser(user1)
 		clientTester.backoffAssert(func() error {
@@ -823,8 +829,8 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			newOAuthClientAuthorization(sa1, &user1WithDifferentUID, scope.UserListAllProjects),
 		)
 
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
-		clientTester.backoffAssert(func() error {
+		clientTester.assert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
+		clientTester.assert(func() error {
 			if err := user1Auth.Delete(getSAName(sa1)); err == nil || !kubeerr.IsNotFound(err) {
 				return fmt.Errorf("%s failed: did NOT return NotFound error when deleting self client auth: %#v", clientTester.currentTest, err)
 			}
@@ -880,7 +886,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			newOAuthClientAuthorization(sa1, user2, scope.UserListAllProjects),
 		)
 
-		clientTester.backoffAssert(func() error {
+		clientTester.assert(func() error {
 			for _, user := range []*userapi.User{user1, user2} {
 				name := helpers.MakeClientAuthorizationName(user.GetName(), getSAName(sa1))
 				if _, err := user1Auth.Get(name); err == nil || !kubeerr.IsBadRequest(err) {
