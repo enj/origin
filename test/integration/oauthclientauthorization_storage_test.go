@@ -163,6 +163,9 @@ func zeroSelfIgnoredFields(list *oauthapi.SelfOAuthClientAuthorizationList) {
 }
 
 func (o *clientAuthorizationTester) assertGetSuccess(auth osclient.SelfOAuthClientAuthorizationInterface, expected *oauthapi.OAuthClientAuthorizationList, saList ...*kapi.ServiceAccount) error {
+	if len(saList) == 0 {
+		o.t.Errorf("%s failed: invalid test data %#v %#v", o.currentTest, saList, expected)
+	}
 	actual := &oauthapi.SelfOAuthClientAuthorizationList{}
 	for _, sa := range saList {
 		data, err := auth.Get(getSAName(sa))
@@ -175,6 +178,9 @@ func (o *clientAuthorizationTester) assertGetSuccess(auth osclient.SelfOAuthClie
 }
 
 func (o *clientAuthorizationTester) assertGetFailure(auth osclient.SelfOAuthClientAuthorizationInterface, saList ...*kapi.ServiceAccount) error {
+	if len(saList) == 0 {
+		o.t.Errorf("%s failed: invalid test data %#v", o.currentTest, saList)
+	}
 	for _, sa := range saList {
 		if _, err := auth.Get(getSAName(sa)); err == nil || !kubeerr.IsNotFound(err) {
 			return fmt.Errorf("%s GetFailure failed: did NOT return NotFound error when getting self client auth: %#v", o.currentTest, err)
@@ -424,20 +430,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 
 	clientTester.runTest("user can delete their new client authorizations", func() {
 		sa1 := clientTester.createSA("sa1")
-		sa2 := clientTester.createSA("sa2")
-		sa3 := clientTester.createSA("sa3")
 		user1, user1Auth := clientTester.createUser("user1")
 
 		clientTester.createClientAuthorizations(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
 		)
 
 		expectedBeforeDelete := newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -447,16 +447,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return clientTester.assertEqualSelfList(expectedBeforeDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedBeforeDelete, sa1, sa2, sa3) })
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedBeforeDelete, sa1) })
 
 		if err := user1Auth.Delete(getSAName(sa1)); err != nil {
 			t.Errorf("%s failed during delete: %#v", clientTester.currentTest, err)
 		}
 
 		expectedAfterDelete := newOAuthClientAuthorizationList(
-			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
+		// should be empty
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -466,26 +464,22 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return clientTester.assertEqualSelfList(expectedAfterDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedAfterDelete, sa2, sa3) })
 		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
 	})
 
 	clientTester.runTest("user cannot see other user's client authorizations", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
-		sa3 := clientTester.createSA("sa3")
 		user1, user1Auth := clientTester.createUser("user1")
-		user2, user2Auth := clientTester.createUser("user2")
+		user2, _ := clientTester.createUser("user2")
 
 		clientTester.createClientAuthorizations(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
 			newOAuthClientAuthorization(sa2, user2, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
 		)
 
 		expectedUser1 := newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -495,43 +489,20 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return clientTester.assertEqualSelfList(expectedUser1, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedUser1, sa1, sa3) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedUser1, sa1) })
 		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2) })
-
-		expectedUser2 := newOAuthClientAuthorizationList(
-			newOAuthClientAuthorization(sa2, user2, scope.UserInfo),
-		)
-
-		clientTester.backoffAssert(func() error {
-			actual, err := user2Auth.List(kapi.ListOptions{})
-			if err != nil {
-				return fmt.Errorf("%s failed: error listing self client auths: %#v", clientTester.currentTest, err)
-			}
-			return clientTester.assertEqualSelfList(expectedUser2, actual)
-		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user2Auth, expectedUser2, sa2) })
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user2Auth, sa1, sa3) })
 	})
 
 	clientTester.runTest("user cannot see client authorizations stored in the old location", func() {
 		sa1 := clientTester.createSA("sa1")
-		sa2 := clientTester.createSA("sa2")
-		sa3 := clientTester.createSA("sa3")
-		sa4 := clientTester.createSA("sa4")
 		user1, user1Auth := clientTester.createUser("user1")
 
-		clientTester.createClientAuthorizations(
-			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
-		)
 		clientTester.oldLocationEtcdCreate(
-			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa4, user1, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa1, user1, scope.UserInfo),
 		)
 
 		expected := newOAuthClientAuthorizationList(
-			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
+		// should be empty
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -541,39 +512,24 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return clientTester.assertEqualSelfList(expected, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expected, sa1, sa3) })
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2, sa4) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
 	})
 
 	clientTester.runTest("cluster admin can see client authorizations stored in the both old and new location", func() {
 		sa1 := clientTester.createSA("sa1")
 		sa2 := clientTester.createSA("sa2")
-		sa3 := clientTester.createSA("sa3")
-		sa4 := clientTester.createSA("sa4")
 		user1, _ := clientTester.createUser("user1")
-		user2, _ := clientTester.createUser("user2")
-		user3, _ := clientTester.createUser("user3")
 
 		clientTester.createClientAuthorizations(
-			newOAuthClientAuthorization(sa1, user2, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user3, scope.UserInfo),
-			newOAuthClientAuthorization(sa2, user3, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
 		)
 		clientTester.oldLocationEtcdCreate(
-			newOAuthClientAuthorization(sa2, user2, scope.UserInfo),
-			newOAuthClientAuthorization(sa4, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa4, user3, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
 		)
 
 		expected := newOAuthClientAuthorizationList(
-			newOAuthClientAuthorization(sa1, user2, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user3, scope.UserInfo),
-			newOAuthClientAuthorization(sa2, user3, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa2, user2, scope.UserInfo),
-			newOAuthClientAuthorization(sa4, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa4, user3, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -587,23 +543,14 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 
 	clientTester.runTest("cluster admin deletes are reflected to the user", func() {
 		sa1 := clientTester.createSA("sa1")
-		sa2 := clientTester.createSA("sa2")
-		sa3 := clientTester.createSA("sa3")
-		sa4 := clientTester.createSA("sa4")
 		user1, user1Auth := clientTester.createUser("user1")
 
 		clientTester.createClientAuthorizations(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa4, user1, scope.UserListAllProjects),
 		)
 
 		expectedBeforeDelete := newOAuthClientAuthorizationList(
 			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa2, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa3, user1, scope.UserInfo),
-			newOAuthClientAuthorization(sa4, user1, scope.UserListAllProjects),
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -613,21 +560,15 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return clientTester.assertEqualSelfList(expectedBeforeDelete, actual)
 		})
-		clientTester.backoffAssert(func() error {
-			return clientTester.assertGetSuccess(user1Auth, expectedBeforeDelete, sa1, sa2, sa3, sa4)
-		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedBeforeDelete, sa1) })
 
-		for _, sa := range []*kapi.ServiceAccount{sa2, sa3} {
-			name := helpers.MakeClientAuthorizationName(user1.GetName(), getSAName(sa))
-			if err := clientTester.asClusterAdmin.Delete(name); err != nil {
-				t.Errorf("%s failed during delete of %s: %#v", clientTester.currentTest, name, err)
-			}
+		name := helpers.MakeClientAuthorizationName(user1.GetName(), getSAName(sa1))
+		if err := clientTester.asClusterAdmin.Delete(name); err != nil {
+			t.Errorf("%s failed during delete of %s: %#v", clientTester.currentTest, name, err)
 		}
 
 		expectedAfterDelete := newOAuthClientAuthorizationList(
-			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
-			newOAuthClientAuthorization(sa4, user1, scope.UserListAllProjects),
+		// should be empty
 		)
 
 		clientTester.backoffAssert(func() error {
@@ -637,8 +578,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return clientTester.assertEqualSelfList(expectedAfterDelete, actual)
 		})
-		clientTester.backoffAssert(func() error { return clientTester.assertGetSuccess(user1Auth, expectedAfterDelete, sa1, sa4) })
-		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa2, sa3) })
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1Auth, sa1) })
 	})
 
 	clientTester.runTest("user cannot see client authorizations for a different UID + their name but cluster admin can see all via non-self and impersonation", func() {
@@ -696,14 +636,6 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			return clientTester.assertEqualSelfList(expectedNewUID, actual)
 		})
 		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1AuthNew, sa1) })
-
-		clientTester.backoffAssert(func() error {
-			actual, err := clientTester.asClusterAdmin.List(kapi.ListOptions{})
-			if err != nil {
-				return fmt.Errorf("%s failed: error listing client auths: %#v", clientTester.currentTest, err)
-			}
-			return clientTester.assertEqualList(expectedOldUID, actual)
-		})
 
 		user1AuthImpersonate := clientTester.asImpersonatingUser(user1)
 		clientTester.backoffAssert(func() error {
@@ -766,7 +698,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		)
 	})
 
-	clientTester.runTest("user cannot see other users' client autorizations during a watch", func() {
+	clientTester.runTest("user cannot see other user's client autorizations during a watch", func() {
 		sa1 := clientTester.createSA("sa1")
 		user1, user1Auth := clientTester.createUser("user1")
 		user2, user2Auth := clientTester.createUser("user2")
@@ -911,6 +843,7 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 			}
 			return nil
 		})
+		clientTester.backoffAssert(func() error { return clientTester.assertGetFailure(user1AuthImpersonate, sa1) })
 	})
 
 	clientTester.runTest("user can see watch events from resource version 0", func() {
