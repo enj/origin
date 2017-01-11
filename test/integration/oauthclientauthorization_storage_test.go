@@ -284,12 +284,12 @@ func (o *clientAuthorizationTester) assertEvents(expected *oauthapi.OAuthClientA
 			case *oauthapi.SelfOAuthClientAuthorization:
 				actualSingle := &oauthapi.SelfOAuthClientAuthorizationList{Items: []oauthapi.SelfOAuthClientAuthorization{*auth}}
 				if err := o.assertEqualSelfList(expectedSingle, actualSingle); err != nil {
-					o.t.Errorf("%s failed: watch event at index %d does not match %#v", o.currentTest, event, i, err)
+					o.t.Errorf("%s failed: self watch event at index %d does not match %#v", o.currentTest, event, i, err)
 				}
 			case *oauthapi.OAuthClientAuthorization:
 				actualSingle := &oauthapi.OAuthClientAuthorizationList{Items: []oauthapi.OAuthClientAuthorization{*auth}}
 				if err := o.assertEqualList(expectedSingle, actualSingle); err != nil {
-					o.t.Errorf("%s failed: watch event at index %d does not match %#v", o.currentTest, event, i, err)
+					o.t.Errorf("%s failed: non-self watch event at index %d does not match %#v", o.currentTest, event, i, err)
 				}
 			default:
 				o.t.Errorf("%s failed: watch event %#v at index %d has unexpected type", o.currentTest, event, i)
@@ -868,5 +868,29 @@ func TestOAuthClientAuthorizationStorage(t *testing.T) {
 		clientTester.assertEvents(expected, user1Watch,
 			watch.Added,
 		)
+	})
+
+	clientTester.runTest("user cannot get or delete using fully qualified name", func() {
+		sa1 := clientTester.createSA("sa1")
+		user1, user1Auth := clientTester.createUser("user1")
+		user2, _ := clientTester.createUser("user2")
+
+		clientTester.createClientAuthorizations(
+			newOAuthClientAuthorization(sa1, user1, scope.UserListAllProjects),
+			newOAuthClientAuthorization(sa1, user2, scope.UserListAllProjects),
+		)
+
+		clientTester.backoffAssert(func() error {
+			for _, user := range []*userapi.User{user1, user2} {
+				name := helpers.MakeClientAuthorizationName(user.GetName(), getSAName(sa1))
+				if _, err := user1Auth.Get(name); err == nil || !kubeerr.IsBadRequest(err) {
+					return fmt.Errorf("%s failed: did NOT return BadRequest error when getting fully qualified self client auth for user %#v: %#v", clientTester.currentTest, user, err)
+				}
+				if err := user1Auth.Delete(name); err == nil || !kubeerr.IsBadRequest(err) {
+					return fmt.Errorf("%s failed: did NOT return BadRequest error when deleting fully qualified self client auth for user %#v: %#v", clientTester.currentTest, user, err)
+				}
+			}
+			return nil
+		})
 	})
 }
