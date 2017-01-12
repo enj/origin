@@ -183,6 +183,8 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				// backwards compatibility
 				authorizationapi.NewRule(read...).Groups(buildGroup).Resources("buildlogs").RuleOrDie(),
 				authorizationapi.NewRule(read...).Groups(kapiGroup).Resources("resourcequotausages").RuleOrDie(),
+
+				authorizationapi.NewRule(read...).Groups(oauthGroup).Resources("selfoauthclientauthorizations").RuleOrDie(),
 			},
 		},
 		{

@@ -115,7 +115,7 @@ func NewREST(optsGetter restoptions.Getter, clientGetter oauthclient.Getter) (*R
 
 	// This simulates overriding the KeyFunc
 	selfNamer := func(ctx kapi.Context, name string) (string, error) {
-		if strings.Contains(name, helpers.UserSpaceSeparator) {
+		if strings.Contains(name, helpers.UserSpaceSeparator) { // This makes sure that the KeyFunc cannot be manipulated to leak data
 			return "", kubeerr.NewBadRequest("Invalid name: " + name)
 		}
 		user, ok := kapi.UserFrom(ctx)
