@@ -9,7 +9,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kapiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -67,7 +66,7 @@ var etcdStorageData = map[reflect.Type]struct {
 	ephemeral        bool             // Set to true to skip testing the object
 	stub             runtime.Object   // Valid stub to use during create
 	prerequisites    []runtime.Object // Optional, ordered list of objects to create before stub
-	expectedEtcdPath string           // Expected location of object in etcd
+	expectedEtcdPath string           // Expected location of object in etcd, do not use any variables, constants, etc to derive this value - always supply the full raw string
 }{
 	reflect.TypeOf(&oauthapiv1.OAuthClientAuthorization{}): {
 		stub: &oauthapiv1.OAuthClientAuthorization{
@@ -92,11 +91,41 @@ var etcdStorageData = map[reflect.Type]struct {
 		},
 		expectedEtcdPath: "openshift.io/oauth/clientauthorizations/user:system:serviceaccount:etcdstoragepath:client",
 	},
-
-	reflect.TypeOf(&oauthapiv1.OAuthRedirectReference{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&oauthapiv1.OAuthClient{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&oauthapiv1.OAuthAuthorizeToken{}):    {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&oauthapiv1.OAuthAccessToken{}):       {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&oauthapiv1.OAuthClient{}): {
+		stub: &oauthapiv1.OAuthClient{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "client"},
+		},
+		expectedEtcdPath: "openshift.io/oauth/clients/client",
+	},
+	reflect.TypeOf(&oauthapiv1.OAuthAuthorizeToken{}): {
+		stub: &oauthapiv1.OAuthAuthorizeToken{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "tokenneedstobelongenoughelseitwontwork"},
+			ClientName: "client",
+			UserName:   "user",
+			UserUID:    "cannot be empty",
+		},
+		prerequisites: []runtime.Object{
+			&oauthapiv1.OAuthClient{
+				ObjectMeta: kapiv1.ObjectMeta{Name: "client"},
+			},
+		},
+		expectedEtcdPath: "openshift.io/oauth/authorizetokens/tokenneedstobelongenoughelseitwontwork",
+	},
+	reflect.TypeOf(&oauthapiv1.OAuthAccessToken{}): {
+		stub: &oauthapiv1.OAuthAccessToken{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "tokenneedstobelongenoughelseitwontwork"},
+			ClientName: "client",
+			UserName:   "user",
+			UserUID:    "cannot be empty",
+		},
+		prerequisites: []runtime.Object{
+			&oauthapiv1.OAuthClient{
+				ObjectMeta: kapiv1.ObjectMeta{Name: "client"},
+			},
+		},
+		expectedEtcdPath: "openshift.io/oauth/accesstokens/tokenneedstobelongenoughelseitwontwork",
+	},
+	reflect.TypeOf(&oauthapiv1.OAuthRedirectReference{}): {ephemeral: true}, // Used for specifying redirects, never stored in etcd
 
 	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 
@@ -268,6 +297,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting master config: %#v", err)
 	}
+	masterConfig.AdmissionConfig.PluginOrderOverride = []string{"PodNodeSelector"} // remove most admission checks to make testing easier
 
 	kubeConfigFile, err := testserver.StartConfiguredMaster(masterConfig)
 	if err != nil {
@@ -283,6 +313,10 @@ func TestEtcdStoragePath(t *testing.T) {
 	d := f.Decoder(false)
 	seen := map[reflect.Type]struct{}{}
 	const testNamespace = "etcdstoragepath"
+
+	if _, err := kubeClient.Core().Namespaces().Create(&kapi.Namespace{ObjectMeta: kapi.ObjectMeta{Name: testNamespace}}); err != nil {
+		t.Fatalf("error creating test namespace: %#v", err)
+	}
 
 	for _, gv := range registered.RegisteredGroupVersions() {
 		for kind, apiType := range kapi.Scheme.KnownTypes(gv) {
@@ -306,31 +340,38 @@ func TestEtcdStoragePath(t *testing.T) {
 				continue
 			}
 
-			if err := prepareEtcd(keys, kubeClient.Core().Namespaces(), testNamespace); err != nil {
-				t.Fatalf("failed to set up etcd: %#v", err)
-			}
+			func() {
+				all := &[]runtime.Object{}
+				defer func() {
+					if !t.Failed() { // do not cleanup if test has already failed since we may need things in the etcd dump
+						if err := cleanup(f, testNamespace, all); err != nil {
+							t.Fatalf("failed to clean up etcd: %#v", err)
+						}
+					}
+				}()
 
-			if err := createPrerequisites(f, testData.prerequisites, testNamespace); err != nil {
-				t.Errorf("failed to create prerequisites for %s from %s: %#v", kind, pkgPath, err)
-				continue
-			}
+				if err := createPrerequisites(f, testNamespace, testData.prerequisites, all); err != nil {
+					t.Errorf("failed to create prerequisites for %s from %s: %#v", kind, pkgPath, err)
+					return
+				}
 
-			gvk := gv.WithKind(kind)
+				gvk := gv.WithKind(kind)
 
-			if err := create(f, testData.stub, &gvk, testNamespace); err != nil {
-				t.Errorf("failed to create stub for %s from %s: %#v", kind, pkgPath, err)
-				continue
-			}
+				if err := create(f, testData.stub, &gvk, testNamespace, all); err != nil {
+					t.Errorf("failed to create stub for %s from %s: %#v", kind, pkgPath, err)
+					return
+				}
 
-			output, err := getFromEtcd(keys, d, testData.expectedEtcdPath, &gvk)
-			if err != nil {
-				t.Errorf("failed to get from etcd for %s from %s: %#v", kind, pkgPath, err)
-				continue
-			}
+				output, err := getFromEtcd(keys, d, testData.expectedEtcdPath, &gvk)
+				if err != nil {
+					t.Errorf("failed to get from etcd for %s from %s: %#v", kind, pkgPath, err)
+					return
+				}
 
-			if !kapi.Semantic.DeepDerivative(testData.stub, output) {
-				t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectDiff(testData.stub, output))
-			}
+				if !kapi.Semantic.DeepDerivative(testData.stub, output) {
+					t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectDiff(testData.stub, output))
+				}
+			}()
 		}
 	}
 
@@ -341,42 +382,61 @@ func TestEtcdStoragePath(t *testing.T) {
 	}
 }
 
-func prepareEtcd(keys etcd.KeysAPI, ns internalversion.NamespaceInterface, testNamespace string) error {
-	for _, key := range []string{"openshift.io", "kubernetes.io"} {
-		if _, err := keys.Delete(context.Background(), key, &etcd.DeleteOptions{Recursive: true}); err != nil && !etcdutil.IsEtcdNotFound(err) {
+func cleanup(f util.ObjectMappingFactory, testNamespace string, objects *[]runtime.Object) error {
+	for i := len(*objects) - 1; i >= 0; i-- { // delete in reverse order in case creation order mattered
+		obj := (*objects)[i]
+
+		helper, name, err := getHelperAndName(f, obj, nil)
+		if err != nil {
 			return err
 		}
-	}
-	if _, err := ns.Create(&kapi.Namespace{ObjectMeta: kapi.ObjectMeta{Name: testNamespace}}); err != nil {
-		return err
+		if err := helper.Delete(testNamespace, name); err != nil && !etcdutil.IsEtcdNotFound(err) {
+			return err
+		}
 	}
 	return nil
 }
 
-func create(f util.ObjectMappingFactory, obj runtime.Object, gvk *unversioned.GroupVersionKind, testNamespace string) error {
+func create(f util.ObjectMappingFactory, obj runtime.Object, gvk *unversioned.GroupVersionKind, testNamespace string, all *[]runtime.Object) error {
+	helper, _, err := getHelperAndName(f, obj, gvk)
+	if err != nil {
+		return err
+	}
+	output, err := helper.Create(testNamespace, false, obj)
+	if err != nil {
+		return err
+	}
+	*all = append(*all, output)
+	return nil
+}
+
+func getHelperAndName(f util.ObjectMappingFactory, obj runtime.Object, gvk *unversioned.GroupVersionKind) (*resource.Helper, string, error) {
 	mapper, typer := f.Object()
 	if gvk == nil {
 		gvks, _, err := typer.ObjectKinds(obj)
 		if err != nil {
-			return err
+			return nil, "", err
 		}
 		gvk = &gvks[0]
 	}
 	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	client, err := f.ClientForMapping(mapping)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
-	_, err = resource.NewHelper(client, mapping).Create(testNamespace, false, obj)
-	return err
+	name, err := mapping.Name(obj)
+	if err != nil {
+		return nil, "", err
+	}
+	return resource.NewHelper(client, mapping), name, nil
 }
 
-func createPrerequisites(f util.ObjectMappingFactory, prerequisites []runtime.Object, testNamespace string) error {
+func createPrerequisites(f util.ObjectMappingFactory, testNamespace string, prerequisites []runtime.Object, all *[]runtime.Object) error {
 	for _, prerequisite := range prerequisites {
-		if err := create(f, prerequisite, nil, testNamespace); err != nil {
+		if err := create(f, prerequisite, nil, testNamespace, all); err != nil {
 			return err
 		}
 	}
