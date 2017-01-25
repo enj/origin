@@ -127,7 +127,7 @@ var etcdStorageData = map[reflect.Type]struct {
 	},
 	reflect.TypeOf(&oauthapiv1.OAuthRedirectReference{}): {ephemeral: true}, // Used for specifying redirects, never stored in etcd
 
-	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // Not a real object so cannot be stored in etcd  // TODO confirm this
 
 	reflect.TypeOf(&authorizationapiv1.PolicyBinding{}):                 {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&authorizationapiv1.IsPersonalSubjectAccessReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
