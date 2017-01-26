@@ -202,10 +202,31 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&authorizationapiv1.ResourceAccessReviewResponse{}):  {ephemeral: true},
 	reflect.TypeOf(&authorizationapiv1.SubjectAccessReviewResponse{}):   {ephemeral: true},
 
-	reflect.TypeOf(&userapiv1.Group{}):               {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&userapiv1.UserIdentityMapping{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&userapiv1.User{}):                {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&userapiv1.Identity{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&userapiv1.Group{}): {
+		stub: &userapiv1.Group{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "group"},
+			Users: userapiv1.OptionalNames{
+				"user1", "user2",
+			},
+		},
+		expectedEtcdPath: "openshift.io/groups/group",
+	},
+	reflect.TypeOf(&userapiv1.User{}): {
+		stub: &userapiv1.User{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "user1"},
+			FullName:   "user1",
+		},
+		expectedEtcdPath: "openshift.io/users/user1",
+	},
+	reflect.TypeOf(&userapiv1.Identity{}): {
+		stub: &userapiv1.Identity{
+			ObjectMeta:       kapiv1.ObjectMeta{Name: "github:user2"},
+			ProviderName:     "github",
+			ProviderUserName: "user2",
+		},
+		expectedEtcdPath: "openshift.io/useridentities/github:user2",
+	},
+	reflect.TypeOf(&userapiv1.UserIdentityMapping{}): {ephemeral: true}, // pointer from user to identity, not stored in etcd
 
 	reflect.TypeOf(&projectapiv1.Project{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&projectapiv1.ProjectRequest{}): {ephemeral: true}, // TODO(mo): Just making the test pass
