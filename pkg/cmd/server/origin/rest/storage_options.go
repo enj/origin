@@ -28,7 +28,7 @@ func StorageOptions(options configapi.MasterConfig) restoptions.Getter {
 
 			{Resource: "identities"}: "useridentities",
 
-			{Resource: "clusterresourcequotas"}: quotaapi.GroupName + "/clusterresourcequotas",
+			{Resource: "clusterresourcequotas"}: quotaapi.GroupName + "/clusterresourcequotas", // TODO this will break upgrades if `quotaapi.GroupName` changes
 
 			{Resource: "clusternetworks"}:       "registry/sdnnetworks",
 			{Resource: "egressnetworkpolicies"}: "registry/egressnetworkpolicy",

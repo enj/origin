@@ -231,10 +231,24 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&projectapiv1.Project{}):        {ephemeral: true}, // proxy for namespace so cannot test here
 	reflect.TypeOf(&projectapiv1.ProjectRequest{}): {ephemeral: true}, // not stored in etcd
 
-	reflect.TypeOf(&apisimagepolicyv1alpha1.ImageReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisimagepolicyv1alpha1.ImageReview{}): {ephemeral: true}, // not stored in etcd
 
-	reflect.TypeOf(&quotaapiv1.ClusterResourceQuota{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&quotaapiv1.AppliedClusterResourceQuota{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&quotaapiv1.ClusterResourceQuota{}): {
+		stub: &quotaapiv1.ClusterResourceQuota{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "quota1"},
+			Spec: quotaapiv1.ClusterResourceQuotaSpec{
+				Selector: quotaapiv1.ClusterResourceQuotaSelector{
+					LabelSelector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{
+							"a": "b",
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/clusterresourcequotas/quota1",
+	},
+	reflect.TypeOf(&quotaapiv1.AppliedClusterResourceQuota{}): {ephemeral: true}, // mirror of ClusterResourceQuota that cannot be created
 
 	reflect.TypeOf(&securityapiv1.PodSecurityPolicyReview{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&securityapiv1.PodSecurityPolicySelfSubjectReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
