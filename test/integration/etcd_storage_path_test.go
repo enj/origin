@@ -275,12 +275,13 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeletConfiguration{}):       {ephemeral: true},
 	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeProxyConfiguration{}):     {ephemeral: true},
 
-	reflect.TypeOf(&apisauthenticationv1beta1.TokenReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisauthenticationv1beta1.TokenReview{}): {ephemeral: true}, // not stored in etcd
 
-	reflect.TypeOf(&apisrbacv1alpha1.RoleBinding{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisrbacv1alpha1.Role{}):               {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisrbacv1alpha1.ClusterRole{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisrbacv1alpha1.ClusterRoleBinding{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	// we cannot create these  // TODO but we should be able to create them in kube
+	reflect.TypeOf(&apisrbacv1alpha1.RoleBinding{}):        {ephemeral: true},
+	reflect.TypeOf(&apisrbacv1alpha1.Role{}):               {ephemeral: true},
+	reflect.TypeOf(&apisrbacv1alpha1.ClusterRole{}):        {ephemeral: true},
+	reflect.TypeOf(&apisrbacv1alpha1.ClusterRoleBinding{}): {ephemeral: true},
 
 	reflect.TypeOf(&imageapiv1.ImageStreamImport{}):  {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&imageapiv1.ImageStreamImage{}):   {ephemeral: true}, // TODO(mo): Just making the test pass
