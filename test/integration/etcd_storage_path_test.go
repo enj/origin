@@ -250,9 +250,10 @@ var etcdStorageData = map[reflect.Type]struct {
 	},
 	reflect.TypeOf(&quotaapiv1.AppliedClusterResourceQuota{}): {ephemeral: true}, // mirror of ClusterResourceQuota that cannot be created
 
-	reflect.TypeOf(&securityapiv1.PodSecurityPolicyReview{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&securityapiv1.PodSecurityPolicySelfSubjectReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&securityapiv1.PodSecurityPolicySubjectReview{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
+	// not stored in etcd
+	reflect.TypeOf(&securityapiv1.PodSecurityPolicyReview{}):            {ephemeral: true},
+	reflect.TypeOf(&securityapiv1.PodSecurityPolicySelfSubjectReview{}): {ephemeral: true},
+	reflect.TypeOf(&securityapiv1.PodSecurityPolicySubjectReview{}):     {ephemeral: true},
 
 	reflect.TypeOf(&apisstoragev1beta1.StorageClass{}): {
 		stub: &apisstoragev1beta1.StorageClass{
