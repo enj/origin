@@ -283,13 +283,27 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&apisrbacv1alpha1.ClusterRole{}):        {ephemeral: true},
 	reflect.TypeOf(&apisrbacv1alpha1.ClusterRoleBinding{}): {ephemeral: true},
 
-	reflect.TypeOf(&imageapiv1.ImageStreamImport{}):  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&imageapiv1.ImageStreamImage{}):   {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&imageapiv1.ImageStreamTag{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&imageapiv1.Image{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&imageapiv1.ImageStreamMapping{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&imageapiv1.ImageStream{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&imageapiv1.ImageSignature{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&imageapiv1.Image{}): {
+		stub: &imageapiv1.Image{
+			ObjectMeta:           kapiv1.ObjectMeta{Name: "image1"},
+			DockerImageReference: "fedora:latest",
+		},
+		expectedEtcdPath: "openshift.io/images/image1",
+	},
+	reflect.TypeOf(&imageapiv1.ImageStream{}): {
+		stub: &imageapiv1.ImageStream{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "is1"},
+			Spec: imageapiv1.ImageStreamSpec{
+				DockerImageRepository: "docker",
+			},
+		},
+		expectedEtcdPath: "openshift.io/imagestreams/etcdstoragepathtestnamespace/is1",
+	},
+	reflect.TypeOf(&imageapiv1.ImageStreamTag{}):     {ephemeral: true}, // part of image stream
+	reflect.TypeOf(&imageapiv1.ImageSignature{}):     {ephemeral: true}, // part of image
+	reflect.TypeOf(&imageapiv1.ImageStreamImport{}):  {ephemeral: true}, // not stored in etcd
+	reflect.TypeOf(&imageapiv1.ImageStreamImage{}):   {ephemeral: true}, // not stored in etcd
+	reflect.TypeOf(&imageapiv1.ImageStreamMapping{}): {ephemeral: true}, // not stored in etcd
 
 	reflect.TypeOf(&apisappsv1beta1.StatefulSet{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 
@@ -579,7 +593,13 @@ func getFromEtcd(keys etcd.KeysAPI, d runtime.Decoder, path string, gvk *unversi
 		return nil, err
 	}
 	// TODO figure out how to get rid of this hack
-	reflect.ValueOf(output).Elem().FieldByName("CreationTimestamp").Set(reflect.ValueOf(unversioned.Time{}))
+	e := reflect.ValueOf(output).Elem()
+	for fieldName, fieldValue := range map[string]interface{}{
+		"CreationTimestamp": unversioned.Time{},
+		"Generation":        int64(0),
+	} {
+		e.FieldByName(fieldName).Set(reflect.ValueOf(fieldValue))
+	}
 	return output, nil
 }
 
