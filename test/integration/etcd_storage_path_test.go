@@ -130,6 +130,8 @@ var etcdStorageData = map[reflect.Type]struct {
 
 	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // Not a real object so cannot be stored in etcd  // TODO confirm this
 
+	reflect.TypeOf(&imageapidocker10.DockerImage{}): {ephemeral: true}, // Not a real object so cannot be stored in etcd  // TODO confirm this
+
 	reflect.TypeOf(&authorizationapiv1.PolicyBinding{}): {
 		stub: &authorizationapiv1.PolicyBinding{
 			RoleBindings: authorizationapiv1.NamedRoleBindings{
@@ -202,6 +204,11 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&authorizationapiv1.ResourceAccessReviewResponse{}):  {ephemeral: true},
 	reflect.TypeOf(&authorizationapiv1.SubjectAccessReviewResponse{}):   {ephemeral: true},
 
+	// SAR objects that are not stored in etcd
+	reflect.TypeOf(&apisauthorizationv1beta1.SelfSubjectAccessReview{}):  {ephemeral: true},
+	reflect.TypeOf(&apisauthorizationv1beta1.LocalSubjectAccessReview{}): {ephemeral: true},
+	reflect.TypeOf(&apisauthorizationv1beta1.SubjectAccessReview{}):      {ephemeral: true},
+
 	reflect.TypeOf(&userapiv1.Group{}): {
 		stub: &userapiv1.Group{
 			ObjectMeta: kapiv1.ObjectMeta{Name: "group"},
@@ -263,15 +270,10 @@ var etcdStorageData = map[reflect.Type]struct {
 		expectedEtcdPath: "kubernetes.io/storageclasses/sc1",
 	},
 
-	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeSchedulerConfiguration{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeletConfiguration{}):       {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeProxyConfiguration{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
-
-	reflect.TypeOf(&imageapidocker10.DockerImage{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-
-	reflect.TypeOf(&apisauthorizationv1beta1.SelfSubjectAccessReview{}):  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisauthorizationv1beta1.LocalSubjectAccessReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisauthorizationv1beta1.SubjectAccessReview{}):      {ephemeral: true}, // TODO(mo): Just making the test pass
+	// not stored in etcd
+	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeSchedulerConfiguration{}): {ephemeral: true},
+	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeletConfiguration{}):       {ephemeral: true},
+	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeProxyConfiguration{}):     {ephemeral: true},
 
 	reflect.TypeOf(&apisauthenticationv1beta1.TokenReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 
