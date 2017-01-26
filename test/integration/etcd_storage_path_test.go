@@ -254,7 +254,13 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&securityapiv1.PodSecurityPolicySelfSubjectReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&securityapiv1.PodSecurityPolicySubjectReview{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
 
-	reflect.TypeOf(&apisstoragev1beta1.StorageClass{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisstoragev1beta1.StorageClass{}): {
+		stub: &apisstoragev1beta1.StorageClass{
+			ObjectMeta:  kapiv1.ObjectMeta{Name: "sc1"},
+			Provisioner: "aws",
+		},
+		expectedEtcdPath: "kubernetes.io/storageclasses/sc1",
+	},
 
 	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeSchedulerConfiguration{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&apiscomponentconfigv1alpha1.KubeletConfiguration{}):       {ephemeral: true}, // TODO(mo): Just making the test pass
