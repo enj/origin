@@ -185,7 +185,7 @@ var etcdStorageData = map[reflect.Type]struct {
 		expectedEtcdPath: "openshift.io/rolebindingrestrictions/etcdstoragepathtestnamespace/rbr",
 	},
 
-	// virtual objects that are not stored in etcd
+	// virtual objects that are not stored in etcd  // TODO this will change in the future when policies go away
 	reflect.TypeOf(&authorizationapiv1.Role{}):               {ephemeral: true},
 	reflect.TypeOf(&authorizationapiv1.ClusterRole{}):        {ephemeral: true},
 	reflect.TypeOf(&authorizationapiv1.RoleBinding{}):        {ephemeral: true},
@@ -228,8 +228,8 @@ var etcdStorageData = map[reflect.Type]struct {
 	},
 	reflect.TypeOf(&userapiv1.UserIdentityMapping{}): {ephemeral: true}, // pointer from user to identity, not stored in etcd
 
-	reflect.TypeOf(&projectapiv1.Project{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&projectapiv1.ProjectRequest{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&projectapiv1.Project{}):        {ephemeral: true}, // proxy for namespace so cannot test here
+	reflect.TypeOf(&projectapiv1.ProjectRequest{}): {ephemeral: true}, // not stored in etcd
 
 	reflect.TypeOf(&apisimagepolicyv1alpha1.ImageReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 
