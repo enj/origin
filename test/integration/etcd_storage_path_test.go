@@ -182,7 +182,7 @@ var etcdStorageData = map[reflect.Type]struct {
 				},
 			},
 		},
-		expectedEtcdPath: "openshift.io/rolebindingrestrictions/rbr",
+		expectedEtcdPath: "openshift.io/rolebindingrestrictions/etcdstoragepathtestnamespace/rbr",
 	},
 
 	// virtual objects that are not stored in etcd
