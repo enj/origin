@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	kapi "k8s.io/kubernetes/pkg/api"
+	kubeerr "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kapiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -70,7 +71,7 @@ var etcdStorageData = map[reflect.Type]struct {
 }{
 	reflect.TypeOf(&oauthapiv1.OAuthClientAuthorization{}): {
 		stub: &oauthapiv1.OAuthClientAuthorization{
-			ClientName: "system:serviceaccount:etcdstoragepath:client",
+			ClientName: "system:serviceaccount:etcdstoragepathtestnamespace:client",
 			UserName:   "user",
 			UserUID:    "cannot be empty",
 			Scopes:     []string{scope.UserInfo},
@@ -89,7 +90,7 @@ var etcdStorageData = map[reflect.Type]struct {
 				Type: kapiv1.SecretTypeServiceAccountToken,
 			},
 		},
-		expectedEtcdPath: "openshift.io/oauth/clientauthorizations/user:system:serviceaccount:etcdstoragepath:client",
+		expectedEtcdPath: "openshift.io/oauth/clientauthorizations/user:system:serviceaccount:etcdstoragepathtestnamespace:client",
 	},
 	reflect.TypeOf(&oauthapiv1.OAuthClient{}): {
 		stub: &oauthapiv1.OAuthClient{
@@ -100,13 +101,13 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&oauthapiv1.OAuthAuthorizeToken{}): {
 		stub: &oauthapiv1.OAuthAuthorizeToken{
 			ObjectMeta: kapiv1.ObjectMeta{Name: "tokenneedstobelongenoughelseitwontwork"},
-			ClientName: "client",
+			ClientName: "client0",
 			UserName:   "user",
 			UserUID:    "cannot be empty",
 		},
 		prerequisites: []runtime.Object{
 			&oauthapiv1.OAuthClient{
-				ObjectMeta: kapiv1.ObjectMeta{Name: "client"},
+				ObjectMeta: kapiv1.ObjectMeta{Name: "client0"},
 			},
 		},
 		expectedEtcdPath: "openshift.io/oauth/authorizetokens/tokenneedstobelongenoughelseitwontwork",
@@ -114,13 +115,13 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&oauthapiv1.OAuthAccessToken{}): {
 		stub: &oauthapiv1.OAuthAccessToken{
 			ObjectMeta: kapiv1.ObjectMeta{Name: "tokenneedstobelongenoughelseitwontwork"},
-			ClientName: "client",
+			ClientName: "client1",
 			UserName:   "user",
 			UserUID:    "cannot be empty",
 		},
 		prerequisites: []runtime.Object{
 			&oauthapiv1.OAuthClient{
-				ObjectMeta: kapiv1.ObjectMeta{Name: "client"},
+				ObjectMeta: kapiv1.ObjectMeta{Name: "client1"},
 			},
 		},
 		expectedEtcdPath: "openshift.io/oauth/accesstokens/tokenneedstobelongenoughelseitwontwork",
@@ -129,24 +130,77 @@ var etcdStorageData = map[reflect.Type]struct {
 
 	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // Not a real object so cannot be stored in etcd  // TODO confirm this
 
-	reflect.TypeOf(&authorizationapiv1.PolicyBinding{}):                 {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.IsPersonalSubjectAccessReview{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.SubjectAccessReview{}):           {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.ResourceAccessReview{}):          {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.ClusterRoleBinding{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.SelfSubjectRulesReview{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.LocalSubjectAccessReview{}):      {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.ResourceAccessReviewResponse{}):  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.RoleBinding{}):                   {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.ClusterPolicy{}):                 {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.LocalResourceAccessReview{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.Role{}):                          {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.RoleBindingRestriction{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.Policy{}):                        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.ClusterPolicyBinding{}):          {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.SubjectAccessReviewResponse{}):   {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.ClusterRole{}):                   {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&authorizationapiv1.SubjectRulesReview{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&authorizationapiv1.PolicyBinding{}): {
+		stub: &authorizationapiv1.PolicyBinding{
+			RoleBindings: authorizationapiv1.NamedRoleBindings{
+				{
+					Name: "rb",
+					RoleBinding: authorizationapiv1.RoleBinding{
+						ObjectMeta: kapiv1.ObjectMeta{Name: "rb", Namespace: testNamespace},
+						RoleRef:    kapiv1.ObjectReference{Name: "r"},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/authorization/local/policybindings/etcdstoragepathtestnamespace/:default",
+	},
+	reflect.TypeOf(&authorizationapiv1.ClusterPolicyBinding{}): {
+		stub: &authorizationapiv1.ClusterPolicyBinding{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "objectisincomparewhitelist"},
+		},
+		expectedEtcdPath: "openshift.io/authorization/cluster/policybindings/:default",
+	},
+	reflect.TypeOf(&authorizationapiv1.Policy{}): {
+		stub: &authorizationapiv1.Policy{
+			Roles: authorizationapiv1.NamedRoles{
+				{
+					Name: "r",
+					Role: authorizationapiv1.Role{
+						ObjectMeta: kapiv1.ObjectMeta{Name: "r", Namespace: testNamespace},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/authorization/local/policies/etcdstoragepathtestnamespace/default",
+	},
+	reflect.TypeOf(&authorizationapiv1.ClusterPolicy{}): {
+		stub: &authorizationapiv1.ClusterPolicy{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "objectisincomparewhitelist"},
+		},
+		expectedEtcdPath: "openshift.io/authorization/cluster/policies/default",
+	},
+	reflect.TypeOf(&authorizationapiv1.RoleBindingRestriction{}): {
+		stub: &authorizationapiv1.RoleBindingRestriction{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "rbr"},
+			Spec: authorizationapiv1.RoleBindingRestrictionSpec{
+				ServiceAccountRestriction: &authorizationapiv1.ServiceAccountRestriction{
+					ServiceAccounts: []authorizationapiv1.ServiceAccountReference{
+						{
+							Name: "sa",
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/rolebindingrestrictions/rbr",
+	},
+
+	// virtual objects that are not stored in etcd
+	reflect.TypeOf(&authorizationapiv1.Role{}):               {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.ClusterRole{}):        {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.RoleBinding{}):        {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.ClusterRoleBinding{}): {ephemeral: true},
+
+	// SAR objects that are not stored in etcd
+	reflect.TypeOf(&authorizationapiv1.SubjectRulesReview{}):            {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.SelfSubjectRulesReview{}):        {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.SubjectAccessReview{}):           {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.ResourceAccessReview{}):          {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.LocalSubjectAccessReview{}):      {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.LocalResourceAccessReview{}):     {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.IsPersonalSubjectAccessReview{}): {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.ResourceAccessReviewResponse{}):  {ephemeral: true},
+	reflect.TypeOf(&authorizationapiv1.SubjectAccessReviewResponse{}):   {ephemeral: true},
 
 	reflect.TypeOf(&userapiv1.Group{}):               {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&userapiv1.UserIdentityMapping{}): {ephemeral: true}, // TODO(mo): Just making the test pass
@@ -284,6 +338,9 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&apisextensionsv1beta1.ThirdPartyResource{}):         {ephemeral: true}, // TODO(mo): Just making the test pass
 }
 
+// namespace used for all tests, do not change this
+const testNamespace = "etcdstoragepathtestnamespace"
+
 // TestEtcdStoragePath tests to make sure that all objects are stored in an expected location in etcd.
 // It will start failing when a new type is added to ensure that all future types are added to this test.
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
@@ -312,7 +369,6 @@ func TestEtcdStoragePath(t *testing.T) {
 	f := osclientcmd.NewFactory(loader)
 	d := f.Decoder(false)
 	seen := map[reflect.Type]struct{}{}
-	const testNamespace = "etcdstoragepath"
 
 	if _, err := kubeClient.Core().Namespaces().Create(&kapi.Namespace{ObjectMeta: kapi.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatalf("error creating test namespace: %#v", err)
@@ -337,6 +393,11 @@ func TestEtcdStoragePath(t *testing.T) {
 
 			if testData.ephemeral {
 				t.Logf("Skipping test for %s from %s", kind, pkgPath)
+				continue
+			}
+
+			if len(testData.expectedEtcdPath) == 0 || testData.stub == nil || reflect.TypeOf(testData.stub) != ptrType || isZero(reflect.ValueOf(testData.stub)) {
+				t.Errorf("invalid test data for %s from %s", kind, pkgPath)
 				continue
 			}
 
@@ -368,6 +429,15 @@ func TestEtcdStoragePath(t *testing.T) {
 					return
 				}
 
+				// just check the type of whitelisted items
+				if isInCreateAndCompareWhiteList(output) {
+					outputType := reflect.TypeOf(output)
+					if outputType != ptrType {
+						t.Errorf("Output for %s from %s has the wrong type, expected %s, got %s", kind, pkgPath, ptrType.String(), outputType.String())
+					}
+					return
+				}
+
 				if !kapi.Semantic.DeepDerivative(testData.stub, output) {
 					t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectDiff(testData.stub, output))
 				}
@@ -380,6 +450,14 @@ func TestEtcdStoragePath(t *testing.T) {
 	if len(inEtcdData) != 0 || len(inSeen) != 0 {
 		t.Fatalf("etcd data does not match the types we saw:\nin etcd data but not seen: %s\nseen but not in etcd data: %s", inEtcdData, inSeen)
 	}
+}
+
+func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
+	switch obj.(type) {
+	case *authorizationapiv1.ClusterPolicyBinding, *authorizationapiv1.ClusterPolicy: // TODO figure out how to not whitelist these
+		return true
+	}
+	return false
 }
 
 func cleanup(f util.ObjectMappingFactory, testNamespace string, objects *[]runtime.Object) error {
@@ -404,6 +482,9 @@ func create(f util.ObjectMappingFactory, obj runtime.Object, gvk *unversioned.Gr
 	}
 	output, err := helper.Create(testNamespace, false, obj)
 	if err != nil {
+		if kubeerr.IsAlreadyExists(err) && isInCreateAndCompareWhiteList(obj) {
+			return nil
+		}
 		return err
 	}
 	*all = append(*all, output)
@@ -478,4 +559,34 @@ func diffMapKeys(a, b interface{}) []string {
 	}
 
 	return ret
+}
+
+// TODO replace with reflect.IsZero when that gets added in 1.9
+func isZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Func, reflect.Map, reflect.Slice:
+		return v.IsNil()
+	case reflect.Array:
+		z := true
+		for i := 0; i < v.Len(); i++ {
+			z = z && isZero(v.Index(i))
+		}
+		return z
+	case reflect.Struct:
+		z := true
+		for i := 0; i < v.NumField(); i++ {
+			if v.Field(i).CanSet() {
+				z = z && isZero(v.Field(i))
+			}
+		}
+		return z
+	case reflect.Ptr:
+		return isZero(reflect.Indirect(v))
+	}
+	if !v.IsValid() {
+		return true
+	}
+	// Compare other types directly:
+	z := reflect.Zero(v.Type())
+	return v.Interface() == z.Interface()
 }
