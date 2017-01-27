@@ -452,7 +452,8 @@ var etcdStorageData = map[reflect.Type]struct {
 		expectedEtcdPath: "kubernetes.io/jobs/etcdstoragepathtestnamespace/job1",
 	},
 
-	reflect.TypeOf(&apisfederationv1beta1.Cluster{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	// we cannot create these  // TODO but we should be able to create them in kube
+	reflect.TypeOf(&apisfederationv1beta1.Cluster{}): {ephemeral: true},
 
 	reflect.TypeOf(&routeapiv1.Route{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 
