@@ -14,7 +14,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
-	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
@@ -56,6 +55,7 @@ import (
 	projectapiv1 "github.com/openshift/origin/pkg/project/api/v1"
 	quotaapiv1 "github.com/openshift/origin/pkg/quota/api/v1"
 	routeapiv1 "github.com/openshift/origin/pkg/route/api/v1"
+	sdnapi "github.com/openshift/origin/pkg/sdn/api"
 	sdnapiv1 "github.com/openshift/origin/pkg/sdn/api/v1"
 	securityapiv1 "github.com/openshift/origin/pkg/security/api/v1"
 	templateapiv1 "github.com/openshift/origin/pkg/template/api/v1"
@@ -331,12 +331,12 @@ var etcdStorageData = map[reflect.Type]struct {
 						Template: kapiv1.PodTemplateSpec{
 							ObjectMeta: kapiv1.ObjectMeta{
 								Labels: map[string]string{
-									"controller-uid": "uid",
+									"controller-uid": "uid0",
 								},
 							},
 							Spec: kapiv1.PodSpec{
 								Containers: []kapiv1.Container{
-									{Name: "container1", Image: "fedora:latest"},
+									{Name: "container0", Image: "fedora:latest"},
 								},
 								RestartPolicy:                 kapiv1.RestartPolicyNever,
 								TerminationGracePeriodSeconds: new(int64),
@@ -352,10 +352,42 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&apisbatchv2alpha1.Job{}):         {ephemeral: true}, // creating this makes a apisbatchv1.Job{} so test that instead
 	reflect.TypeOf(&apisbatchv2alpha1.JobTemplate{}): {ephemeral: true}, // not stored in etcd
 
-	reflect.TypeOf(&sdnapiv1.EgressNetworkPolicy{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&sdnapiv1.HostSubnet{}):          {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&sdnapiv1.NetNamespace{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&sdnapiv1.ClusterNetwork{}):      {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&sdnapiv1.EgressNetworkPolicy{}): {
+		stub: &sdnapiv1.EgressNetworkPolicy{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "enp1"},
+			Spec: sdnapiv1.EgressNetworkPolicySpec{
+				Egress: []sdnapiv1.EgressNetworkPolicyRule{
+					{Type: sdnapiv1.EgressNetworkPolicyRuleAllow, To: sdnapiv1.EgressNetworkPolicyPeer{CIDRSelector: "192.168.1.1/24"}},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/registry/egressnetworkpolicy/etcdstoragepathtestnamespace/enp1",
+	},
+	reflect.TypeOf(&sdnapiv1.HostSubnet{}): {
+		stub: &sdnapiv1.HostSubnet{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "hs1"}, // This will fail to delete because meta.name != Host but it is keyed off Host
+			Host:       "hostname",
+			HostIP:     "192.168.1.1",
+			Subnet:     "192.168.1.1/24",
+		},
+		expectedEtcdPath: "openshift.io/registry/sdnsubnets/hostname",
+	},
+	reflect.TypeOf(&sdnapiv1.NetNamespace{}): {
+		stub: &sdnapiv1.NetNamespace{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "nn1"}, // This will fail to delete because meta.name != NetName but it is keyed off NetName
+			NetName:    "networkname",
+			NetID:      100,
+		},
+		expectedEtcdPath: "openshift.io/registry/sdnnetnamespaces/networkname",
+	},
+	reflect.TypeOf(&sdnapiv1.ClusterNetwork{}): {
+		stub: &sdnapiv1.ClusterNetwork{
+			ObjectMeta:     kapiv1.ObjectMeta{Name: "cn1"},
+			Network:        "192.168.0.1/24",
+			ServiceNetwork: "192.168.1.1/24",
+		},
+		expectedEtcdPath: "openshift.io/registry/sdnnetworks/cn1",
+	},
 
 	reflect.TypeOf(&kapiv1.ConfigMap{}):                  {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&kapiv1.Service{}):                    {ephemeral: true}, // TODO(mo): Just making the test pass
@@ -397,13 +429,13 @@ var etcdStorageData = map[reflect.Type]struct {
 				Completions:    new(int32),
 				Selector: &unversioned.LabelSelector{
 					MatchLabels: map[string]string{
-						"controller-uid": "uid",
+						"controller-uid": "uid1",
 					},
 				},
 				Template: kapiv1.PodTemplateSpec{
 					ObjectMeta: kapiv1.ObjectMeta{
 						Labels: map[string]string{
-							"controller-uid": "uid",
+							"controller-uid": "uid1",
 						},
 					},
 					Spec: kapiv1.PodSpec{
@@ -590,6 +622,14 @@ func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
 	return false
 }
 
+func isInInvalidNameWhiteList(obj runtime.Object) bool {
+	switch obj.(type) {
+	case *sdnapi.HostSubnet, *sdnapi.NetNamespace: // TODO figure out how to not whitelist these
+		return true
+	}
+	return false
+}
+
 func cleanup(f util.ObjectMappingFactory, testNamespace string, objects *[]runtime.Object) error {
 	for i := len(*objects) - 1; i >= 0; i-- { // delete in reverse order in case creation order mattered
 		obj := (*objects)[i]
@@ -598,7 +638,10 @@ func cleanup(f util.ObjectMappingFactory, testNamespace string, objects *[]runti
 		if err != nil {
 			return err
 		}
-		if err := helper.Delete(testNamespace, name); err != nil && !etcdutil.IsEtcdNotFound(err) {
+		if err := helper.Delete(testNamespace, name); err != nil {
+			if kubeerr.IsNotFound(err) && isInInvalidNameWhiteList(obj) {
+				return nil
+			}
 			return err
 		}
 	}
@@ -663,15 +706,19 @@ func getFromEtcd(keys etcd.KeysAPI, d runtime.Decoder, path string, gvk *unversi
 	if err != nil {
 		return nil, err
 	}
-	// TODO figure out how to get rid of this hack
-	e := reflect.ValueOf(output).Elem()
+	return unsetProblematicFields(output), nil
+}
+
+// TODO figure out how to get rid of this hack
+func unsetProblematicFields(obj runtime.Object) runtime.Object {
+	e := reflect.ValueOf(obj).Elem()
 	for fieldName, fieldValue := range map[string]interface{}{
 		"CreationTimestamp": unversioned.Time{},
 		"Generation":        int64(0),
 	} {
 		e.FieldByName(fieldName).Set(reflect.ValueOf(fieldValue))
 	}
-	return output, nil
+	return obj
 }
 
 func diffMapKeys(a, b interface{}) []string {
