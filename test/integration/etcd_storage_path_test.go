@@ -305,11 +305,52 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&imageapiv1.ImageStreamImage{}):   {ephemeral: true}, // not stored in etcd
 	reflect.TypeOf(&imageapiv1.ImageStreamMapping{}): {ephemeral: true}, // not stored in etcd
 
-	reflect.TypeOf(&apisappsv1beta1.StatefulSet{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisappsv1beta1.StatefulSet{}): {
+		stub: &apisappsv1beta1.StatefulSet{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "ss1"},
+			Spec: apisappsv1beta1.StatefulSetSpec{
+				Template: kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"a": "b",
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/statefulsets/etcdstoragepathtestnamespace/ss1",
+	},
 
-	reflect.TypeOf(&apisbatchv2alpha1.JobTemplate{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisbatchv2alpha1.Job{}):         {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisbatchv2alpha1.CronJob{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisbatchv2alpha1.CronJob{}): {
+		stub: &apisbatchv2alpha1.CronJob{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "cj1"},
+			Spec: apisbatchv2alpha1.CronJobSpec{
+				Schedule: "* * * * *",
+				JobTemplate: apisbatchv2alpha1.JobTemplateSpec{
+					Spec: apisbatchv2alpha1.JobSpec{
+						Template: kapiv1.PodTemplateSpec{
+							ObjectMeta: kapiv1.ObjectMeta{
+								Labels: map[string]string{
+									"controller-uid": "uid",
+								},
+							},
+							Spec: kapiv1.PodSpec{
+								Containers: []kapiv1.Container{
+									{Name: "container1", Image: "fedora:latest"},
+								},
+								RestartPolicy:                 kapiv1.RestartPolicyNever,
+								TerminationGracePeriodSeconds: new(int64),
+								DNSPolicy:                     kapiv1.DNSClusterFirst,
+							},
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/cronjobs/etcdstoragepathtestnamespace/cj1",
+	},
+	reflect.TypeOf(&apisbatchv2alpha1.Job{}):         {ephemeral: true}, // creating this makes a apisbatchv1.Job{} so test that instead
+	reflect.TypeOf(&apisbatchv2alpha1.JobTemplate{}): {ephemeral: true}, // not stored in etcd
 
 	reflect.TypeOf(&sdnapiv1.EgressNetworkPolicy{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&sdnapiv1.HostSubnet{}):          {ephemeral: true}, // TODO(mo): Just making the test pass
@@ -347,7 +388,37 @@ var etcdStorageData = map[reflect.Type]struct {
 	reflect.TypeOf(&kapiv1.PodStatusResult{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
 	reflect.TypeOf(&kapiv1.Event{}):                      {ephemeral: true}, // TODO(mo): Just making the test pass
 
-	reflect.TypeOf(&apisbatchv1.Job{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisbatchv1.Job{}): {
+		stub: &apisbatchv1.Job{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "job1"},
+			Spec: apisbatchv1.JobSpec{
+				ManualSelector: func() *bool { b := true; return &b }(),
+				Parallelism:    new(int32),
+				Completions:    new(int32),
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"controller-uid": "uid",
+					},
+				},
+				Template: kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"controller-uid": "uid",
+						},
+					},
+					Spec: kapiv1.PodSpec{
+						Containers: []kapiv1.Container{
+							{Name: "container1", Image: "fedora:latest"},
+						},
+						RestartPolicy:                 kapiv1.RestartPolicyNever,
+						TerminationGracePeriodSeconds: new(int64),
+						DNSPolicy:                     kapiv1.DNSClusterFirst,
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/jobs/etcdstoragepathtestnamespace/job1",
+	},
 
 	reflect.TypeOf(&apisfederationv1beta1.Cluster{}): {ephemeral: true}, // TODO(mo): Just making the test pass
 
@@ -498,7 +569,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				}
 
 				if !kapi.Semantic.DeepDerivative(testData.stub, output) {
-					t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectDiff(testData.stub, output))
+					t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectGoPrintDiff(testData.stub, output))
 				}
 			}()
 		}
