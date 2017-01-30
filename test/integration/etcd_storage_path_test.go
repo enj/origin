@@ -15,6 +15,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	osclientcmd "github.com/openshift/origin/pkg/cmd/util/clientcmd"
@@ -65,7 +66,7 @@ import (
 // Etcd data for all persisted objects.  Be very careful when setting ephemeral to true as that removes the safety we gain from this test.
 var etcdStorageData = map[reflect.Type]struct {
 	ephemeral        bool             // Set to true to skip testing the object
-	stub             runtime.Object   // Valid stub to use during create
+	stub             runtime.Object   // Valid stub to use during create (this should have at least one field other than name)
 	prerequisites    []runtime.Object // Optional, ordered list of objects to create before stub
 	expectedEtcdPath string           // Expected location of object in etcd, do not use any variables, constants, etc to derive this value - always supply the full raw string
 }{
@@ -349,7 +350,7 @@ var etcdStorageData = map[reflect.Type]struct {
 		},
 		expectedEtcdPath: "kubernetes.io/cronjobs/etcdstoragepathtestnamespace/cj1",
 	},
-	reflect.TypeOf(&apisbatchv2alpha1.Job{}):         {ephemeral: true}, // creating this makes a apisbatchv1.Job{} so test that instead
+	reflect.TypeOf(&apisbatchv2alpha1.Job{}):         {ephemeral: true}, // creating this makes a apisbatchv1.Job so test that instead
 	reflect.TypeOf(&apisbatchv2alpha1.JobTemplate{}): {ephemeral: true}, // not stored in etcd
 
 	reflect.TypeOf(&sdnapiv1.EgressNetworkPolicy{}): {
@@ -455,50 +456,289 @@ var etcdStorageData = map[reflect.Type]struct {
 	// we cannot create these  // TODO but we should be able to create them in kube
 	reflect.TypeOf(&apisfederationv1beta1.Cluster{}): {ephemeral: true},
 
-	reflect.TypeOf(&routeapiv1.Route{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&routeapiv1.Route{}): {
+		stub: &routeapiv1.Route{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "route1"},
+			Spec: routeapiv1.RouteSpec{
+				Host: "hostname1",
+				To: routeapiv1.RouteTargetReference{
+					Name: "service1",
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/routes/etcdstoragepathtestnamespace/route1",
+	},
 
-	reflect.TypeOf(&apisautoscalingv1.Scale{}):                   {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisautoscalingv1.HorizontalPodAutoscaler{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisautoscalingv1.HorizontalPodAutoscaler{}): {ephemeral: true}, // creating this returns a apisextensionsv1beta1.HorizontalPodAutoscaler so test that instead
+	reflect.TypeOf(&apisautoscalingv1.Scale{}):                   {ephemeral: true}, // not stored in etcd, part of kapiv1.ReplicationController
 
-	reflect.TypeOf(&apispolicyv1beta1.Eviction{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apispolicyv1beta1.PodDisruptionBudget{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apispolicyv1beta1.PodDisruptionBudget{}): {
+		stub: &apispolicyv1beta1.PodDisruptionBudget{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "pdb1"},
+			Spec: apispolicyv1beta1.PodDisruptionBudgetSpec{
+				MinAvailable: intstr.FromInt(3),
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/poddisruptionbudgets/etcdstoragepathtestnamespace/pdb1",
+	},
+	reflect.TypeOf(&apispolicyv1beta1.Eviction{}): {ephemeral: true}, // not stored in etcd, deals with evicting kapiv1.Pod
 
-	reflect.TypeOf(&pkgwatchversioned.Event{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&pkgwatchversioned.Event{}): {ephemeral: true}, // watch events are not stored in etcd
 
-	reflect.TypeOf(&templateapiv1.Template{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&templateapiv1.Template{}): {
+		stub: &templateapiv1.Template{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "template1"},
+			Message:    "Jenkins template",
+		},
+		expectedEtcdPath: "openshift.io/templates/etcdstoragepathtestnamespace/template1",
+	},
 
-	reflect.TypeOf(&buildapiv1.BuildConfig{}):               {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&buildapiv1.Build{}):                     {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&buildapiv1.BuildRequest{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&buildapiv1.BuildLogOptions{}):           {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&buildapiv1.BuildLog{}):                  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&buildapiv1.BinaryBuildRequestOptions{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&buildapiv1.BuildConfig{}): {
+		stub: &buildapiv1.BuildConfig{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "bc1"},
+			Spec: buildapiv1.BuildConfigSpec{
+				CommonSpec: buildapiv1.CommonSpec{
+					Strategy: buildapiv1.BuildStrategy{
+						DockerStrategy: &buildapiv1.DockerBuildStrategy{
+							NoCache: true,
+						},
+					},
+					Source: buildapiv1.BuildSource{
+						Dockerfile: func() *string { s := "Dockerfile0"; return &s }(),
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/buildconfigs/etcdstoragepathtestnamespace/bc1",
+	},
+	reflect.TypeOf(&buildapiv1.Build{}): {
+		stub: &buildapiv1.Build{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "build1"},
+			Spec: buildapiv1.BuildSpec{
+				CommonSpec: buildapiv1.CommonSpec{
+					Strategy: buildapiv1.BuildStrategy{
+						DockerStrategy: &buildapiv1.DockerBuildStrategy{
+							NoCache: true,
+						},
+					},
+					Source: buildapiv1.BuildSource{
+						Dockerfile: func() *string { s := "Dockerfile1"; return &s }(),
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/builds/etcdstoragepathtestnamespace/build1",
+	},
+	// used for streaming build logs from pod, not stored in etcd
+	reflect.TypeOf(&buildapiv1.BuildLog{}):        {ephemeral: true},
+	reflect.TypeOf(&buildapiv1.BuildLogOptions{}): {ephemeral: true},
+	// BuildGenerator helpers not stored in etcd
+	reflect.TypeOf(&buildapiv1.BuildRequest{}):              {ephemeral: true},
+	reflect.TypeOf(&buildapiv1.BinaryBuildRequestOptions{}): {ephemeral: true},
 
-	reflect.TypeOf(&deployapiv1.DeploymentLog{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&deployapiv1.DeploymentRequest{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&deployapiv1.DeploymentConfigRollback{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&deployapiv1.DeploymentLogOptions{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&deployapiv1.DeploymentConfig{}):         {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&deployapiv1.DeploymentConfig{}): {
+		stub: &deployapiv1.DeploymentConfig{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "dc1"},
+			Spec: deployapiv1.DeploymentConfigSpec{
+				Selector: map[string]string{
+					"d": "c",
+				},
+				Template: &kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"d": "c",
+						},
+					},
+					Spec: kapiv1.PodSpec{
+						Containers: []kapiv1.Container{
+							{Name: "container2", Image: "fedora:latest"},
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "openshift.io/deploymentconfigs/etcdstoragepathtestnamespace/dc1",
+	},
+	// used for streaming deployment logs from pod, not stored in etcd
+	reflect.TypeOf(&deployapiv1.DeploymentLog{}):            {ephemeral: true},
+	reflect.TypeOf(&deployapiv1.DeploymentLogOptions{}):     {ephemeral: true},
+	reflect.TypeOf(&deployapiv1.DeploymentRequest{}):        {ephemeral: true}, // triggers new dc, not stored in etcd
+	reflect.TypeOf(&deployapiv1.DeploymentConfigRollback{}): {ephemeral: true}, // triggers rolleback dc, not stored in etcd
 
-	reflect.TypeOf(&apiscertificatesv1alpha1.CertificateSigningRequest{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apiscertificatesv1alpha1.CertificateSigningRequest{}): {
+		stub: &apiscertificatesv1alpha1.CertificateSigningRequest{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "csr1"},
+			Spec: apiscertificatesv1alpha1.CertificateSigningRequestSpec{
+				Request: []byte(`-----BEGIN CERTIFICATE REQUEST-----
+MIIByjCCATMCAQAwgYkxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlh
+MRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MRMwEQYDVQQKEwpHb29nbGUgSW5jMR8w
+HQYDVQQLExZJbmZvcm1hdGlvbiBUZWNobm9sb2d5MRcwFQYDVQQDEw53d3cuZ29v
+Z2xlLmNvbTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEApZtYJCHJ4VpVXHfV
+IlstQTlO4qC03hjX+ZkPyvdYd1Q4+qbAeTwXmCUKYHThVRd5aXSqlPzyIBwieMZr
+WFlRQddZ1IzXAlVRDWwAo60KecqeAXnnUK+5fXoTI/UgWshre8tJ+x/TMHaQKR/J
+cIWPhqaQhsJuzZbvAdGA80BLxdMCAwEAAaAAMA0GCSqGSIb3DQEBBQUAA4GBAIhl
+4PvFq+e7ipARgI5ZM+GZx6mpCz44DTo0JkwfRDf+BtrsaC0q68eTf2XhYOsq4fkH
+Q0uA0aVog3f5iJxCa3Hp5gxbJQ6zV6kJ0TEsuaaOhEko9sdpCoPOnRBm2i/XRD2D
+6iNh8f8z0ShGsFqjDgFHyF3o+lUyj+UC6H1QW7bn
+-----END CERTIFICATE REQUEST-----`),
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/certificatesigningrequests/csr1",
+	},
 
-	reflect.TypeOf(&unversioned.Status{}):      {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&unversioned.APIGroup{}):    {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&unversioned.APIVersions{}): {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&unversioned.Status{}):      {ephemeral: true}, // return value for calls, not stored in etcd
+	reflect.TypeOf(&unversioned.APIGroup{}):    {ephemeral: true}, // not stored in etcd
+	reflect.TypeOf(&unversioned.APIVersions{}): {ephemeral: true}, // not stored in etcd
 
-	reflect.TypeOf(&apisextensionsv1beta1.Ingress{}):                    {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.Scale{}):                      {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.NetworkPolicy{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.ReplicaSet{}):                 {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.HorizontalPodAutoscaler{}):    {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.PodSecurityPolicy{}):          {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.ThirdPartyResourceData{}):     {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.Job{}):                        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.DeploymentRollback{}):         {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.DaemonSet{}):                  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.Deployment{}):                 {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.ReplicationControllerDummy{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&apisextensionsv1beta1.ThirdPartyResource{}):         {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&apisextensionsv1beta1.Ingress{}): {
+		stub: &apisextensionsv1beta1.Ingress{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "ingress1"},
+			Spec: apisextensionsv1beta1.IngressSpec{
+				Backend: &apisextensionsv1beta1.IngressBackend{
+					ServiceName: "service",
+					ServicePort: intstr.FromInt(5000),
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/ingress/etcdstoragepathtestnamespace/ingress1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.NetworkPolicy{}): {
+		stub: &apisextensionsv1beta1.NetworkPolicy{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "np1"},
+			Spec: apisextensionsv1beta1.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"e": "f",
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/networkpolicies/etcdstoragepathtestnamespace/np1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.ReplicaSet{}): {
+		stub: &apisextensionsv1beta1.ReplicaSet{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "rs1"},
+			Spec: apisextensionsv1beta1.ReplicaSetSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"g": "h",
+					},
+				},
+				Template: kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"g": "h",
+						},
+					},
+					Spec: kapiv1.PodSpec{
+						Containers: []kapiv1.Container{
+							{Name: "container4", Image: "fedora:latest"},
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/replicasets/etcdstoragepathtestnamespace/rs1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.HorizontalPodAutoscaler{}): {
+		stub: &apisextensionsv1beta1.HorizontalPodAutoscaler{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "hpa1"},
+			Spec: apisextensionsv1beta1.HorizontalPodAutoscalerSpec{
+				MaxReplicas: 3,
+				ScaleRef: apisextensionsv1beta1.SubresourceReference{
+					Name: "cross",
+					Kind: "something",
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.PodSecurityPolicy{}): {
+		stub: &apisextensionsv1beta1.PodSecurityPolicy{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "psp1"},
+			Spec: apisextensionsv1beta1.PodSecurityPolicySpec{
+				Privileged: true,
+				RunAsUser: apisextensionsv1beta1.RunAsUserStrategyOptions{
+					Rule: apisextensionsv1beta1.RunAsUserStrategyRunAsAny,
+				},
+				SELinux: apisextensionsv1beta1.SELinuxStrategyOptions{
+					Rule: apisextensionsv1beta1.SELinuxStrategyMustRunAs,
+				},
+				SupplementalGroups: apisextensionsv1beta1.SupplementalGroupsStrategyOptions{
+					Rule: apisextensionsv1beta1.SupplementalGroupsStrategyRunAsAny,
+				},
+				FSGroup: apisextensionsv1beta1.FSGroupStrategyOptions{
+					Rule: apisextensionsv1beta1.FSGroupStrategyRunAsAny,
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/podsecuritypolicy/psp1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.ThirdPartyResource{}): {
+		stub: &apisextensionsv1beta1.ThirdPartyResource{
+			ObjectMeta:  kapiv1.ObjectMeta{Name: "kind.domain.tld"},
+			Description: "third party",
+			Versions: []apisextensionsv1beta1.APIVersion{
+				{Name: "v3"},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/thirdpartyresources/kind.domain.tld",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.DaemonSet{}): {
+		stub: &apisextensionsv1beta1.DaemonSet{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "ds1"},
+			Spec: apisextensionsv1beta1.DaemonSetSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"u": "t",
+					},
+				},
+				Template: kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"u": "t",
+						},
+					},
+					Spec: kapiv1.PodSpec{
+						Containers: []kapiv1.Container{
+							{Name: "container5", Image: "fedora:latest"},
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/daemonsets/etcdstoragepathtestnamespace/ds1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.Deployment{}): {
+		stub: &apisextensionsv1beta1.Deployment{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "deployment1"},
+			Spec: apisextensionsv1beta1.DeploymentSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"f": "z",
+					},
+				},
+				Template: kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"f": "z",
+						},
+					},
+					Spec: kapiv1.PodSpec{
+						Containers: []kapiv1.Container{
+							{Name: "container6", Image: "fedora:latest"},
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/deployments/etcdstoragepathtestnamespace/deployment1",
+	},
+	reflect.TypeOf(&apisextensionsv1beta1.DeploymentRollback{}):         {ephemeral: true}, // used to rollback deployment, not stored in etcd
+	reflect.TypeOf(&apisextensionsv1beta1.ReplicationControllerDummy{}): {ephemeral: true}, // not stored in etcd
+	reflect.TypeOf(&apisextensionsv1beta1.Job{}):                        {ephemeral: true}, // creating this makes a apisbatchv1.Job so test that instead
+	reflect.TypeOf(&apisextensionsv1beta1.Scale{}):                      {ephemeral: true}, // not stored in etcd, part of kapiv1.ReplicationController
+	reflect.TypeOf(&apisextensionsv1beta1.ThirdPartyResourceData{}):     {ephemeral: true}, // we cannot create this  // TODO but we should be able to create it in kube
 }
 
 // namespace used for all tests, do not change this
@@ -550,12 +790,17 @@ func TestEtcdStoragePath(t *testing.T) {
 			pkgPath := apiType.PkgPath()
 
 			if !ok {
-				t.Errorf("no test data for %s from %s", kind, pkgPath)
+				t.Errorf("no test data for %s from %s.  Please add a test for your new type to etcdStorageData.", kind, pkgPath)
 				continue
 			}
 
 			if testData.ephemeral {
 				t.Logf("Skipping test for %s from %s", kind, pkgPath)
+				continue
+			}
+
+			if isInKindAndPathWhiteList(kind, pkgPath) {
+				t.Logf("kind and path are whitelisted: skipping test for %s from %s", kind, pkgPath)
 				continue
 			}
 
@@ -619,6 +864,8 @@ func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
 	switch obj.(type) {
 	case *authorizationapiv1.ClusterPolicyBinding, *authorizationapiv1.ClusterPolicy: // TODO figure out how to not whitelist these
 		return true
+	case *apisbatchv2alpha1.CronJob: // since we do not cleanup once a test is failed, we will get an AlreadyExists error since ScheduledJob aliases CronJob
+		return true
 	}
 	return false
 }
@@ -626,6 +873,16 @@ func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
 func isInInvalidNameWhiteList(obj runtime.Object) bool {
 	switch obj.(type) {
 	case *sdnapi.HostSubnet, *sdnapi.NetNamespace: // TODO figure out how to not whitelist these
+		return true
+	}
+	return false
+}
+
+func isInKindAndPathWhiteList(kind, pkgPath string) bool {
+	switch {
+	// aliases for templateapiv1.Template
+	case kind == "TemplateConfig" && pkgPath == "github.com/openshift/origin/pkg/template/api/v1",
+		kind == "ProcessedTemplate" && pkgPath == "github.com/openshift/origin/pkg/template/api/v1":
 		return true
 	}
 	return false
