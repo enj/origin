@@ -38,7 +38,7 @@ func DefaultKeyFunctions(store *registry.Store, prefix string, isNamespaced bool
 
 // ApplyOptions updates the given generic storage from the provided rest options
 // TODO: remove need for etcdPrefix once Decorator interface is refactored upstream
-func ApplyOptions(optsGetter Getter, store *registry.Store, _ bool, triggerFn storage.TriggerPublisherFunc) error {
+func ApplyOptions(optsGetter Getter, store *registry.Store, oldIsNamespaced bool, triggerFn storage.TriggerPublisherFunc) error {
 	if store.QualifiedResource.Empty() {
 		return fmt.Errorf("store must have a non-empty qualified resource")
 	}
@@ -53,6 +53,9 @@ func ApplyOptions(optsGetter Getter, store *registry.Store, _ bool, triggerFn st
 	}
 
 	isNamespaced := store.CreateStrategy.NamespaceScoped()
+	if isNamespaced != oldIsNamespaced {
+		return fmt.Errorf("CreateStrategy has %q for namespace scope but user specified %q as namespace scope", isNamespaced, oldIsNamespaced)
+	}
 
 	opts, err := optsGetter.GetRESTOptions(store.QualifiedResource)
 	if err != nil {
