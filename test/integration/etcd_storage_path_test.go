@@ -619,7 +619,7 @@ var etcdStorageData = map[reflect.Type]struct {
 		expectedEtcdPath: "kubernetes.io/services/endpoints/etcdstoragepathtestnamespace/ep1name",
 	},
 	reflect.TypeOf(&kapiv1.Binding{}):             {ephemeral: true}, // annotation on pod, not stored in etcd
-	reflect.TypeOf(&kapiv1.RangeAllocation{}):     {ephemeral: true}, // stored in various places etcd but cannot be directly created // TODO maybe possible in kube
+	reflect.TypeOf(&kapiv1.RangeAllocation{}):     {ephemeral: true}, // stored in various places in etcd but cannot be directly created // TODO maybe possible in kube
 	reflect.TypeOf(&kapiv1.ComponentStatus{}):     {ephemeral: true}, // status info not stored in etcd
 	reflect.TypeOf(&kapiv1.SerializedReference{}): {ephemeral: true}, // used for serilization, not stored in etcd
 	reflect.TypeOf(&kapiv1.PodStatusResult{}):     {ephemeral: true}, // wrapper object not stored in etcd
@@ -666,8 +666,7 @@ var etcdStorageData = map[reflect.Type]struct {
 		expectedEtcdPath: "kubernetes.io/jobs/etcdstoragepathtestnamespace/job1",
 	},
 
-	// we cannot create these  // TODO but we should be able to create them in kube
-	reflect.TypeOf(&apisfederationv1beta1.Cluster{}): {ephemeral: true},
+	reflect.TypeOf(&apisfederationv1beta1.Cluster{}): {ephemeral: true}, // we cannot create this  // TODO but we should be able to create it in kube
 
 	reflect.TypeOf(&routeapiv1.Route{}): {
 		stub: &routeapiv1.Route{
@@ -1011,7 +1010,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				continue
 			}
 
-			if testData.ephemeral {
+			if testData.ephemeral { // TODO it would be nice if we could remove this and infer if an object is not stored in etcd
 				t.Logf("Skipping test for %s from %s", kind, pkgPath)
 				continue
 			}
@@ -1026,7 +1025,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				continue
 			}
 
-			func() {
+			func() { // forces defer to run per iteration of the for loop
 				all := &[]runtime.Object{}
 				defer func() {
 					if !t.Failed() { // do not cleanup if test has already failed since we may need things in the etcd dump
