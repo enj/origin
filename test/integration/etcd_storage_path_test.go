@@ -7,6 +7,7 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	kubeerr "k8s.io/kubernetes/pkg/api/errors"
+	apiresource "k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kapiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -390,36 +391,248 @@ var etcdStorageData = map[reflect.Type]struct {
 		expectedEtcdPath: "openshift.io/registry/sdnnetworks/cn1",
 	},
 
-	reflect.TypeOf(&kapiv1.ConfigMap{}):                  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Service{}):                    {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PodProxyOptions{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Binding{}):                    {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Namespace{}):                  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.RangeAllocation{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ExportOptions{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Node{}):                       {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ComponentStatus{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ReplicationController{}):      {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.DeleteOptions{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.LimitRange{}):                 {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.NodeProxyOptions{}):           {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ResourceQuota{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PersistentVolumeClaim{}):      {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.SecurityContextConstraints{}): {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PodTemplate{}):                {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ServiceAccount{}):             {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PersistentVolume{}):           {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ListOptions{}):                {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PodLogOptions{}):              {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Endpoints{}):                  {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PodExecOptions{}):             {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.SerializedReference{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PodAttachOptions{}):           {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.ServiceProxyOptions{}):        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Secret{}):                     {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Pod{}):                        {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.PodStatusResult{}):            {ephemeral: true}, // TODO(mo): Just making the test pass
-	reflect.TypeOf(&kapiv1.Event{}):                      {ephemeral: true}, // TODO(mo): Just making the test pass
+	reflect.TypeOf(&kapiv1.ConfigMap{}): {
+		stub: &kapiv1.ConfigMap{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "cm1"},
+			Data: map[string]string{
+				"foo": "bar",
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/configmaps/etcdstoragepathtestnamespace/cm1",
+	},
+	reflect.TypeOf(&kapiv1.Service{}): {
+		stub: &kapiv1.Service{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "service1"},
+			Spec: kapiv1.ServiceSpec{
+				ExternalName: "service1name",
+				Ports: []kapiv1.ServicePort{
+					{
+						Port:       10000,
+						TargetPort: intstr.FromInt(11000),
+					},
+				},
+				Selector: map[string]string{
+					"test": "data",
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/services/specs/etcdstoragepathtestnamespace/service1",
+	},
+	reflect.TypeOf(&kapiv1.Namespace{}): {
+		stub: &kapiv1.Namespace{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "namespace1"},
+			Spec: kapiv1.NamespaceSpec{
+				Finalizers: []kapiv1.FinalizerName{
+					kapiv1.FinalizerKubernetes,
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/namespaces/namespace1",
+	},
+	reflect.TypeOf(&kapiv1.Node{}): {
+		stub: &kapiv1.Node{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "node1"},
+			Spec: kapiv1.NodeSpec{
+				Unschedulable: true,
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/minions/node1",
+	},
+	reflect.TypeOf(&kapiv1.Event{}): {
+		stub: &kapiv1.Event{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "event1"},
+			Message:    "some data here",
+			InvolvedObject: kapiv1.ObjectReference{
+				Namespace: testNamespace,
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/events/etcdstoragepathtestnamespace/event1",
+	},
+	reflect.TypeOf(&kapiv1.Secret{}): {
+		stub: &kapiv1.Secret{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "secret1"},
+			Data: map[string][]byte{
+				"key": []byte("data file"),
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/secrets/etcdstoragepathtestnamespace/secret1",
+	},
+	reflect.TypeOf(&kapiv1.Pod{}): {
+		stub: &kapiv1.Pod{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "pod1"},
+			Spec: kapiv1.PodSpec{
+				Containers: []kapiv1.Container{
+					{Name: "container7", Image: "fedora:latest"},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/pods/etcdstoragepathtestnamespace/pod1",
+	},
+	reflect.TypeOf(&kapiv1.ServiceAccount{}): {
+		stub: &kapiv1.ServiceAccount{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "sa1name"},
+			Secrets: []kapiv1.ObjectReference{
+				{Name: "secret00"},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/serviceaccounts/etcdstoragepathtestnamespace/sa1name",
+	},
+	reflect.TypeOf(&kapiv1.ReplicationController{}): {
+		stub: &kapiv1.ReplicationController{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "rc1"},
+			Spec: kapiv1.ReplicationControllerSpec{
+				Selector: map[string]string{
+					"new": "stuff",
+				},
+				Template: &kapiv1.PodTemplateSpec{
+					ObjectMeta: kapiv1.ObjectMeta{
+						Labels: map[string]string{
+							"new": "stuff",
+						},
+					},
+					Spec: kapiv1.PodSpec{
+						Containers: []kapiv1.Container{
+							{Name: "container8", Image: "fedora:latest"},
+						},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/controllers/etcdstoragepathtestnamespace/rc1",
+	},
+	reflect.TypeOf(&kapiv1.PersistentVolume{}): {
+		stub: &kapiv1.PersistentVolume{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "pv1name"},
+			Spec: kapiv1.PersistentVolumeSpec{
+				AccessModes: []kapiv1.PersistentVolumeAccessMode{
+					kapiv1.ReadWriteOnce,
+				},
+				Capacity: kapiv1.ResourceList{
+					kapiv1.ResourceStorage: apiresource.MustParse("3.0"),
+				},
+				PersistentVolumeSource: kapiv1.PersistentVolumeSource{
+					HostPath: &kapiv1.HostPathVolumeSource{
+						Path: "/tmp/test/",
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/persistentvolumes/pv1name",
+	},
+	reflect.TypeOf(&kapiv1.PersistentVolumeClaim{}): {
+		stub: &kapiv1.PersistentVolumeClaim{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "pvc1"},
+			Spec: kapiv1.PersistentVolumeClaimSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"pvc": "stuff",
+					},
+				},
+				AccessModes: []kapiv1.PersistentVolumeAccessMode{
+					kapiv1.ReadWriteOnce,
+				},
+				Resources: kapiv1.ResourceRequirements{
+					Limits: kapiv1.ResourceList{
+						kapiv1.ResourceStorage: apiresource.MustParse("1.0"),
+					},
+					Requests: kapiv1.ResourceList{
+						kapiv1.ResourceStorage: apiresource.MustParse("2.0"),
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/persistentvolumeclaims/etcdstoragepathtestnamespace/pvc1",
+	},
+	reflect.TypeOf(&kapiv1.SecurityContextConstraints{}): {
+		stub: &kapiv1.SecurityContextConstraints{
+			ObjectMeta:               kapiv1.ObjectMeta{Name: "scc1"},
+			AllowPrivilegedContainer: true,
+			RunAsUser: kapiv1.RunAsUserStrategyOptions{
+				Type: kapiv1.RunAsUserStrategyRunAsAny,
+			},
+			SELinuxContext: kapiv1.SELinuxContextStrategyOptions{
+				Type: kapiv1.SELinuxStrategyMustRunAs,
+			},
+			SupplementalGroups: kapiv1.SupplementalGroupsStrategyOptions{
+				Type: kapiv1.SupplementalGroupsStrategyRunAsAny,
+			},
+			FSGroup: kapiv1.FSGroupStrategyOptions{
+				Type: kapiv1.FSGroupStrategyRunAsAny,
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/securitycontextconstraints/scc1",
+	},
+	reflect.TypeOf(&kapiv1.ResourceQuota{}): {
+		stub: &kapiv1.ResourceQuota{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "rq1name"},
+			Spec: kapiv1.ResourceQuotaSpec{
+				Hard: kapiv1.ResourceList{
+					kapiv1.ResourceCPU: apiresource.MustParse("5.0"),
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/resourcequotas/etcdstoragepathtestnamespace/rq1name",
+	},
+	reflect.TypeOf(&kapiv1.LimitRange{}): {
+		stub: &kapiv1.LimitRange{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "lr1name"},
+			Spec: kapiv1.LimitRangeSpec{
+				Limits: []kapiv1.LimitRangeItem{
+					{Type: kapiv1.LimitTypePod},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/limitranges/etcdstoragepathtestnamespace/lr1name",
+	},
+	reflect.TypeOf(&kapiv1.PodTemplate{}): {
+		stub: &kapiv1.PodTemplate{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "pt1name"},
+			Template: kapiv1.PodTemplateSpec{
+				ObjectMeta: kapiv1.ObjectMeta{
+					Labels: map[string]string{
+						"pt": "01",
+					},
+				},
+				Spec: kapiv1.PodSpec{
+					Containers: []kapiv1.Container{
+						{Name: "container9", Image: "fedora:latest"},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/podtemplates/etcdstoragepathtestnamespace/pt1name",
+	},
+	reflect.TypeOf(&kapiv1.Endpoints{}): {
+		stub: &kapiv1.Endpoints{
+			ObjectMeta: kapiv1.ObjectMeta{Name: "ep1name"},
+			Subsets: []kapiv1.EndpointSubset{
+				{
+					Addresses: []kapiv1.EndpointAddress{
+						{Hostname: "bar-001", IP: "192.168.3.1"},
+					},
+					Ports: []kapiv1.EndpointPort{
+						{Port: 8000},
+					},
+				},
+			},
+		},
+		expectedEtcdPath: "kubernetes.io/services/endpoints/etcdstoragepathtestnamespace/ep1name",
+	},
+	reflect.TypeOf(&kapiv1.Binding{}):             {ephemeral: true}, // annotation on pod, not stored in etcd
+	reflect.TypeOf(&kapiv1.RangeAllocation{}):     {ephemeral: true}, // stored in various places etcd but cannot be directly created // TODO maybe possible in kube
+	reflect.TypeOf(&kapiv1.ComponentStatus{}):     {ephemeral: true}, // status info not stored in etcd
+	reflect.TypeOf(&kapiv1.SerializedReference{}): {ephemeral: true}, // used for serilization, not stored in etcd
+	reflect.TypeOf(&kapiv1.PodStatusResult{}):     {ephemeral: true}, // wrapper object not stored in etcd
+	// used in queries, not stored in etcd
+	reflect.TypeOf(&kapiv1.ListOptions{}):         {ephemeral: true},
+	reflect.TypeOf(&kapiv1.DeleteOptions{}):       {ephemeral: true},
+	reflect.TypeOf(&kapiv1.ExportOptions{}):       {ephemeral: true},
+	reflect.TypeOf(&kapiv1.PodLogOptions{}):       {ephemeral: true},
+	reflect.TypeOf(&kapiv1.PodExecOptions{}):      {ephemeral: true},
+	reflect.TypeOf(&kapiv1.PodAttachOptions{}):    {ephemeral: true},
+	reflect.TypeOf(&kapiv1.PodProxyOptions{}):     {ephemeral: true},
+	reflect.TypeOf(&kapiv1.NodeProxyOptions{}):    {ephemeral: true},
+	reflect.TypeOf(&kapiv1.ServiceProxyOptions{}): {ephemeral: true},
 
 	reflect.TypeOf(&apisbatchv1.Job{}): {
 		stub: &apisbatchv1.Job{
@@ -476,7 +689,11 @@ var etcdStorageData = map[reflect.Type]struct {
 		stub: &apispolicyv1beta1.PodDisruptionBudget{
 			ObjectMeta: kapiv1.ObjectMeta{Name: "pdb1"},
 			Spec: apispolicyv1beta1.PodDisruptionBudgetSpec{
-				MinAvailable: intstr.FromInt(3),
+				Selector: &unversioned.LabelSelector{
+					MatchLabels: map[string]string{
+						"anokkey": "anokvalue",
+					},
+				},
 			},
 		},
 		expectedEtcdPath: "kubernetes.io/poddisruptionbudgets/etcdstoragepathtestnamespace/pdb1",
