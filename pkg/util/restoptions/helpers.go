@@ -53,7 +53,7 @@ func ApplyOptions(optsGetter Getter, store *registry.Store, oldIsNamespaced bool
 	}
 
 	isNamespaced := store.CreateStrategy.NamespaceScoped()
-	if isNamespaced != oldIsNamespaced {
+	if isNamespaced != oldIsNamespaced { // TODO(soltysh): oldIsNamespaced should be completely removed in #12541
 		return fmt.Errorf("CreateStrategy has %q for namespace scope but user specified %q as namespace scope", isNamespaced, oldIsNamespaced)
 	}
 
