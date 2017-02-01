@@ -2,6 +2,7 @@ package integration
 
 import (
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -1033,6 +1034,9 @@ func TestEtcdStoragePath(t *testing.T) {
 							t.Fatalf("failed to clean up etcd: %#v", err)
 						}
 					}
+					// We create a lot of TCP connections in a tight loop.
+					// This frees them so we do not run out of file descriptors.
+					debug.FreeOSMemory()
 				}()
 
 				if err := createPrerequisites(f, testNamespace, testData.prerequisites, all); err != nil {
