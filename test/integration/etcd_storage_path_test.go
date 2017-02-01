@@ -25,9 +25,8 @@ import (
 	testutil "github.com/openshift/origin/test/util"
 	testserver "github.com/openshift/origin/test/util/server"
 
-	// install all APIs // TODO do I need this at all?
+	// install all APIs
 	_ "github.com/openshift/origin/pkg/api/install"
-	_ "k8s.io/kubernetes/pkg/api/install"
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
@@ -131,9 +130,9 @@ var etcdStorageData = map[reflect.Type]struct {
 	},
 	reflect.TypeOf(&oauthapiv1.OAuthRedirectReference{}): {ephemeral: true}, // Used for specifying redirects, never stored in etcd
 
-	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // Not a real object so cannot be stored in etcd  // TODO confirm this
+	reflect.TypeOf(&imageapidockerpre012.DockerImage{}): {ephemeral: true}, // part of imageapiv1.Image
 
-	reflect.TypeOf(&imageapidocker10.DockerImage{}): {ephemeral: true}, // Not a real object so cannot be stored in etcd  // TODO confirm this
+	reflect.TypeOf(&imageapidocker10.DockerImage{}): {ephemeral: true}, // part of imageapiv1.Image
 
 	reflect.TypeOf(&authorizationapiv1.PolicyBinding{}): {
 		stub: &authorizationapiv1.PolicyBinding{
@@ -341,9 +340,8 @@ var etcdStorageData = map[reflect.Type]struct {
 								Containers: []kapiv1.Container{
 									{Name: "container0", Image: "fedora:latest"},
 								},
-								RestartPolicy:                 kapiv1.RestartPolicyNever,
-								TerminationGracePeriodSeconds: new(int64),
-								DNSPolicy:                     kapiv1.DNSClusterFirst,
+								RestartPolicy: kapiv1.RestartPolicyNever,
+								DNSPolicy:     kapiv1.DNSClusterFirst,
 							},
 						},
 					},
@@ -640,8 +638,6 @@ var etcdStorageData = map[reflect.Type]struct {
 			ObjectMeta: kapiv1.ObjectMeta{Name: "job1"},
 			Spec: apisbatchv1.JobSpec{
 				ManualSelector: func() *bool { b := true; return &b }(),
-				Parallelism:    new(int32),
-				Completions:    new(int32),
 				Selector: &unversioned.LabelSelector{
 					MatchLabels: map[string]string{
 						"controller-uid": "uid1",
@@ -657,9 +653,8 @@ var etcdStorageData = map[reflect.Type]struct {
 						Containers: []kapiv1.Container{
 							{Name: "container1", Image: "fedora:latest"},
 						},
-						RestartPolicy:                 kapiv1.RestartPolicyNever,
-						TerminationGracePeriodSeconds: new(int64),
-						DNSPolicy:                     kapiv1.DNSClusterFirst,
+						RestartPolicy: kapiv1.RestartPolicyNever,
+						DNSPolicy:     kapiv1.DNSClusterFirst,
 					},
 				},
 			},
@@ -1084,8 +1079,9 @@ func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
 	switch obj.(type) {
 	case *authorizationapiv1.ClusterPolicyBinding, *authorizationapiv1.ClusterPolicy: // TODO figure out how to not whitelist these
 		return true
-	case *apisbatchv2alpha1.CronJob: // since we do not cleanup once a test is failed, we will get an AlreadyExists error since ScheduledJob aliases CronJob
-		return true
+		// Removed this case per soltysh's request to not have so many exceptions, but leaving here so people are not confused by the errors
+		//case *apisbatchv2alpha1.CronJob: // since we do not cleanup once a test is failed, we will get an AlreadyExists error since ScheduledJob aliases CronJob
+		//	return true
 	}
 	return false
 }
