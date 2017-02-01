@@ -507,7 +507,7 @@ var etcdStorageData = map[reflect.Type]struct {
 					kapiv1.ReadWriteOnce,
 				},
 				Capacity: kapiv1.ResourceList{
-					kapiv1.ResourceStorage: apiresource.MustParse("3.0"),
+					kapiv1.ResourceStorage: apiresource.MustParse("3000000.0"),
 				},
 				PersistentVolumeSource: kapiv1.PersistentVolumeSource{
 					HostPath: &kapiv1.HostPathVolumeSource{
@@ -532,10 +532,10 @@ var etcdStorageData = map[reflect.Type]struct {
 				},
 				Resources: kapiv1.ResourceRequirements{
 					Limits: kapiv1.ResourceList{
-						kapiv1.ResourceStorage: apiresource.MustParse("1.0"),
+						kapiv1.ResourceStorage: apiresource.MustParse("1000000.0"),
 					},
 					Requests: kapiv1.ResourceList{
-						kapiv1.ResourceStorage: apiresource.MustParse("2.0"),
+						kapiv1.ResourceStorage: apiresource.MustParse("2000000.0"),
 					},
 				},
 			},
@@ -566,7 +566,7 @@ var etcdStorageData = map[reflect.Type]struct {
 			ObjectMeta: kapiv1.ObjectMeta{Name: "rq1name"},
 			Spec: kapiv1.ResourceQuotaSpec{
 				Hard: kapiv1.ResourceList{
-					kapiv1.ResourceCPU: apiresource.MustParse("5.0"),
+					kapiv1.ResourceCPU: apiresource.MustParse("5000000.0"),
 				},
 			},
 		},
