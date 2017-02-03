@@ -155,6 +155,17 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 				obj.EnableUnidling = &v
 			}
 		},
+		func(obj *RequestHeaderAuthenticationOptions) {
+			if obj.UsernameHeaders == nil {
+				obj.UsernameHeaders = []string{"X-Remote-User"}
+			}
+			if obj.GroupHeaders == nil {
+				obj.GroupHeaders = []string{"X-Remote-Group"}
+			}
+			if obj.ExtraHeaderPrefixes == nil {
+				obj.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
+			}
+		},
 		func(obj *EtcdStorageConfig) {
 			if len(obj.KubernetesStorageVersion) == 0 {
 				obj.KubernetesStorageVersion = "v1"
