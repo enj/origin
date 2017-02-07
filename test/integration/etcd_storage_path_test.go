@@ -281,7 +281,7 @@ var etcdStorageData = map[unversioned.GroupVersionResource]struct {
 		expectedEtcdPath: "kubernetes.io/podtemplates/etcdstoragepathtestnamespace/pt1name",
 	},
 	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}: {
-		stub:             `{"metadata": {"name": "pod1"}, "spec": {"containers": [{"image": "fedora:latest", "name": "container7"}]}}`,
+		stub:             `{"metadata": {"name": "pod1"}, "spec": {"containers": [{"image": "fedora:latest", "name": "container7", "resources": {"limits": {"cpu": "1M"}, "requests": {"cpu": "1M"}}}]}}`,
 		expectedEtcdPath: "kubernetes.io/pods/etcdstoragepathtestnamespace/pod1",
 	},
 	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}: {
@@ -906,6 +906,8 @@ func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
 	case *authorizationapiv1.ClusterPolicyBinding, *authorizationapiv1.ClusterPolicy: // TODO figure out how to not whitelist these
 		return true
 		// Removed this case per soltysh's request to not have so many exceptions, but leaving here so people are not confused by the errors
+		// Note that this case no longer makes sense because we never create objects in this whitelist, and thus enabling
+		// this would cause the test to fail because it would be looking in etcd for an object it never created
 		//case *apisbatchv2alpha1.CronJob: // since we do not cleanup once a test is failed, we will get an AlreadyExists error since ScheduledJob aliases CronJob
 		//	return true
 	}
