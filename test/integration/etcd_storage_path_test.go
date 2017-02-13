@@ -3,6 +3,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"mime"
 	"net/http"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/openshift/origin/pkg/api/latest"
 	osclientcmd "github.com/openshift/origin/pkg/cmd/util/clientcmd"
@@ -30,505 +32,512 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
-
-	authorizationapiv1 "github.com/openshift/origin/pkg/authorization/api/v1"
-	sdnapi "github.com/openshift/origin/pkg/sdn/api"
 )
 
-// Etcd data for all persisted objects.  Be very careful when setting ephemeral to true as that removes the safety we gain from this test.
+// Etcd data for all persisted objects.
 var etcdStorageData = map[unversioned.GroupVersionResource]struct {
-	ephemeral        bool           // Set to true to skip testing the object
-	stub             string         // Valid JSON stub to use during create (this should have at least one field other than name)
-	prerequisites    []prerequisite // Optional, ordered list of JSON objects to create before stub
-	expectedEtcdPath string         // Expected location of object in etcd, do not use any variables, constants, etc to derive this value - always supply the full raw string
+	stub             string                        // Valid JSON stub to use during create
+	prerequisites    []prerequisite                // Optional, ordered list of JSON objects to create before stub
+	expectedEtcdPath string                        // Expected location of object in etcd, do not use any variables, constants, etc to derive this value - always supply the full raw string
+	expectedGVK      *unversioned.GroupVersionKind // The GVK that we expect this object to be stored as - leave this nil to use the default
 }{
 	// github.com/openshift/origin/pkg/authorization/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "clusterpolicybindings"}: {
-		stub:             `{"metadata": {"name": "objectisincomparewhitelist"}}`,
+	gvr("", "v1", "clusterpolicybindings"): { // no stub because cannot create one of these but it always exists
 		expectedEtcdPath: "openshift.io/authorization/cluster/policybindings/:default",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "clusterpolicies"}: {
-		stub:             `{"metadata": {"name": "objectisincomparewhitelist"}}`,
+	gvr("", "v1", "clusterpolicies"): { // no stub because cannot create one of these but it always exists
 		expectedEtcdPath: "openshift.io/authorization/cluster/policies/default",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "policybindings"}: {
+	gvr("", "v1", "policybindings"): {
 		stub:             `{"roleBindings": [{"name": "rb", "roleBinding": {"metadata": {"name": "rb", "namespace": "etcdstoragepathtestnamespace"}, "roleRef": {"name": "r"}}}]}`,
 		expectedEtcdPath: "openshift.io/authorization/local/policybindings/etcdstoragepathtestnamespace/:default",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "rolebindingrestrictions"}: {
+	gvr("", "v1", "rolebindingrestrictions"): {
 		stub:             `{"metadata": {"name": "rbr"}, "spec": {"serviceaccountrestriction": {"serviceaccounts": [{"name": "sa"}]}}}`,
 		expectedEtcdPath: "openshift.io/rolebindingrestrictions/etcdstoragepathtestnamespace/rbr",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "policies"}: {
+	gvr("", "v1", "policies"): {
 		stub:             `{"roles": [{"name": "r", "role": {"metadata": {"name": "r", "namespace": "etcdstoragepathtestnamespace"}}}]}`,
 		expectedEtcdPath: "openshift.io/authorization/local/policies/etcdstoragepathtestnamespace/default",
 	},
-
-	// virtual objects that are not stored in etcd  // TODO this will change in the future when policies go away
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "roles"}:               {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "clusterroles"}:        {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "rolebindings"}:        {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "clusterrolebindings"}: {ephemeral: true},
-
-	// SAR objects that are not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "subjectrulesreviews"}:            {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "selfsubjectrulesreviews"}:        {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "subjectaccessreviews"}:           {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "resourceaccessreviews"}:          {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "localsubjectaccessreviews"}:      {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "localresourceaccessreviews"}:     {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "ispersonalsubjectaccessreviews"}: {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "resourceaccessreviewresponses"}:  {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "subjectaccessreviewresponses"}:   {ephemeral: true},
 	// --
 
 	// github.com/openshift/origin/pkg/build/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "builds"}: {
+	gvr("", "v1", "builds"): {
 		stub:             `{"metadata": {"name": "build1"}, "spec": {"source": {"dockerfile": "Dockerfile1"}, "strategy": {"dockerStrategy": {"noCache": true}}}}`,
 		expectedEtcdPath: "openshift.io/builds/etcdstoragepathtestnamespace/build1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "buildconfigs"}: {
+	gvr("", "v1", "buildconfigs"): {
 		stub:             `{"metadata": {"name": "bc1"}, "spec": {"source": {"dockerfile": "Dockerfile0"}, "strategy": {"dockerStrategy": {"noCache": true}}}}`,
 		expectedEtcdPath: "openshift.io/buildconfigs/etcdstoragepathtestnamespace/bc1",
 	},
-
-	// used for streaming build logs from pod, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "buildlogs"}:         {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "buildlogoptionses"}: {ephemeral: true},
-
-	// BuildGenerator helpers not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "buildrequests"}:               {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "binarybuildrequestoptionses"}: {ephemeral: true},
 	// --
 
 	// github.com/openshift/origin/pkg/deploy/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "deploymentconfigs"}: {
+	gvr("", "v1", "deploymentconfigs"): {
 		stub:             `{"metadata": {"name": "dc1"}, "spec": {"selector": {"d": "c"}, "template": {"metadata": {"labels": {"d": "c"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container2"}]}}}}`,
 		expectedEtcdPath: "openshift.io/deploymentconfigs/etcdstoragepathtestnamespace/dc1",
 	},
-
-	// used for streaming deployment logs from pod, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "deploymentlogs"}:         {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "deploymentlogoptionses"}: {ephemeral: true},
-
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "deploymentrequests"}:        {ephemeral: true}, // triggers new dc, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "deploymentconfigrollbacks"}: {ephemeral: true}, // triggers rolleback dc, not stored in etcd
-	// --
-
-	// github.com/openshift/origin/pkg/image/api/docker10
-	unversioned.GroupVersionResource{Group: "", Version: "1.0", Resource: "dockerimages"}: {ephemeral: true}, // part of imageapiv1.Image
-	// --
-
-	// github.com/openshift/origin/pkg/image/api/dockerpre012
-	unversioned.GroupVersionResource{Group: "", Version: "pre012", Resource: "dockerimages"}: {ephemeral: true}, // part of imageapiv1.Image
 	// --
 
 	// github.com/openshift/origin/pkg/image/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "imagestreams"}: {
+	gvr("", "v1", "imagestreams"): {
 		stub:             `{"metadata": {"name": "is1"}, "spec": {"dockerImageRepository": "docker"}}`,
 		expectedEtcdPath: "openshift.io/imagestreams/etcdstoragepathtestnamespace/is1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "images"}: {
+	gvr("", "v1", "images"): {
 		stub:             `{"dockerImageReference": "fedora:latest", "metadata": {"name": "image1"}}`,
 		expectedEtcdPath: "openshift.io/images/image1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "imagestreamtags"}:     {ephemeral: true}, // part of image stream
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "imagesignatures"}:     {ephemeral: true}, // part of image
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "imagestreamimports"}:  {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "imagestreamimages"}:   {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "imagestreammappings"}: {ephemeral: true}, // not stored in etcd
 	// --
 
 	// github.com/openshift/origin/pkg/oauth/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthclientauthorizations"}: {
+	gvr("", "v1", "oauthclientauthorizations"): {
 		stub:             `{"clientName": "system:serviceaccount:etcdstoragepathtestnamespace:client", "scopes": ["user:info"], "userName": "user", "userUID": "cannot be empty"}`,
 		expectedEtcdPath: "openshift.io/oauth/clientauthorizations/user:system:serviceaccount:etcdstoragepathtestnamespace:client",
 		prerequisites: []prerequisite{
 			{
-				gvr:  unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"},
-				stub: `{"metadata": {"annotations": {"serviceaccounts.openshift.io/oauth-redirecturi.foo": "http://bar"}, "name": "client"}}`,
+				gvrData: gvr("", "v1", "serviceaccounts"),
+				stub:    `{"metadata": {"annotations": {"serviceaccounts.openshift.io/oauth-redirecturi.foo": "http://bar"}, "name": "client"}}`,
 			},
 			{
-				gvr:  unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"},
-				stub: `{"metadata": {"annotations": {"kubernetes.io/service-account.name": "client"}, "generateName": "client"}, "type": "kubernetes.io/service-account-token"}`,
+				gvrData: gvr("", "v1", "secrets"),
+				stub:    `{"metadata": {"annotations": {"kubernetes.io/service-account.name": "client"}, "generateName": "client"}, "type": "kubernetes.io/service-account-token"}`,
 			},
 		},
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthaccesstokens"}: {
+	gvr("", "v1", "oauthaccesstokens"): {
 		stub:             `{"clientName": "client1", "metadata": {"name": "tokenneedstobelongenoughelseitwontwork"}, "userName": "user", "userUID": "cannot be empty"}`,
 		expectedEtcdPath: "openshift.io/oauth/accesstokens/tokenneedstobelongenoughelseitwontwork",
 		prerequisites: []prerequisite{
 			{
-				gvr:  unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthclients"},
-				stub: `{"metadata": {"name": "client1"}}`,
+				gvrData: gvr("", "v1", "oauthclients"),
+				stub:    `{"metadata": {"name": "client1"}}`,
 			},
 		},
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthauthorizetokens"}: {
+	gvr("", "v1", "oauthauthorizetokens"): {
 		stub:             `{"clientName": "client0", "metadata": {"name": "tokenneedstobelongenoughelseitwontwork"}, "userName": "user", "userUID": "cannot be empty"}`,
 		expectedEtcdPath: "openshift.io/oauth/authorizetokens/tokenneedstobelongenoughelseitwontwork",
 		prerequisites: []prerequisite{
 			{
-				gvr:  unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthclients"},
-				stub: `{"metadata": {"name": "client0"}}`,
+				gvrData: gvr("", "v1", "oauthclients"),
+				stub:    `{"metadata": {"name": "client0"}}`,
 			},
 		},
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthclients"}: {
+	gvr("", "v1", "oauthclients"): {
 		stub:             `{"metadata": {"name": "client"}}`,
 		expectedEtcdPath: "openshift.io/oauth/clients/client",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "oauthredirectreferences"}: {ephemeral: true}, // Used for specifying redirects, never stored in etcd
 	// --
 
 	// github.com/openshift/origin/pkg/project/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "projects"}:        {ephemeral: true}, // proxy for namespace so cannot test here
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "projectrequests"}: {ephemeral: true}, // not stored in etcd
+	gvr("", "v1", "projects"): {
+		stub:             `{"metadata": {"name": "namespace2"}, "spec": {"finalizers": ["kubernetes", "openshift.io/origin"]}}`,
+		expectedEtcdPath: "kubernetes.io/namespaces/namespace2",
+		expectedGVK:      &unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}, // project is a proxy for namespace
+	},
 	// --
 
 	// github.com/openshift/origin/pkg/quota/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "clusterresourcequotas"}: {
+	gvr("", "v1", "clusterresourcequotas"): {
 		stub:             `{"metadata": {"name": "quota1"}, "spec": {"selector": {"labels": {"matchLabels": {"a": "b"}}}}}`,
 		expectedEtcdPath: "openshift.io/clusterresourcequotas/quota1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "appliedclusterresourcequotas"}: {ephemeral: true}, // mirror of ClusterResourceQuota that cannot be created
 	// --
 
 	// github.com/openshift/origin/pkg/route/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "routes"}: {
+	gvr("", "v1", "routes"): {
 		stub:             `{"metadata": {"name": "route1"}, "spec": {"host": "hostname1", "to": {"name": "service1"}}}`,
 		expectedEtcdPath: "openshift.io/routes/etcdstoragepathtestnamespace/route1",
 	},
 	// --
 
 	// github.com/openshift/origin/pkg/sdn/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "netnamespaces"}: { // This will fail to delete because meta.name != NetName but it is keyed off NetName
+	gvr("", "v1", "netnamespaces"): { // This will fail to delete because meta.name != NetName but it is keyed off NetName
 		stub:             `{"metadata": {"name": "nn1"}, "netid": 100, "netname": "networkname"}`,
 		expectedEtcdPath: "openshift.io/registry/sdnnetnamespaces/networkname",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "hostsubnets"}: { // This will fail to delete because meta.name != Host but it is keyed off Host
+	gvr("", "v1", "hostsubnets"): { // This will fail to delete because meta.name != Host but it is keyed off Host
 		stub:             `{"host": "hostname", "hostIP": "192.168.1.1", "metadata": {"name": "hs1"}, "subnet": "192.168.1.1/24"}`,
 		expectedEtcdPath: "openshift.io/registry/sdnsubnets/hostname",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "clusternetworks"}: {
+	gvr("", "v1", "clusternetworks"): {
 		stub:             `{"metadata": {"name": "cn1"}, "network": "192.168.0.1/24", "serviceNetwork": "192.168.1.1/24"}`,
 		expectedEtcdPath: "openshift.io/registry/sdnnetworks/cn1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "egressnetworkpolicies"}: {
+	gvr("", "v1", "egressnetworkpolicies"): {
 		stub:             `{"metadata": {"name": "enp1"}, "spec": {"egress": [{"to": {"cidrSelector": "192.168.1.1/24"}, "type": "Allow"}]}}`,
 		expectedEtcdPath: "openshift.io/registry/egressnetworkpolicy/etcdstoragepathtestnamespace/enp1",
 	},
 	// --
 
-	// github.com/openshift/origin/pkg/security/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "podsecuritypolicyselfsubjectreviews"}: {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "podsecuritypolicyreviews"}:            {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "podsecuritypolicysubjectreviews"}:     {ephemeral: true}, // not stored in etcd
-	// --
-
 	// github.com/openshift/origin/pkg/template/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "templateconfigs"}: {
-		stub:             `{"message": "Jenkins template", "metadata": {"name": "template1"}}`,
-		expectedEtcdPath: "openshift.io/templates/etcdstoragepathtestnamespace/template1",
-	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "processedtemplates"}: {
-		stub:             `{"message": "Jenkins template", "metadata": {"name": "template1"}}`,
-		expectedEtcdPath: "openshift.io/templates/etcdstoragepathtestnamespace/template1",
-	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "templates"}: {
+	gvr("", "v1", "templates"): {
 		stub:             `{"message": "Jenkins template", "metadata": {"name": "template1"}}`,
 		expectedEtcdPath: "openshift.io/templates/etcdstoragepathtestnamespace/template1",
 	},
 	// --
 
 	// github.com/openshift/origin/pkg/user/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "groups"}: {
+	gvr("", "v1", "groups"): {
 		stub:             `{"metadata": {"name": "group"}, "users": ["user1", "user2"]}`,
 		expectedEtcdPath: "openshift.io/groups/group",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "users"}: {
+	gvr("", "v1", "users"): {
 		stub:             `{"fullName": "user1", "metadata": {"name": "user1"}}`,
 		expectedEtcdPath: "openshift.io/users/user1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "identities"}: {
+	gvr("", "v1", "identities"): {
 		stub:             `{"metadata": {"name": "github:user2"}, "providerName": "github", "providerUserName": "user2"}`,
 		expectedEtcdPath: "openshift.io/useridentities/github:user2",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "useridentitymappings"}: {ephemeral: true}, // pointer from user to identity, not stored in etcd
-	// --
-
-	// k8s.io/kubernetes/federation/apis/federation/v1beta1
-	unversioned.GroupVersionResource{Group: "federation", Version: "v1beta1", Resource: "clusters"}: {ephemeral: true}, // we cannot create this  // TODO but we should be able to create it in kube
-	// --
-
-	// k8s.io/kubernetes/pkg/api/unversioned
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "statuses"}:      {ephemeral: true}, // return value for calls, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "apigroups"}:     {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "apiversionses"}: {ephemeral: true}, // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/api/v1
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}: {
+	gvr("", "v1", "configmaps"): {
 		stub:             `{"data": {"foo": "bar"}, "metadata": {"name": "cm1"}}`,
 		expectedEtcdPath: "kubernetes.io/configmaps/etcdstoragepathtestnamespace/cm1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}: {
+	gvr("", "v1", "services"): {
 		stub:             `{"metadata": {"name": "service1"}, "spec": {"externalName": "service1name", "ports": [{"port": 10000, "targetPort": 11000}], "selector": {"test": "data"}}}`,
 		expectedEtcdPath: "kubernetes.io/services/specs/etcdstoragepathtestnamespace/service1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "podtemplates"}: {
+	gvr("", "v1", "podtemplates"): {
 		stub:             `{"metadata": {"name": "pt1name"}, "template": {"metadata": {"labels": {"pt": "01"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container9"}]}}}`,
 		expectedEtcdPath: "kubernetes.io/podtemplates/etcdstoragepathtestnamespace/pt1name",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}: {
+	gvr("", "v1", "pods"): {
 		stub:             `{"metadata": {"name": "pod1"}, "spec": {"containers": [{"image": "fedora:latest", "name": "container7", "resources": {"limits": {"cpu": "1M"}, "requests": {"cpu": "1M"}}}]}}`,
 		expectedEtcdPath: "kubernetes.io/pods/etcdstoragepathtestnamespace/pod1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}: {
+	gvr("", "v1", "endpoints"): {
 		stub:             `{"metadata": {"name": "ep1name"}, "subsets": [{"addresses": [{"hostname": "bar-001", "ip": "192.168.3.1"}], "ports": [{"port": 8000}]}]}`,
 		expectedEtcdPath: "kubernetes.io/services/endpoints/etcdstoragepathtestnamespace/ep1name",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "resourcequotas"}: {
+	gvr("", "v1", "resourcequotas"): {
 		stub:             `{"metadata": {"name": "rq1name"}, "spec": {"hard": {"cpu": "5M"}}}`,
 		expectedEtcdPath: "kubernetes.io/resourcequotas/etcdstoragepathtestnamespace/rq1name",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "limitranges"}: {
+	gvr("", "v1", "limitranges"): {
 		stub:             `{"metadata": {"name": "lr1name"}, "spec": {"limits": [{"type": "Pod"}]}}`,
 		expectedEtcdPath: "kubernetes.io/limitranges/etcdstoragepathtestnamespace/lr1name",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}: {
+	gvr("", "v1", "namespaces"): {
 		stub:             `{"metadata": {"name": "namespace1"}, "spec": {"finalizers": ["kubernetes"]}}`,
 		expectedEtcdPath: "kubernetes.io/namespaces/namespace1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "securitycontextconstraints"}: {
+	gvr("", "v1", "securitycontextconstraints"): {
 		stub:             `{"allowPrivilegedContainer": true, "fsGroup": {"type": "RunAsAny"}, "metadata": {"name": "scc1"}, "runAsUser": {"type": "RunAsAny"}, "seLinuxContext": {"type": "MustRunAs"}, "supplementalGroups": {"type": "RunAsAny"}}`,
 		expectedEtcdPath: "kubernetes.io/securitycontextconstraints/scc1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}: {
+	gvr("", "v1", "nodes"): {
 		stub:             `{"metadata": {"name": "node1"}, "spec": {"unschedulable": true}}`,
 		expectedEtcdPath: "kubernetes.io/minions/node1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumes"}: {
+	gvr("", "v1", "persistentvolumes"): {
 		stub:             `{"metadata": {"name": "pv1name"}, "spec": {"accessModes": ["ReadWriteOnce"], "capacity": {"storage": "3M"}, "hostPath": {"path": "/tmp/test/"}}}`,
 		expectedEtcdPath: "kubernetes.io/persistentvolumes/pv1name",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}: {
+	gvr("", "v1", "events"): {
 		stub:             `{"involvedObject": {"namespace": "etcdstoragepathtestnamespace"}, "message": "some data here", "metadata": {"name": "event1"}}`,
 		expectedEtcdPath: "kubernetes.io/events/etcdstoragepathtestnamespace/event1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}: {
+	gvr("", "v1", "persistentvolumeclaims"): {
 		stub:             `{"metadata": {"name": "pvc1"}, "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"limits": {"storage": "1M"}, "requests": {"storage": "2M"}}, "selector": {"matchLabels": {"pvc": "stuff"}}}}`,
 		expectedEtcdPath: "kubernetes.io/persistentvolumeclaims/etcdstoragepathtestnamespace/pvc1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"}: {
+	gvr("", "v1", "serviceaccounts"): {
 		stub:             `{"metadata": {"name": "sa1name"}, "secrets": [{"name": "secret00"}]}`,
 		expectedEtcdPath: "kubernetes.io/serviceaccounts/etcdstoragepathtestnamespace/sa1name",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}: {
+	gvr("", "v1", "secrets"): {
 		stub:             `{"data": {"key": "ZGF0YSBmaWxl"}, "metadata": {"name": "secret1"}}`,
 		expectedEtcdPath: "kubernetes.io/secrets/etcdstoragepathtestnamespace/secret1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}: {
+	gvr("", "v1", "replicationcontrollers"): {
 		stub:             `{"metadata": {"name": "rc1"}, "spec": {"selector": {"new": "stuff"}, "template": {"metadata": {"labels": {"new": "stuff"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container8"}]}}}}`,
 		expectedEtcdPath: "kubernetes.io/controllers/etcdstoragepathtestnamespace/rc1",
 	},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "exportoptionses"}:      {ephemeral: true}, // used in queries, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:             {ephemeral: true}, // annotation on pod, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "rangeallocations"}:     {ephemeral: true}, // stored in various places in etcd but cannot be directly created // TODO maybe possible in kube
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:    {ephemeral: true}, // status info not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "serializedreferences"}: {ephemeral: true}, // used for serilization, not stored in etcd
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "podstatusresults"}:     {ephemeral: true}, // wrapper object not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta1
-	unversioned.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "statefulsets"}: {
+	gvr("apps", "v1beta1", "statefulsets"): {
 		stub:             `{"metadata": {"name": "ss1"}, "spec": {"template": {"metadata": {"labels": {"a": "b"}}}}}`,
 		expectedEtcdPath: "kubernetes.io/statefulsets/etcdstoragepathtestnamespace/ss1",
 	},
 	// --
 
-	// k8s.io/kubernetes/pkg/apis/authentication/v1beta1
-	unversioned.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}: {ephemeral: true}, // not stored in etcd
-	// --
-
-	// k8s.io/kubernetes/pkg/apis/authorization/v1beta1
-
-	// SAR objects that are not stored in etcd
-	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {ephemeral: true},
-	// --
-
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
-	unversioned.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}: {ephemeral: true}, // creating this returns a apisextensionsv1beta1.HorizontalPodAutoscaler so test that instead
-	unversioned.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "scales"}:                   {ephemeral: true}, // not stored in etcd, part of kapiv1.ReplicationController
+	gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
+		stub:             `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+		expectedEtcdPath: "kubernetes.io/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa2",
+		expectedGVK:      &unversioned.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "HorizontalPodAutoscaler"}, // still a beta extension
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v1
-	unversioned.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}: {
+	gvr("batch", "v1", "jobs"): {
 		stub:             `{"metadata": {"name": "job1"}, "spec": {"manualSelector": true, "selector": {"matchLabels": {"controller-uid": "uid1"}}, "template": {"metadata": {"labels": {"controller-uid": "uid1"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container1"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}`,
 		expectedEtcdPath: "kubernetes.io/jobs/etcdstoragepathtestnamespace/job1",
 	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v2alpha1
-	unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "scheduledjobs"}: {
+	gvr("batch", "v2alpha1", "cronjobs"): {
 		stub:             `{"metadata": {"name": "cj1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "kubernetes.io/cronjobs/etcdstoragepathtestnamespace/cj1",
 	},
-	unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {
-		stub:             `{"metadata": {"name": "cj1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
-		expectedEtcdPath: "kubernetes.io/cronjobs/etcdstoragepathtestnamespace/cj1",
+	gvr("batch", "v2alpha1", "scheduledjobs"): {
+		stub:             `{"metadata": {"name": "cj2"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
+		expectedEtcdPath: "kubernetes.io/cronjobs/etcdstoragepathtestnamespace/cj2",
+		expectedGVK:      &unversioned.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}, // scheduledjobs were deprecated by cronjobs
 	},
-	unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobs"}:         {ephemeral: true}, // creating this makes a apisbatchv1.Job so test that instead
-	unversioned.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobtemplates"}: {ephemeral: true}, // not stored in etcd
+	gvr("batch", "v2alpha1", "jobs"): {
+		stub:             `{"metadata": {"name": "job2"}, "spec": {"manualSelector": true, "selector": {"matchLabels": {"controller-uid": "uid1"}}, "template": {"metadata": {"labels": {"controller-uid": "uid1"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container1"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}`,
+		expectedEtcdPath: "kubernetes.io/jobs/etcdstoragepathtestnamespace/job2",
+		expectedGVK:      &unversioned.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}, // job is v1 now
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/certificates/v1alpha1
-	unversioned.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1alpha1", Resource: "certificatesigningrequests"}: {
+	gvr("certificates.k8s.io", "v1alpha1", "certificatesigningrequests"): {
 		stub:             `{"metadata": {"name": "csr1"}, "spec": {"request": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQnlqQ0NBVE1DQVFBd2dZa3hDekFKQmdOVkJBWVRBbFZUTVJNd0VRWURWUVFJRXdwRFlXeHBabTl5Ym1saApNUll3RkFZRFZRUUhFdzFOYjNWdWRHRnBiaUJXYVdWM01STXdFUVlEVlFRS0V3cEhiMjluYkdVZ1NXNWpNUjh3CkhRWURWUVFMRXhaSmJtWnZjbTFoZEdsdmJpQlVaV05vYm05c2IyZDVNUmN3RlFZRFZRUURFdzUzZDNjdVoyOXYKWjJ4bExtTnZiVENCbnpBTkJna3Foa2lHOXcwQkFRRUZBQU9CalFBd2dZa0NnWUVBcFp0WUpDSEo0VnBWWEhmVgpJbHN0UVRsTzRxQzAzaGpYK1prUHl2ZFlkMVE0K3FiQWVUd1htQ1VLWUhUaFZSZDVhWFNxbFB6eUlCd2llTVpyCldGbFJRZGRaMUl6WEFsVlJEV3dBbzYwS2VjcWVBWG5uVUsrNWZYb1RJL1VnV3NocmU4dEoreC9UTUhhUUtSL0oKY0lXUGhxYVFoc0p1elpidkFkR0E4MEJMeGRNQ0F3RUFBYUFBTUEwR0NTcUdTSWIzRFFFQkJRVUFBNEdCQUlobAo0UHZGcStlN2lwQVJnSTVaTStHWng2bXBDejQ0RFRvMEprd2ZSRGYrQnRyc2FDMHE2OGVUZjJYaFlPc3E0ZmtIClEwdUEwYVZvZzNmNWlKeENhM0hwNWd4YkpRNnpWNmtKMFRFc3VhYU9oRWtvOXNkcENvUE9uUkJtMmkvWFJEMkQKNmlOaDhmOHowU2hHc0ZxakRnRkh5RjNvK2xVeWorVUM2SDFRVzdibgotLS0tLUVORCBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0="}}`,
 		expectedEtcdPath: "kubernetes.io/certificatesigningrequests/csr1",
 	},
 	// --
 
-	// k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1
-	unversioned.GroupVersionResource{Group: "componentconfig", Version: "v1alpha1", Resource: "kubeletconfigurations"}:       {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "componentconfig", Version: "v1alpha1", Resource: "kubeschedulerconfigurations"}: {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "componentconfig", Version: "v1alpha1", Resource: "kubeproxyconfigurations"}:     {ephemeral: true}, // not stored in etcd
-	// --
-
 	// k8s.io/kubernetes/pkg/apis/extensions/v1beta1
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}: {
+	gvr("extensions", "v1beta1", "daemonsets"): {
 		stub:             `{"metadata": {"name": "ds1"}, "spec": {"selector": {"matchLabels": {"u": "t"}}, "template": {"metadata": {"labels": {"u": "t"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container5"}]}}}}`,
 		expectedEtcdPath: "kubernetes.io/daemonsets/etcdstoragepathtestnamespace/ds1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "podsecuritypolicies"}: {
+	gvr("extensions", "v1beta1", "podsecuritypolicies"): {
 		stub:             `{"metadata": {"name": "psp1"}, "spec": {"fsGroup": {"rule": "RunAsAny"}, "privileged": true, "runAsUser": {"rule": "RunAsAny"}, "seLinux": {"rule": "MustRunAs"}, "supplementalGroups": {"rule": "RunAsAny"}}}`,
 		expectedEtcdPath: "kubernetes.io/podsecuritypolicy/psp1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "thirdpartyresources"}: {
+	gvr("extensions", "v1beta1", "thirdpartyresources"): {
 		stub:             `{"description": "third party", "metadata": {"name": "kind.domain.tld"}, "versions": [{"name": "v3"}]}`,
 		expectedEtcdPath: "kubernetes.io/thirdpartyresources/kind.domain.tld",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "ingresses"}: {
+	gvr("extensions", "v1beta1", "ingresses"): {
 		stub:             `{"metadata": {"name": "ingress1"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
 		expectedEtcdPath: "kubernetes.io/ingress/etcdstoragepathtestnamespace/ingress1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "networkpolicies"}: {
+	gvr("extensions", "v1beta1", "networkpolicies"): {
 		stub:             `{"metadata": {"name": "np1"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
 		expectedEtcdPath: "kubernetes.io/networkpolicies/etcdstoragepathtestnamespace/np1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}: {
+	gvr("extensions", "v1beta1", "deployments"): {
 		stub:             `{"metadata": {"name": "deployment1"}, "spec": {"selector": {"matchLabels": {"f": "z"}}, "template": {"metadata": {"labels": {"f": "z"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container6"}]}}}}`,
 		expectedEtcdPath: "kubernetes.io/deployments/etcdstoragepathtestnamespace/deployment1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "horizontalpodautoscalers"}: {
+	gvr("extensions", "v1beta1", "horizontalpodautoscalers"): {
 		stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleRef": {"kind": "something", "name": "cross"}}}`,
 		expectedEtcdPath: "kubernetes.io/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}: {
+	gvr("extensions", "v1beta1", "replicasets"): {
 		stub:             `{"metadata": {"name": "rs1"}, "spec": {"selector": {"matchLabels": {"g": "h"}}, "template": {"metadata": {"labels": {"g": "h"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container4"}]}}}}`,
 		expectedEtcdPath: "kubernetes.io/replicasets/etcdstoragepathtestnamespace/rs1",
 	},
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deploymentrollbacks"}:          {ephemeral: true}, // used to rollback deployment, not stored in etcd
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollerdummies"}: {ephemeral: true}, // not stored in etcd
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "jobs"}:                         {ephemeral: true}, // creating this makes a apisbatchv1.Job so test that instead
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "scales"}:                       {ephemeral: true}, // not stored in etcd, part of kapiv1.ReplicationController
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "thirdpartyresourcedatas"}:      {ephemeral: true}, // we cannot create this  // TODO but we should be able to create it in kube
-	// --
-
-	// k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1
-	unversioned.GroupVersionResource{Group: "imagepolicy.k8s.io", Version: "v1alpha1", Resource: "imagereviews"}: {ephemeral: true}, // not stored in etcd
+	gvr("extensions", "v1beta1", "jobs"): {
+		stub:             `{"metadata": {"name": "job3"}, "spec": {"manualSelector": true, "selector": {"matchLabels": {"controller-uid": "uid1"}}, "template": {"metadata": {"labels": {"controller-uid": "uid1"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container1"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}`,
+		expectedEtcdPath: "kubernetes.io/jobs/etcdstoragepathtestnamespace/job3",
+		expectedGVK:      &unversioned.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}, // job is v1 now
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/policy/v1beta1
-	unversioned.GroupVersionResource{Group: "policy", Version: "v1beta1", Resource: "poddisruptionbudgets"}: {
+	gvr("policy", "v1beta1", "poddisruptionbudgets"): {
 		stub:             `{"metadata": {"name": "pdb1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,
 		expectedEtcdPath: "kubernetes.io/poddisruptionbudgets/etcdstoragepathtestnamespace/pdb1",
 	},
-	unversioned.GroupVersionResource{Group: "policy", Version: "v1beta1", Resource: "evictions"}: {ephemeral: true}, // not stored in etcd, deals with evicting kapiv1.Pod
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	gvr("storage.k8s.io", "v1beta1", "storageclasses"): {
+		stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,
+		expectedEtcdPath: "kubernetes.io/storageclasses/sc1",
+	},
+	// --
+}
+
+// Be very careful when whitelisting an object as ephemeral.
+// Doing so removes the safety we gain from this test by skipping that object.
+var ephemeralWhiteList = createEphemeralWhiteList(
+	// github.com/openshift/origin/pkg/authorization/api/v1
+
+	// virtual objects that are not stored in etcd  // TODO this will change in the future when policies go away
+	gvr("", "v1", "roles"),
+	gvr("", "v1", "clusterroles"),
+	gvr("", "v1", "rolebindings"),
+	gvr("", "v1", "clusterrolebindings"),
+
+	// SAR objects that are not stored in etcd
+	gvr("", "v1", "subjectrulesreviews"),
+	gvr("", "v1", "selfsubjectrulesreviews"),
+	gvr("", "v1", "subjectaccessreviews"),
+	gvr("", "v1", "resourceaccessreviews"),
+	gvr("", "v1", "localsubjectaccessreviews"),
+	gvr("", "v1", "localresourceaccessreviews"),
+	gvr("", "v1", "ispersonalsubjectaccessreviews"),
+	gvr("", "v1", "resourceaccessreviewresponses"),
+	gvr("", "v1", "subjectaccessreviewresponses"),
+	// --
+
+	// github.com/openshift/origin/pkg/build/api/v1
+
+	// used for streaming build logs from pod, not stored in etcd
+	gvr("", "v1", "buildlogs"),
+	gvr("", "v1", "buildlogoptionses"),
+
+	// BuildGenerator helpers not stored in etcd
+	gvr("", "v1", "buildrequests"),
+	gvr("", "v1", "binarybuildrequestoptionses"),
+	// --
+
+	// github.com/openshift/origin/pkg/deploy/api/v1
+
+	// used for streaming deployment logs from pod, not stored in etcd
+	gvr("", "v1", "deploymentlogs"),
+	gvr("", "v1", "deploymentlogoptionses"),
+
+	gvr("", "v1", "deploymentrequests"),        // triggers new dc, not stored in etcd
+	gvr("", "v1", "deploymentconfigrollbacks"), // triggers rolleback dc, not stored in etcd
+	// --
+
+	// github.com/openshift/origin/pkg/image/api/docker10
+	gvr("", "1.0", "dockerimages"), // part of imageapiv1.Image
+	// --
+
+	// github.com/openshift/origin/pkg/image/api/dockerpre012
+	gvr("", "pre012", "dockerimages"), // part of imageapiv1.Image
+	// --
+
+	// github.com/openshift/origin/pkg/image/api/v1
+	gvr("", "v1", "imagestreamtags"),     // part of image stream
+	gvr("", "v1", "imagesignatures"),     // part of image
+	gvr("", "v1", "imagestreamimports"),  // not stored in etcd
+	gvr("", "v1", "imagestreamimages"),   // not stored in etcd
+	gvr("", "v1", "imagestreammappings"), // not stored in etcd
+	// --
+
+	// github.com/openshift/origin/pkg/oauth/api/v1
+	gvr("", "v1", "oauthredirectreferences"), // Used for specifying redirects, never stored in etcd
+	// --
+
+	// github.com/openshift/origin/pkg/project/api/v1
+	gvr("", "v1", "projectrequests"), // not stored in etcd
+	// --
+
+	// github.com/openshift/origin/pkg/quota/api/v1
+	gvr("", "v1", "appliedclusterresourcequotas"), // mirror of ClusterResourceQuota that cannot be created
+	// --
+
+	// github.com/openshift/origin/pkg/security/api/v1
+	gvr("", "v1", "podsecuritypolicyselfsubjectreviews"), // not stored in etcd
+	gvr("", "v1", "podsecuritypolicyreviews"),            // not stored in etcd
+	gvr("", "v1", "podsecuritypolicysubjectreviews"),     // not stored in etcd
+	// --
+
+	// github.com/openshift/origin/pkg/template/api/v1
+
+	// deprecated aliases for templateapiv1.Template
+	gvr("", "v1", "templateconfigs"),
+	gvr("", "v1", "processedtemplates"),
+	// --
+
+	// github.com/openshift/origin/pkg/user/api/v1
+	gvr("", "v1", "useridentitymappings"), // pointer from user to identity, not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/federation/apis/federation/v1beta1
+	gvr("federation", "v1beta1", "clusters"), // we cannot create this  // TODO but we should be able to create it in kube
+	// --
+
+	// k8s.io/kubernetes/pkg/api/unversioned
+	gvr("", "v1", "statuses"),      // return value for calls, not stored in etcd
+	gvr("", "v1", "apigroups"),     // not stored in etcd
+	gvr("", "v1", "apiversionses"), // not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/api/v1
+	gvr("", "v1", "exportoptionses"),      // used in queries, not stored in etcd
+	gvr("", "v1", "bindings"),             // annotation on pod, not stored in etcd
+	gvr("", "v1", "rangeallocations"),     // stored in various places in etcd but cannot be directly created // TODO maybe possible in kube
+	gvr("", "v1", "componentstatuses"),    // status info not stored in etcd
+	gvr("", "v1", "serializedreferences"), // used for serilization, not stored in etcd
+	gvr("", "v1", "podstatusresults"),     // wrapper object not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/authentication/v1beta1
+	gvr("authentication.k8s.io", "v1beta1", "tokenreviews"), // not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/authorization/v1beta1
+
+	// SAR objects that are not stored in etcd
+	gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"),
+	gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"),
+	gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"),
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
+	gvr("autoscaling", "v1", "scales"), // not stored in etcd, part of kapiv1.ReplicationController
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/batch/v2alpha1
+	gvr("batch", "v2alpha1", "jobtemplates"), // not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1
+	gvr("componentconfig", "v1alpha1", "kubeletconfigurations"),       // not stored in etcd
+	gvr("componentconfig", "v1alpha1", "kubeschedulerconfigurations"), // not stored in etcd
+	gvr("componentconfig", "v1alpha1", "kubeproxyconfigurations"),     // not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/extensions/v1beta1
+	gvr("extensions", "v1beta1", "deploymentrollbacks"),          // used to rollback deployment, not stored in etcd
+	gvr("extensions", "v1beta1", "replicationcontrollerdummies"), // not stored in etcd
+	gvr("extensions", "v1beta1", "scales"),                       // not stored in etcd, part of kapiv1.ReplicationController
+	gvr("extensions", "v1beta1", "thirdpartyresourcedatas"),      // we cannot create this  // TODO but we should be able to create it in kube
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1
+	gvr("imagepolicy.k8s.io", "v1alpha1", "imagereviews"), // not stored in etcd
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/policy/v1beta1
+	gvr("policy", "v1beta1", "evictions"), // not stored in etcd, deals with evicting kapiv1.Pod
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/rbac/v1alpha1
 
 	// we cannot create these  // TODO but we should be able to create them in kube
-	unversioned.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "roles"}:               {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "clusterroles"}:        {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "rolebindings"}:        {ephemeral: true},
-	unversioned.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "clusterrolebindings"}: {ephemeral: true},
+	gvr("rbac.authorization.k8s.io", "v1alpha1", "roles"),
+	gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterroles"),
+	gvr("rbac.authorization.k8s.io", "v1alpha1", "rolebindings"),
+	gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterrolebindings"),
 	// --
+)
 
-	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-	unversioned.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "storageclasses"}: {
-		stub:             `{"metadata": {"name": "sc1"}, "provisioner": "aws"}`,
-		expectedEtcdPath: "kubernetes.io/storageclasses/sc1",
-	},
-}
-
-// Only add objects to this list when there is no mapping from GVK to GVR (and thus there is no way to create the object)
-var gvkWhiteList = createGVKWhiteList(
+// Only add kinds to this list when there is no mapping from GVK to GVR (and thus there is no way to create the object)
+var kindWhiteList = sets.NewString(
 	// k8s.io/kubernetes/pkg/api/v1
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "NodeProxyOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "PodAttachOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "PodExecOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "PodLogOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "PodProxyOptions"},
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceProxyOptions"},
-	unversioned.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1beta1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1beta1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "certificates.k8s.io", Version: "v1alpha1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "certificates.k8s.io", Version: "v1alpha1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "certificates.k8s.io", Version: "v1alpha1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "federation", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "federation", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "federation", Version: "v1beta1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "imagepolicy.k8s.io", Version: "v1alpha1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "imagepolicy.k8s.io", Version: "v1alpha1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "imagepolicy.k8s.io", Version: "v1alpha1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ListOptions"},
-	unversioned.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "DeleteOptions"},
-	unversioned.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "ExportOptions"},
-	unversioned.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "ListOptions"},
+	"DeleteOptions",
+	"ExportOptions",
+	"ListOptions",
+	"NodeProxyOptions",
+	"PodAttachOptions",
+	"PodExecOptions",
+	"PodLogOptions",
+	"PodProxyOptions",
+	"ServiceProxyOptions",
 	// --
 
 	// k8s.io/kubernetes/pkg/watch/versioned
-	unversioned.GroupVersionKind{Group: "", Version: "v1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1beta1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "certificates.k8s.io", Version: "v1alpha1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "federation", Version: "v1beta1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "WatchEvent"},
-	unversioned.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "WatchEvent"},
+	"WatchEvent",
 	// --
 )
 
@@ -576,8 +585,9 @@ func TestEtcdStoragePath(t *testing.T) {
 		t.Fatalf("error creating test namespace: %#v", err)
 	}
 
-	gvkSeen := map[unversioned.GroupVersionKind]empty{}
-	gvrSeen := map[unversioned.GroupVersionResource]empty{}
+	kindSeen := sets.NewString()
+	etcdSeen := map[unversioned.GroupVersionResource]empty{}
+	ephemeralSeen := map[unversioned.GroupVersionResource]empty{}
 
 	for gvk, apiType := range kapi.Scheme.AllKnownTypes() {
 		// we do not care about internal objects or lists // TODO make sure this is always true
@@ -590,46 +600,51 @@ func TestEtcdStoragePath(t *testing.T) {
 
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
-			gvkSeen[gvk] = empty{}
-			_, ok := gvkWhiteList[gvk]
-			if ok {
-				t.Logf("skipping test for %s from %s because its GVK %s is whitelisted and has no mapping", kind, pkgPath, gvk)
+			kindSeen.Insert(kind)
+			if kindWhiteList.Has(kind) {
+				// t.Logf("skipping test for %s from %s because its GVK %s is whitelisted and has no mapping", kind, pkgPath, gvk)
 			} else {
 				t.Errorf("no mapping found for %s from %s but its GVK %s is not whitelisted", kind, pkgPath, gvk)
 			}
 			continue
 		}
 
-		gvr := gvk.GroupVersion().WithResource(mapping.Resource)
-		gvrSeen[gvr] = empty{}
+		gvResource := gvk.GroupVersion().WithResource(mapping.Resource)
+		etcdSeen[gvResource] = empty{}
 
-		ptrType := reflect.PtrTo(apiType)
-		testData, ok := etcdStorageData[gvr]
+		testData, hasTest := etcdStorageData[gvResource]
+		_, isEphemeral := ephemeralWhiteList[gvResource]
 
-		if !ok {
+		if !hasTest && !isEphemeral {
 			t.Errorf("no test data for %s from %s.  Please add a test for your new type to etcdStorageData.", kind, pkgPath)
 			continue
 		}
 
-		if testData.ephemeral { // TODO it would be nice if we could remove this and infer if an object is not stored in etcd
-			t.Logf("Skipping test for %s from %s", kind, pkgPath)
+		if hasTest && isEphemeral {
+			t.Errorf("duplicate test data for %s from %s.  Object has both test data and is ephemeral.", kind, pkgPath)
 			continue
 		}
 
-		if isInKindAndPathWhiteList(kind, pkgPath) {
-			t.Logf("kind and path are whitelisted: skipping test for %s from %s", kind, pkgPath)
+		if isEphemeral { // TODO it would be nice if we could remove this and infer if an object is not stored in etcd
+			// t.Logf("Skipping test for %s from %s", kind, pkgPath)
+			ephemeralSeen[gvResource] = empty{}
+			delete(etcdSeen, gvResource)
 			continue
 		}
 
-		if len(testData.expectedEtcdPath) == 0 || len(testData.stub) == 0 {
+		if len(testData.expectedEtcdPath) == 0 {
 			t.Errorf("empty test data for %s from %s", kind, pkgPath)
 			continue
 		}
 
-		obj, err := jsonToObject(testData.stub, gvk)
-		if err != nil || reflect.TypeOf(obj) != ptrType || isZero(reflect.ValueOf(obj)) {
-			t.Errorf("invalid test data for %s from %s: %s", kind, pkgPath, err)
-			continue
+		shouldCreate := len(testData.stub) != 0 // try to create only if we have a stub
+
+		var input map[string]interface{}
+		if shouldCreate {
+			if input, err = jsonToMap(testData.stub); err != nil || isZeroMap(input) {
+				t.Errorf("invalid test data for %s from %s: %s", kind, pkgPath, err)
+				continue
+			}
 		}
 
 		func() { // forces defer to run per iteration of the for loop
@@ -647,50 +662,51 @@ func TestEtcdStoragePath(t *testing.T) {
 				return
 			}
 
-			if !isInCreateAndCompareWhiteList(obj) { // do not try to create whitelisted items
+			if shouldCreate { // do not try to create items with no stub
 				if err := client.create(testData.stub, testNamespace, mapping, all); err != nil {
 					t.Errorf("failed to create stub for %s from %s: %#v", kind, pkgPath, err)
 					return
 				}
 			}
 
-			output, err := getFromEtcd(keys, testData.expectedEtcdPath, gvk)
+			output, err := getFromEtcd(keys, testData.expectedEtcdPath)
 			if err != nil {
 				t.Errorf("failed to get from etcd for %s from %s: %#v", kind, pkgPath, err)
 				return
 			}
 
-			// just check the type of whitelisted items
-			if isInCreateAndCompareWhiteList(output) {
-				outputType := reflect.TypeOf(output)
-				if outputType != ptrType {
-					t.Errorf("Output for %s from %s has the wrong type, expected %s, got %s", kind, pkgPath, ptrType.String(), outputType.String())
-				}
-				return
+			expectedGVK := gvk
+			if testData.expectedGVK != nil {
+				expectedGVK = *testData.expectedGVK
 			}
 
-			if !kapi.Semantic.DeepDerivative(obj, output) {
-				t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectGoPrintDiff(obj, output))
+			actualGVK := getGVK(output)
+			if actualGVK != expectedGVK {
+				t.Errorf("GVK for %s from %s does not match, expected %s got %s", kind, pkgPath, expectedGVK, actualGVK)
+			}
+
+			if !deepDerivativeMap(input, output) {
+				t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectGoPrintDiff(input, output))
 			}
 		}()
 	}
 
-	inEtcdData := diffMapKeys(etcdStorageData, gvrSeen, gvStringer)
-	inGVRSeen := diffMapKeys(gvrSeen, etcdStorageData, gvStringer)
-	if len(inEtcdData) != 0 || len(inGVRSeen) != 0 {
-		t.Errorf("etcd data does not match the types we saw:\nin etcd data but not seen:\n%s\nseen but not in etcd data:\n%s", inEtcdData, inGVRSeen)
+	if inEtcdData, inEtcdSeen := diffMaps(etcdStorageData, etcdSeen); len(inEtcdData) != 0 || len(inEtcdSeen) != 0 {
+		t.Errorf("etcd data does not match the types we saw:\nin etcd data but not seen:\n%s\nseen but not in etcd data:\n%s", inEtcdData, inEtcdSeen)
 	}
 
-	inGVKData := diffMapKeys(gvkWhiteList, gvkSeen, gvStringer)
-	inGVKSeen := diffMapKeys(gvkSeen, gvkWhiteList, gvStringer)
-	if len(inGVKData) != 0 || len(inGVKSeen) != 0 {
-		t.Errorf("GVK whitelist data does not match the types we saw:\nin GVK whitelist but not seen:\n%s\nseen but not in GVK whitelist:\n%s", inGVKData, inGVKSeen)
+	if inEphemeralWhiteList, inEphemeralSeen := diffMaps(ephemeralWhiteList, ephemeralSeen); len(inEphemeralWhiteList) != 0 || len(inEphemeralSeen) != 0 {
+		t.Errorf("ephemeral whitelist does not match the types we saw:\nin ephemeral whitelist but not seen:\n%s\nseen but not in ephemeral whitelist:\n%s", inEphemeralWhiteList, inEphemeralSeen)
+	}
+
+	if inKindData, inKindSeen := diffMaps(kindWhiteList, kindSeen); len(inKindData) != 0 || len(inKindSeen) != 0 {
+		t.Errorf("kind whitelist data does not match the types we saw:\nin kind whitelist but not seen:\n%s\nseen but not in kind whitelist:\n%s", inKindData, inKindSeen)
 	}
 }
 
 type prerequisite struct {
-	gvr  unversioned.GroupVersionResource
-	stub string
+	gvrData unversioned.GroupVersionResource
+	stub    string
 }
 
 type empty struct{}
@@ -700,36 +716,106 @@ type cleanupData struct {
 	mapping *meta.RESTMapping
 }
 
-func createGVKWhiteList(gvks ...unversioned.GroupVersionKind) map[unversioned.GroupVersionKind]empty {
-	whiteList := map[unversioned.GroupVersionKind]empty{}
-	for _, gvk := range gvks {
-		_, ok := whiteList[gvk]
-		if ok {
-			panic("invalid whitelist contains duplicate keys")
-		}
-		whiteList[gvk] = empty{}
-	}
-	return whiteList
+func gvr(g, v, r string) unversioned.GroupVersionResource {
+	return unversioned.GroupVersionResource{Group: g, Version: v, Resource: r}
 }
 
-func jsonToObject(stub string, gvk unversioned.GroupVersionKind) (runtime.Object, error) {
-	obj, err := kapi.Scheme.New(gvk)
-	if err != nil {
-		return nil, err
+func getGVK(obj map[string]interface{}) unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj["apiVersion"].(string), obj["kind"].(string))
+}
+
+var requiredFields = sets.NewString("name", "namespace")
+
+func deepDerivativeMap(a, b map[string]interface{}) bool {
+	for key, aval := range a {
+		bval, ok := b[key]
+		if !ok && requiredFields.Has(key) { // fail if missing an important field
+			return false
+		} else if !ok { // if missing an unimportant field, assume type drift and do not compare
+			continue
+		}
+		if aval == nil || isZero(aval) {
+			continue
+		}
+		if !jsonCompare(aval, bval) {
+			return false
+		}
 	}
-	if err := json.Unmarshal([]byte(stub), obj); err != nil {
+	return true
+}
+
+func deepDerivativeSlice(a, b []interface{}) bool {
+	if len(a) == 0 {
+		return true
+	}
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		aval := a[i]
+		if aval == nil || isZero(aval) {
+			continue
+		}
+		bval := b[i]
+		if !jsonCompare(aval, bval) {
+			return false
+		}
+	}
+	return true
+}
+
+func jsonCompare(aval, bval interface{}) bool {
+	switch avalType := aval.(type) {
+	case bool:
+		bvalBool, correctType := bval.(bool)
+		return correctType && avalType == bvalBool
+	case float64:
+		bvalFloat, correctType := bval.(float64)
+		return correctType && floatEquals(avalType, bvalFloat)
+	case string:
+		bvalString, correctType := bval.(string)
+		return correctType && avalType == bvalString
+	case []interface{}:
+		bvalSlice, correctType := bval.([]interface{})
+		return correctType && deepDerivativeSlice(avalType, bvalSlice)
+	case map[string]interface{}:
+		bvalMap, correctType := bval.(map[string]interface{})
+		return correctType && deepDerivativeMap(avalType, bvalMap)
+	default:
+		panic("invalid type for JSON")
+	}
+}
+
+func floatEquals(a, b float64) bool {
+	return math.Abs(a-b) < 0.000001
+}
+
+func createEphemeralWhiteList(gvrs ...unversioned.GroupVersionResource) map[unversioned.GroupVersionResource]empty {
+	ephemeral := map[unversioned.GroupVersionResource]empty{}
+	for _, gvResource := range gvrs {
+		if _, ok := ephemeral[gvResource]; ok {
+			panic("invalid ephemeral whitelist contains duplicate keys")
+		}
+		ephemeral[gvResource] = empty{}
+	}
+	return ephemeral
+}
+
+func jsonToMap(stub string) (map[string]interface{}, error) {
+	obj := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(stub), &obj); err != nil {
 		return nil, err
 	}
 	return obj, nil
 }
 
-func gvStringer(i interface{}) string {
+func keyStringer(i interface{}) string {
 	base := "\n\t"
-	switch gv := i.(type) {
+	switch key := i.(type) {
+	case string:
+		return base + key
 	case unversioned.GroupVersionResource:
-		return base + gv.String()
-	case unversioned.GroupVersionKind:
-		return base + gv.String()
+		return base + key.String()
 	default:
 		panic("unexpected type")
 	}
@@ -800,10 +886,12 @@ func (c *allClient) cleanup(all *[]cleanupData) error {
 		mapping := (*all)[i].mapping
 
 		if err := c.destroy(obj, mapping); err != nil {
-			if kubeerr.IsNotFound(err) && isInInvalidNameWhiteList(obj) {
-				return nil
+			if kubeerr.IsNotFound(err) && isInInvalidNameWhiteList(mapping) {
+				continue
 			}
 			return err
+		} else if err == nil && isInInvalidNameWhiteList(mapping) {
+			return fmt.Errorf("Object %#v with mapping %#v should fail to delete if it is in the invalid name whitelist", obj, mapping)
 		}
 	}
 	return nil
@@ -811,7 +899,7 @@ func (c *allClient) cleanup(all *[]cleanupData) error {
 
 func (c *allClient) createPrerequisites(mapper meta.RESTMapper, ns string, prerequisites []prerequisite, all *[]cleanupData) error {
 	for _, prerequisite := range prerequisites {
-		gvk, err := mapper.KindFor(prerequisite.gvr)
+		gvk, err := mapper.KindFor(prerequisite.gvrData)
 		if err != nil {
 			return err
 		}
@@ -901,59 +989,27 @@ func createSerializers(config restclient.ContentConfig) (*restclient.Serializers
 	return s, nil
 }
 
-func isInCreateAndCompareWhiteList(obj runtime.Object) bool {
-	switch obj.(type) {
-	case *authorizationapiv1.ClusterPolicyBinding, *authorizationapiv1.ClusterPolicy: // TODO figure out how to not whitelist these
-		return true
-		// Removed this case per soltysh's request to not have so many exceptions, but leaving here so people are not confused by the errors
-		// Note that this case no longer makes sense because we never create objects in this whitelist, and thus enabling
-		// this would cause the test to fail because it would be looking in etcd for an object it never created
-		//case *apisbatchv2alpha1.CronJob: // since we do not cleanup once a test is failed, we will get an AlreadyExists error since ScheduledJob aliases CronJob
-		//	return true
-	}
-	return false
-}
-
-func isInInvalidNameWhiteList(obj runtime.Object) bool {
-	switch obj.(type) {
-	case *sdnapi.HostSubnet, *sdnapi.NetNamespace: // TODO figure out how to not whitelist these
+// do NOT add anything to this - doing so means you wrote something that is broken
+func isInInvalidNameWhiteList(mapping *meta.RESTMapping) bool {
+	switch mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource) {
+	case gvr("", "v1", "netnamespaces"), gvr("", "v1", "hostsubnets"): // TODO figure out how to not whitelist these
 		return true
 	}
 	return false
 }
 
-func isInKindAndPathWhiteList(kind, pkgPath string) bool {
-	switch {
-	// aliases for templateapiv1.Template
-	case kind == "TemplateConfig" && pkgPath == "github.com/openshift/origin/pkg/template/api/v1",
-		kind == "ProcessedTemplate" && pkgPath == "github.com/openshift/origin/pkg/template/api/v1":
-		return true
-	}
-	return false
-}
-
-func getFromEtcd(keys etcd.KeysAPI, path string, gvk unversioned.GroupVersionKind) (runtime.Object, error) {
+func getFromEtcd(keys etcd.KeysAPI, path string) (map[string]interface{}, error) {
 	response, err := keys.Get(context.Background(), path, nil)
 	if err != nil {
 		return nil, err
 	}
-	output, err := jsonToObject(response.Node.Value, gvk)
-	if err != nil {
-		return nil, err
-	}
-	return unsetProblematicFields(output), nil
+	return jsonToMap(response.Node.Value)
 }
 
-// TODO figure out how to get rid of this hack
-func unsetProblematicFields(obj runtime.Object) runtime.Object {
-	e := reflect.ValueOf(obj).Elem()
-	for fieldName, fieldValue := range map[string]interface{}{
-		"CreationTimestamp": unversioned.Time{},
-		"Generation":        int64(0),
-	} {
-		e.FieldByName(fieldName).Set(reflect.ValueOf(fieldValue))
-	}
-	return obj
+func diffMaps(a, b interface{}) ([]string, []string) {
+	inA := diffMapKeys(a, b, keyStringer)
+	inB := diffMapKeys(b, a, keyStringer)
+	return inA, inB
 }
 
 func diffMapKeys(a, b interface{}, stringer func(interface{}) string) []string {
@@ -979,27 +1035,40 @@ func diffMapKeys(a, b interface{}, stringer func(interface{}) string) []string {
 	return ret
 }
 
+func isZeroMap(m map[string]interface{}) bool {
+	for _, val := range m {
+		if !isZero(val) {
+			return false
+		}
+	}
+	return true
+}
+
+func isZero(i interface{}) bool {
+	return isZeroValue(reflect.ValueOf(i))
+}
+
 // TODO replace with reflect.IsZero when that gets added in 1.9
-func isZero(v reflect.Value) bool {
+func isZeroValue(v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.Func, reflect.Map, reflect.Slice:
 		return v.IsNil()
 	case reflect.Array:
 		z := true
 		for i := 0; i < v.Len(); i++ {
-			z = z && isZero(v.Index(i))
+			z = z && isZeroValue(v.Index(i))
 		}
 		return z
 	case reflect.Struct:
 		z := true
 		for i := 0; i < v.NumField(); i++ {
 			if v.Field(i).CanSet() {
-				z = z && isZero(v.Field(i))
+				z = z && isZeroValue(v.Field(i))
 			}
 		}
 		return z
 	case reflect.Ptr:
-		return isZero(reflect.Indirect(v))
+		return isZeroValue(reflect.Indirect(v))
 	}
 	if !v.IsValid() {
 		return true
