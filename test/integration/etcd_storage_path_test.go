@@ -3,7 +3,6 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"mime"
 	"net/http"
 	"reflect"
@@ -49,7 +48,7 @@ var etcdStorageData = map[unversioned.GroupVersionResource]struct {
 		expectedEtcdPath: "openshift.io/authorization/cluster/policies/default",
 	},
 	gvr("", "v1", "policybindings"): {
-		stub:             `{"roleBindings": [{"name": "rb", "roleBinding": {"metadata": {"name": "rb", "namespace": "etcdstoragepathtestnamespace"}, "roleRef": {"name": "r"}}}]}`,
+		stub:             `{"metadata": {"name": ":default"}, "roleBindings": [{"name": "rb", "roleBinding": {"metadata": {"name": "rb", "namespace": "etcdstoragepathtestnamespace"}, "roleRef": {"name": "r"}}}]}`,
 		expectedEtcdPath: "openshift.io/authorization/local/policybindings/etcdstoragepathtestnamespace/:default",
 	},
 	gvr("", "v1", "rolebindingrestrictions"): {
@@ -57,7 +56,7 @@ var etcdStorageData = map[unversioned.GroupVersionResource]struct {
 		expectedEtcdPath: "openshift.io/rolebindingrestrictions/etcdstoragepathtestnamespace/rbr",
 	},
 	gvr("", "v1", "policies"): {
-		stub:             `{"roles": [{"name": "r", "role": {"metadata": {"name": "r", "namespace": "etcdstoragepathtestnamespace"}}}]}`,
+		stub:             `{"metadata": {"name": "default"}, "roles": [{"name": "r", "role": {"metadata": {"name": "r", "namespace": "etcdstoragepathtestnamespace"}}}]}`,
 		expectedEtcdPath: "openshift.io/authorization/local/policies/etcdstoragepathtestnamespace/default",
 	},
 	// --
@@ -93,7 +92,7 @@ var etcdStorageData = map[unversioned.GroupVersionResource]struct {
 
 	// github.com/openshift/origin/pkg/oauth/api/v1
 	gvr("", "v1", "oauthclientauthorizations"): {
-		stub:             `{"clientName": "system:serviceaccount:etcdstoragepathtestnamespace:client", "scopes": ["user:info"], "userName": "user", "userUID": "cannot be empty"}`,
+		stub:             `{"clientName": "system:serviceaccount:etcdstoragepathtestnamespace:client", "metadata": {"name": "user:system:serviceaccount:etcdstoragepathtestnamespace:client"}, "scopes": ["user:info"], "userName": "user", "userUID": "cannot be empty"}`,
 		expectedEtcdPath: "openshift.io/oauth/clientauthorizations/user:system:serviceaccount:etcdstoragepathtestnamespace:client",
 		prerequisites: []prerequisite{
 			{
@@ -639,10 +638,10 @@ func TestEtcdStoragePath(t *testing.T) {
 
 		shouldCreate := len(testData.stub) != 0 // try to create only if we have a stub
 
-		var input map[string]interface{}
+		var input *metaObject
 		if shouldCreate {
-			if input, err = jsonToMap(testData.stub); err != nil || isZeroMap(input) {
-				t.Errorf("invalid test data for %s from %s: %s", kind, pkgPath, err)
+			if input, err = jsonToMetaObject(testData.stub); err != nil || input.isEmpty() {
+				t.Errorf("invalid test data for %s from %s: %v", kind, pkgPath, err)
 				continue
 			}
 		}
@@ -680,12 +679,12 @@ func TestEtcdStoragePath(t *testing.T) {
 				expectedGVK = *testData.expectedGVK
 			}
 
-			actualGVK := getGVK(output)
+			actualGVK := output.getGVK()
 			if actualGVK != expectedGVK {
 				t.Errorf("GVK for %s from %s does not match, expected %s got %s", kind, pkgPath, expectedGVK, actualGVK)
 			}
 
-			if !deepDerivativeMap(input, output) {
+			if !kapi.Semantic.DeepDerivative(input, output) {
 				t.Errorf("Test stub for %s from %s does not match: %s", kind, pkgPath, diff.ObjectGoPrintDiff(input, output))
 			}
 		}()
@@ -704,6 +703,27 @@ func TestEtcdStoragePath(t *testing.T) {
 	}
 }
 
+// stable fields to compare as a sanity check
+type metaObject struct {
+	// all of type meta
+	Kind       string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
+
+	// parts of object meta
+	Metadata struct {
+		Name      string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+		Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+	} `json:"metadata,omitempty" protobuf:"bytes,3,opt,name=metadata"`
+}
+
+func (obj *metaObject) getGVK() unversioned.GroupVersionKind {
+	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+func (obj *metaObject) isEmpty() bool {
+	return obj == nil || *obj == metaObject{} // compare to zero value since all fields are strings
+}
+
 type prerequisite struct {
 	gvrData unversioned.GroupVersionResource
 	stub    string
@@ -720,76 +740,6 @@ func gvr(g, v, r string) unversioned.GroupVersionResource {
 	return unversioned.GroupVersionResource{Group: g, Version: v, Resource: r}
 }
 
-func getGVK(obj map[string]interface{}) unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind(obj["apiVersion"].(string), obj["kind"].(string))
-}
-
-var requiredFields = sets.NewString("name", "namespace")
-
-func deepDerivativeMap(a, b map[string]interface{}) bool {
-	for key, aval := range a {
-		bval, ok := b[key]
-		if !ok && requiredFields.Has(key) { // fail if missing an important field
-			return false
-		} else if !ok { // if missing an unimportant field, assume type drift and do not compare
-			continue
-		}
-		if aval == nil || isZero(aval) {
-			continue
-		}
-		if !jsonCompare(aval, bval) {
-			return false
-		}
-	}
-	return true
-}
-
-func deepDerivativeSlice(a, b []interface{}) bool {
-	if len(a) == 0 {
-		return true
-	}
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		aval := a[i]
-		if aval == nil || isZero(aval) {
-			continue
-		}
-		bval := b[i]
-		if !jsonCompare(aval, bval) {
-			return false
-		}
-	}
-	return true
-}
-
-func jsonCompare(aval, bval interface{}) bool {
-	switch avalType := aval.(type) {
-	case bool:
-		bvalBool, correctType := bval.(bool)
-		return correctType && avalType == bvalBool
-	case float64:
-		bvalFloat, correctType := bval.(float64)
-		return correctType && floatEquals(avalType, bvalFloat)
-	case string:
-		bvalString, correctType := bval.(string)
-		return correctType && avalType == bvalString
-	case []interface{}:
-		bvalSlice, correctType := bval.([]interface{})
-		return correctType && deepDerivativeSlice(avalType, bvalSlice)
-	case map[string]interface{}:
-		bvalMap, correctType := bval.(map[string]interface{})
-		return correctType && deepDerivativeMap(avalType, bvalMap)
-	default:
-		panic("invalid type for JSON")
-	}
-}
-
-func floatEquals(a, b float64) bool {
-	return math.Abs(a-b) < 0.000001
-}
-
 func createEphemeralWhiteList(gvrs ...unversioned.GroupVersionResource) map[unversioned.GroupVersionResource]empty {
 	ephemeral := map[unversioned.GroupVersionResource]empty{}
 	for _, gvResource := range gvrs {
@@ -801,8 +751,8 @@ func createEphemeralWhiteList(gvrs ...unversioned.GroupVersionResource) map[unve
 	return ephemeral
 }
 
-func jsonToMap(stub string) (map[string]interface{}, error) {
-	obj := map[string]interface{}{}
+func jsonToMetaObject(stub string) (*metaObject, error) {
+	obj := &metaObject{}
 	if err := json.Unmarshal([]byte(stub), &obj); err != nil {
 		return nil, err
 	}
@@ -998,12 +948,12 @@ func isInInvalidNameWhiteList(mapping *meta.RESTMapping) bool {
 	return false
 }
 
-func getFromEtcd(keys etcd.KeysAPI, path string) (map[string]interface{}, error) {
+func getFromEtcd(keys etcd.KeysAPI, path string) (*metaObject, error) {
 	response, err := keys.Get(context.Background(), path, nil)
 	if err != nil {
 		return nil, err
 	}
-	return jsonToMap(response.Node.Value)
+	return jsonToMetaObject(response.Node.Value)
 }
 
 func diffMaps(a, b interface{}) ([]string, []string) {
@@ -1033,47 +983,4 @@ func diffMapKeys(a, b interface{}, stringer func(interface{}) string) []string {
 	}
 
 	return ret
-}
-
-func isZeroMap(m map[string]interface{}) bool {
-	for _, val := range m {
-		if !isZero(val) {
-			return false
-		}
-	}
-	return true
-}
-
-func isZero(i interface{}) bool {
-	return isZeroValue(reflect.ValueOf(i))
-}
-
-// TODO replace with reflect.IsZero when that gets added in 1.9
-func isZeroValue(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.Func, reflect.Map, reflect.Slice:
-		return v.IsNil()
-	case reflect.Array:
-		z := true
-		for i := 0; i < v.Len(); i++ {
-			z = z && isZeroValue(v.Index(i))
-		}
-		return z
-	case reflect.Struct:
-		z := true
-		for i := 0; i < v.NumField(); i++ {
-			if v.Field(i).CanSet() {
-				z = z && isZeroValue(v.Field(i))
-			}
-		}
-		return z
-	case reflect.Ptr:
-		return isZeroValue(reflect.Indirect(v))
-	}
-	if !v.IsValid() {
-		return true
-	}
-	// Compare other types directly:
-	z := reflect.Zero(v.Type())
-	return v.Interface() == z.Interface()
 }
