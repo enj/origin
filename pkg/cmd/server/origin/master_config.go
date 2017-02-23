@@ -665,7 +665,7 @@ func newAuthenticator(config configapi.MasterConfig, restOptionsGetter restoptio
 		authenticators = append(authenticators, certauth)
 	}
 
-	ret := &unionrequest.Authenticator{
+	var ret authenticator.Request = &unionrequest.Authenticator{
 		FailOnError: true,
 		Handlers: []authenticator.Request{
 			// if you change this, have a look at the impersonationFilter where we attach groups to the impersonated user
@@ -684,9 +684,12 @@ func newAuthenticator(config configapi.MasterConfig, restOptionsGetter restoptio
 			config.AuthConfig.RequestHeader.ExtraHeaderPrefixes,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Error building front proxy auth config: %v", err)
 		}
-		ret.Handlers = append([]authenticator.Request{requestHeaderAuthenticator}, ret.Handlers...)
+		// First try to authenticate with the front proxy
+		// If that fails then gracefully fallthrough to the original authentication chain
+		// Thus failing to authenticate with the front proxy is equivalent to not having the proxy in the authentication chain
+		ret = unionrequest.NewUnionAuthentication(requestHeaderAuthenticator, ret)
 	}
 
 	return ret, nil
