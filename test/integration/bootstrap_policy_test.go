@@ -196,16 +196,7 @@ func TestSelfSubjectAccessReviewsNonExistingNamespace(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	valerieClientConfig := *clusterAdminClientConfig
-	valerieClientConfig.Username = ""
-	valerieClientConfig.Password = ""
-	valerieClientConfig.BearerToken = ""
-	valerieClientConfig.CertFile = ""
-	valerieClientConfig.KeyFile = ""
-	valerieClientConfig.CertData = nil
-	valerieClientConfig.KeyData = nil
-
-	valerieOpenshiftClient, _, _, err := testutil.GetClientForUser(valerieClientConfig, "valerie")
+	valerieOpenshiftClient, valerieKubeClient, _, err := testutil.GetClientForUser(*clusterAdminClientConfig, "valerie")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -213,12 +204,14 @@ func TestSelfSubjectAccessReviewsNonExistingNamespace(t *testing.T) {
 	// ensure that a SAR for a non-exisitng namespace gives a SAR response and not a
 	// namespace doesn't exist response from admisison.
 	askCanICreatePodsInNonExistingNamespace := &authorizationapi.LocalSubjectAccessReview{
+		User:   "valerie",
 		Action: authorizationapi.Action{Namespace: "foo", Verb: "create", Resource: "pods"},
 	}
 	subjectAccessReviewTest{
-		description:    "ensure SAR for non-existing namespace does not leak namespace info",
-		localInterface: valerieOpenshiftClient.LocalSubjectAccessReviews("foo"),
-		localReview:    askCanICreatePodsInNonExistingNamespace,
+		description:        "ensure SAR for non-existing namespace does not leak namespace info",
+		localInterface:     valerieOpenshiftClient.LocalSubjectAccessReviews("foo"),
+		localReview:        askCanICreatePodsInNonExistingNamespace,
+		kubeLocalInterface: valerieKubeClient.Authorization(),
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "valerie" cannot create pods in project "foo"`,

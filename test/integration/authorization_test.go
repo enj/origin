@@ -11,7 +11,9 @@ import (
 	kapierror "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kunvapi "k8s.io/kubernetes/pkg/api/unversioned"
+	kubeauthorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
@@ -609,55 +611,177 @@ type subjectAccessReviewTest struct {
 	localReview      *authorizationapi.LocalSubjectAccessReview
 	clusterReview    *authorizationapi.SubjectAccessReview
 
+	user      string
+	namespace string
+
+	kubeLocalInterface   internalversion.LocalSubjectAccessReviewsGetter
+	kubeClusterInterface internalversion.SubjectAccessReviewsGetter
+
 	response authorizationapi.SubjectAccessReviewResponse
 	err      string
 }
 
 func (test subjectAccessReviewTest) run(t *testing.T) {
-	failMessage := ""
-	err := wait.Poll(testutil.PolicyCachePollInterval, testutil.PolicyCachePollTimeout, func() (bool, error) {
-		var err error
-		var actualResponse *authorizationapi.SubjectAccessReviewResponse
-		if test.localReview != nil {
-			actualResponse, err = test.localInterface.Create(test.localReview)
-		} else {
-			actualResponse, err = test.clusterInterface.Create(test.clusterReview)
-		}
-		if len(test.err) > 0 {
-			if err == nil {
-				failMessage = fmt.Sprintf("%s: Expected error: %v", test.description, test.err)
-				return false, nil
-			} else if !strings.HasPrefix(err.Error(), test.err) {
-				failMessage = fmt.Sprintf("%s: expected\n\t%v\ngot\n\t%v", test.description, test.err, err)
-				return false, nil
-			}
-		} else {
-			if err != nil {
-				failMessage = fmt.Sprintf("%s: unexpected error: %v", test.description, err)
-				return false, nil
-			}
-		}
-
-		if (actualResponse.Namespace != test.response.Namespace) ||
-			(actualResponse.Allowed != test.response.Allowed) ||
-			(!strings.HasPrefix(actualResponse.Reason, test.response.Reason)) {
+	{
+		failMessage := ""
+		err := wait.Poll(testutil.PolicyCachePollInterval, testutil.PolicyCachePollTimeout, func() (bool, error) {
+			var err error
+			var actualResponse *authorizationapi.SubjectAccessReviewResponse
 			if test.localReview != nil {
-				failMessage = fmt.Sprintf("%s: from local review\n\t%#v\nexpected\n\t%#v\ngot\n\t%#v", test.description, test.localReview, &test.response, actualResponse)
+				actualResponse, err = test.localInterface.Create(test.localReview)
 			} else {
-				failMessage = fmt.Sprintf("%s: from review\n\t%#v\nexpected\n\t%#v\ngot\n\t%#v", test.description, test.clusterReview, &test.response, actualResponse)
+				actualResponse, err = test.clusterInterface.Create(test.clusterReview)
 			}
-			return false, nil
+			if len(test.err) > 0 {
+				if err == nil {
+					failMessage = fmt.Sprintf("%s: Expected error: %v", test.description, test.err)
+					return false, nil
+				} else if !strings.HasPrefix(err.Error(), test.err) {
+					failMessage = fmt.Sprintf("%s: expected\n\t%v\ngot\n\t%v", test.description, test.err, err)
+					return false, nil
+				}
+			} else {
+				if err != nil {
+					failMessage = fmt.Sprintf("%s: unexpected error: %v", test.description, err)
+					return false, nil
+				}
+			}
+
+			if (actualResponse.Namespace != test.response.Namespace) ||
+				(actualResponse.Allowed != test.response.Allowed) ||
+				(!strings.HasPrefix(actualResponse.Reason, test.response.Reason)) {
+				if test.localReview != nil {
+					failMessage = fmt.Sprintf("%s: from local review\n\t%#v\nexpected\n\t%#v\ngot\n\t%#v", test.description, test.localReview, &test.response, actualResponse)
+				} else {
+					failMessage = fmt.Sprintf("%s: from review\n\t%#v\nexpected\n\t%#v\ngot\n\t%#v", test.description, test.clusterReview, &test.response, actualResponse)
+				}
+				return false, nil
+			}
+
+			failMessage = ""
+			return true, nil
+		})
+
+		if err != nil {
+			t.Error(err)
 		}
-
-		failMessage = ""
-		return true, nil
-	})
-
-	if err != nil {
-		t.Error(err)
+		if len(failMessage) != 0 {
+			t.Error(failMessage)
+		}
 	}
-	if len(failMessage) != 0 {
-		t.Error(failMessage)
+
+	if test.kubeLocalInterface != nil || test.kubeClusterInterface != nil {
+		testNS := test.response.Namespace
+		if len(testNS) == 0 {
+			testNS = test.namespace
+		}
+		failMessage := ""
+		err := wait.Poll(testutil.PolicyCachePollInterval, testutil.PolicyCachePollTimeout, func() (bool, error) {
+			var err error
+			var actualResponse kubeauthorizationapi.SubjectAccessReviewStatus
+			if test.localReview != nil {
+				var tmp *kubeauthorizationapi.LocalSubjectAccessReview
+				if tmp, err = test.kubeLocalInterface.LocalSubjectAccessReviews(testNS).Create(toKubeLocalSAR(testNS, test.user, test.localReview)); err == nil {
+					actualResponse = tmp.Status
+				}
+			} else {
+				var tmp *kubeauthorizationapi.SubjectAccessReview
+				if tmp, err = test.kubeClusterInterface.SubjectAccessReviews().Create(toKubeClusterSAR(test.clusterReview)); err == nil {
+					actualResponse = tmp.Status
+				}
+			}
+			if len(test.err) > 0 {
+				if err == nil {
+					failMessage = fmt.Sprintf("%s: Expected error: %v\ngot\n\t%#v", test.description, test.err, actualResponse)
+					return false, nil
+				} else if !strings.HasPrefix(err.Error(), test.err) {
+					failMessage = fmt.Sprintf("%s: expected\n\t%v\ngot\n\t%v", test.description, test.err, err)
+					return false, nil
+				}
+			} else {
+				if err != nil {
+					failMessage = fmt.Sprintf("%s: unexpected error: %v", test.description, err)
+					return false, nil
+				}
+			}
+
+			//if (actualResponse.Namespace != test.response.Namespace) ||
+			if (actualResponse.Allowed != test.response.Allowed) ||
+				(!strings.HasPrefix(actualResponse.Reason, test.response.Reason)) {
+				if test.localReview != nil {
+					failMessage = fmt.Sprintf("%s: from local review\n\t%#v\nexpected\n\t%#v\ngot\n\t%#v", test.description, test.localReview, &test.response, actualResponse)
+				} else {
+					failMessage = fmt.Sprintf("%s: from review\n\t%#v\nexpected\n\t%#v\ngot\n\t%#v", test.description, test.clusterReview, &test.response, actualResponse)
+				}
+				return false, nil
+			}
+
+			failMessage = ""
+			return true, nil
+		})
+
+		if err != nil {
+			t.Error(err)
+		}
+		if len(failMessage) != 0 {
+			t.Error(failMessage)
+		}
+	}
+}
+
+func toKubeLocalSAR(testNS, testUser string, sar *authorizationapi.LocalSubjectAccessReview) *kubeauthorizationapi.LocalSubjectAccessReview {
+	ns := sar.Namespace
+	if len(ns) == 0 {
+		ns = testNS
+	}
+	user := sar.User
+	if len(user) == 0 {
+		user = testUser
+	}
+	return &kubeauthorizationapi.LocalSubjectAccessReview{
+		ObjectMeta: kapi.ObjectMeta{Namespace: ns},
+		Spec: kubeauthorizationapi.SubjectAccessReviewSpec{
+			User:   user,
+			Groups: sar.Groups.List(),
+			//Extra: scope?? TODO
+			ResourceAttributes: &kubeauthorizationapi.ResourceAttributes{
+				Namespace: ns,
+				Verb:      sar.Verb,
+				Group:     sar.Group,
+				Version:   sar.Version,
+				Resource:  sar.Resource,
+				//Subresource :sar.Subreouse,?? TODO
+				Name: sar.ResourceName,
+			},
+			//NonResourceAttributes: &kubeauthorizationapi.NonResourceAttributes{
+			//	Path: sar.Path,
+			//	Verb: sar.Verb,
+			//},
+		},
+	}
+}
+
+func toKubeClusterSAR(sar *authorizationapi.SubjectAccessReview) *kubeauthorizationapi.SubjectAccessReview {
+	return &kubeauthorizationapi.SubjectAccessReview{
+		ObjectMeta: kapi.ObjectMeta{Namespace: sar.Namespace},
+		Spec: kubeauthorizationapi.SubjectAccessReviewSpec{
+			User:   sar.User,
+			Groups: sar.Groups.List(),
+			//Extra: scope?? TODO
+			ResourceAttributes: &kubeauthorizationapi.ResourceAttributes{
+				Namespace: sar.Namespace,
+				Verb:      sar.Verb,
+				Group:     sar.Group,
+				Version:   sar.Version,
+				Resource:  sar.Resource,
+				//Subresource :sar.Subreouse,?? TODO
+				Name: sar.ResourceName,
+			},
+			//NonResourceAttributes: &kubeauthorizationapi.NonResourceAttributes{
+			//	Path: sar.Path,
+			//	Verb: sar.Verb,
+			//},
+		},
 	}
 }
 
@@ -674,6 +798,13 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	clusterAdminKubeClient, err := testutil.GetClusterAdminKubeClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	clusterAdminLocalSARGetter := clusterAdminKubeClient.Authorization()
 
 	clusterAdminClientConfig, err := testutil.GetClusterAdminClientConfig(clusterAdminKubeConfig)
 	if err != nil {
@@ -693,6 +824,7 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 			User:   "harold",
 			Action: authorizationapi.Action{Verb: "get", Group: "extensions", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in hammer-project",
@@ -706,6 +838,7 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 			User:   "harold",
 			Action: authorizationapi.Action{Verb: "get", Group: "", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "harold" cannot get horizontalpodautoscalers in project "hammer-project"`,
@@ -719,6 +852,7 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 			User:   "harold",
 			Action: authorizationapi.Action{Verb: "get", Group: "foo", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminKubeClient.Authorization(),
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "harold" cannot get foo.horizontalpodautoscalers in project "hammer-project"`,
@@ -732,6 +866,7 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 			User:   "harold",
 			Action: authorizationapi.Action{Verb: "get", Group: "*", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "harold" cannot get *.horizontalpodautoscalers in project "hammer-project"`,
@@ -744,8 +879,10 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 		description:    "cluster admin told they can get extensions.horizontalpodautoscalers in project hammer-project",
 		localInterface: clusterAdminClient.LocalSubjectAccessReviews("any-project"),
 		localReview: &authorizationapi.LocalSubjectAccessReview{
-			Action: authorizationapi.Action{Verb: "get", Group: "extensions", Resource: "horizontalpodautoscalers"},
+			Action: authorizationapi.Action{Namespace: "any-project", Verb: "get", Group: "extensions", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
+		user:               "system:admin",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in any-project",
@@ -756,8 +893,10 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 		description:    "cluster admin told they can get horizontalpodautoscalers (with no API group) in project any-project",
 		localInterface: clusterAdminClient.LocalSubjectAccessReviews("any-project"),
 		localReview: &authorizationapi.LocalSubjectAccessReview{
-			Action: authorizationapi.Action{Verb: "get", Group: "", Resource: "horizontalpodautoscalers"},
+			Action: authorizationapi.Action{Namespace: "any-project", Verb: "get", Group: "", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
+		user:               "system:admin",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in any-project",
@@ -768,8 +907,10 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 		description:    "cluster admin told they can get horizontalpodautoscalers (with invalid API group) in project any-project",
 		localInterface: clusterAdminClient.LocalSubjectAccessReviews("any-project"),
 		localReview: &authorizationapi.LocalSubjectAccessReview{
-			Action: authorizationapi.Action{Verb: "get", Group: "foo", Resource: "horizontalpodautoscalers"},
+			Action: authorizationapi.Action{Namespace: "any-project", Verb: "get", Group: "foo", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
+		user:               "system:admin",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in any-project",
@@ -780,8 +921,10 @@ func TestAuthorizationSubjectAccessReviewAPIGroup(t *testing.T) {
 		description:    "cluster admin told they can get horizontalpodautoscalers (with * API group) in project any-project",
 		localInterface: clusterAdminClient.LocalSubjectAccessReviews("any-project"),
 		localReview: &authorizationapi.LocalSubjectAccessReview{
-			Action: authorizationapi.Action{Verb: "get", Group: "*", Resource: "horizontalpodautoscalers"},
+			Action: authorizationapi.Action{Namespace: "any-project", Verb: "get", Group: "*", Resource: "horizontalpodautoscalers"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
+		user:               "system:admin",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in any-project",
@@ -804,6 +947,13 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	clusterAdminKubeClient, err := testutil.GetClusterAdminKubeClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	clusterAdminLocalSARGetter := clusterAdminKubeClient.Authorization()
+
 	clusterAdminClientConfig, err := testutil.GetClusterAdminClientConfig(clusterAdminKubeConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -813,6 +963,11 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	_, haroldKubeClient, _, err := testutil.GetClientForUser(*clusterAdminClientConfig, "harold")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	haroldLocalSARGetter := haroldKubeClient.Authorization()
 
 	markClient, err := testserver.CreateNewProject(clusterAdminClient, *clusterAdminClientConfig, "mallet-project", "mark")
 	if err != nil {
@@ -860,6 +1015,7 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 			User:   "danny",
 			Action: authorizationapi.Action{Verb: "get", Resource: "projects"},
 		},
+		kubeLocalInterface: clusterAdminLocalSARGetter,
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in default",
@@ -914,9 +1070,10 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		Action: authorizationapi.Action{Verb: "get", Resource: "projects"},
 	}
 	subjectAccessReviewTest{
-		description:    "harold told valerie can get project hammer-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("hammer-project"),
-		localReview:    askCanValerieGetProject,
+		description:        "harold told valerie can get project hammer-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("hammer-project"),
+		localReview:        askCanValerieGetProject,
+		kubeLocalInterface: haroldLocalSARGetter,
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in hammer-project",
@@ -950,10 +1107,12 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 	}.run(t)
 	// ensure unprivileged users cannot check other users' access
 	subjectAccessReviewTest{
-		description:    "harold denied ability to run subject access review in project mallet-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("mallet-project"),
-		localReview:    askCanEdgarDeletePods,
-		err:            `User "harold" cannot create localsubjectaccessreviews in project "mallet-project"`,
+		description:        "harold denied ability to run subject access review in project mallet-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("mallet-project"),
+		localReview:        askCanEdgarDeletePods,
+		kubeLocalInterface: haroldLocalSARGetter,
+		namespace:          "mallet-project",
+		err:                `User "harold" cannot create localsubjectaccessreviews in project "mallet-project"`,
 	}.run(t)
 	subjectAccessReviewTest{
 		description:    "system:anonymous denied ability to run subject access review in project mallet-project",
@@ -963,10 +1122,12 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 	}.run(t)
 	// ensure message does not leak whether the namespace exists or not
 	subjectAccessReviewTest{
-		description:    "harold denied ability to run subject access review in project nonexistent-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("nonexistent-project"),
-		localReview:    askCanEdgarDeletePods,
-		err:            `User "harold" cannot create localsubjectaccessreviews in project "nonexistent-project"`,
+		description:        "harold denied ability to run subject access review in project nonexistent-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("nonexistent-project"),
+		localReview:        askCanEdgarDeletePods,
+		kubeLocalInterface: haroldLocalSARGetter,
+		namespace:          "nonexistent-project",
+		err:                `User "harold" cannot create localsubjectaccessreviews in project "nonexistent-project"`,
 	}.run(t)
 	subjectAccessReviewTest{
 		description:    "system:anonymous denied ability to run subject access review in project nonexistent-project",
@@ -980,9 +1141,10 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		Action: authorizationapi.Action{Verb: "update", Resource: "projects"},
 	}
 	subjectAccessReviewTest{
-		description:    "harold told harold can update project hammer-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("hammer-project"),
-		localReview:    askCanHaroldUpdateProject,
+		description:        "harold told harold can update project hammer-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("hammer-project"),
+		localReview:        askCanHaroldUpdateProject,
+		kubeLocalInterface: haroldLocalSARGetter,
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in hammer-project",
@@ -1015,9 +1177,11 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		Action: authorizationapi.Action{Verb: "create", Resource: "pods"},
 	}
 	subjectAccessReviewTest{
-		description:    "harold told he can create pods in project hammer-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("hammer-project"),
-		localReview:    askCanICreatePods,
+		description:        "harold told he can create pods in project hammer-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("hammer-project"),
+		localReview:        askCanICreatePods,
+		kubeLocalInterface: haroldLocalSARGetter,
+		user:               "harold",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   true,
 			Reason:    "allowed by rule in hammer-project",
@@ -1037,9 +1201,11 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 
 	// test checking self permissions when denied
 	subjectAccessReviewTest{
-		description:    "harold told he cannot create pods in project mallet-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("mallet-project"),
-		localReview:    askCanICreatePods,
+		description:        "harold told he cannot create pods in project mallet-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("mallet-project"),
+		localReview:        askCanICreatePods,
+		kubeLocalInterface: haroldLocalSARGetter,
+		user:               "harold",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "harold" cannot create pods in project "mallet-project"`,
@@ -1060,9 +1226,11 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 	// test checking self-permissions doesn't leak whether namespace exists or not
 	// We carry a patch to allow this
 	subjectAccessReviewTest{
-		description:    "harold told he cannot create pods in project nonexistent-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("nonexistent-project"),
-		localReview:    askCanICreatePods,
+		description:        "harold told he cannot create pods in project nonexistent-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("nonexistent-project"),
+		localReview:        askCanICreatePods,
+		kubeLocalInterface: haroldLocalSARGetter,
+		user:               "harold",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "harold" cannot create pods in project "nonexistent-project"`,
@@ -1084,9 +1252,11 @@ func TestAuthorizationSubjectAccessReview(t *testing.T) {
 		Action: authorizationapi.Action{Verb: "create", Resource: "policybindings"},
 	}
 	subjectAccessReviewTest{
-		description:    "harold told he can create policybindings in project hammer-project",
-		localInterface: haroldClient.LocalSubjectAccessReviews("hammer-project"),
-		localReview:    askCanICreatePolicyBindings,
+		description:        "harold told he can create policybindings in project hammer-project",
+		localInterface:     haroldClient.LocalSubjectAccessReviews("hammer-project"),
+		kubeLocalInterface: haroldLocalSARGetter,
+		localReview:        askCanICreatePolicyBindings,
+		user:               "harold",
 		response: authorizationapi.SubjectAccessReviewResponse{
 			Allowed:   false,
 			Reason:    `User "harold" cannot create policybindings in project "hammer-project"`,
