@@ -304,7 +304,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 
 				authorizationapi.NewRule(readWrite...).Groups(authzGroup).Resources("roles", "rolebindings").RuleOrDie(),
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("localresourceaccessreviews", "localsubjectaccessreviews", "subjectrulesreviews").RuleOrDie(),
-				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("selfsubjectaccessreviews", "subjectaccessreviews", "localsubjectaccessreviews").RuleOrDie(),
+				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
 				authorizationapi.NewRule("create").Groups(securityGroup).Resources("podsecuritypolicysubjectreviews", "podsecuritypolicyselfsubjectreviews", "podsecuritypolicyreviews").RuleOrDie(),
 
 				authorizationapi.NewRule(read...).Groups(authzGroup).Resources("policies", "policybindings", "rolebindingrestrictions").RuleOrDie(),
@@ -464,7 +464,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				authorizationapi.NewRule("list", "watch").Groups(projectGroup).Resources("projects").RuleOrDie(),
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("selfsubjectrulesreviews").RuleOrDie(),
 				{Verbs: sets.NewString("create"), APIGroups: []string{authzGroup}, Resources: sets.NewString("subjectaccessreviews", "localsubjectaccessreviews"), AttributeRestrictions: &authorizationapi.IsPersonalSubjectAccessReview{}},
-				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("selfsubjectaccessreviews", "localsubjectaccessreviews").RuleOrDie(), // TODO not sure about this
+				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("selfsubjectaccessreviews").RuleOrDie(),
 			},
 		},
 		{
@@ -477,6 +477,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 			Rules: []authorizationapi.PolicyRule{
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("selfsubjectrulesreviews").RuleOrDie(),
 				{Verbs: sets.NewString("create"), APIGroups: []string{authzGroup}, Resources: sets.NewString("subjectaccessreviews", "localsubjectaccessreviews"), AttributeRestrictions: &authorizationapi.IsPersonalSubjectAccessReview{}},
+				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("selfsubjectaccessreviews").RuleOrDie(),
 			},
 		},
 		{
@@ -724,6 +725,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				// Needed to check API access.  These creates are non-mutating
 				authorizationapi.NewRule("create").Groups(kAuthnGroup).Resources("tokenreviews").RuleOrDie(),
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("subjectaccessreviews", "localsubjectaccessreviews").RuleOrDie(),
+				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("subjectaccessreviews", "localsubjectaccessreviews").RuleOrDie(),
 				// Needed to build serviceLister, to populate env vars for services
 				authorizationapi.NewRule(read...).Groups(kapiGroup).Resources("services").RuleOrDie(),
 				// Nodes can register themselves
@@ -828,6 +830,7 @@ func GetBootstrapClusterRoles() []authorizationapi.ClusterRole {
 				authorizationapi.NewRule("get", "update").Groups(imageGroup).Resources("imagestreams/layers").RuleOrDie(),
 				authorizationapi.NewRule(readWrite...).Groups(authzGroup).Resources("rolebindings", "roles").RuleOrDie(),
 				authorizationapi.NewRule("create").Groups(authzGroup).Resources("localresourceaccessreviews", "localsubjectaccessreviews", "subjectrulesreviews").RuleOrDie(),
+				authorizationapi.NewRule("create").Groups(kAuthzGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
 				authorizationapi.NewRule(read...).Groups(authzGroup).Resources("policies", "policybindings").RuleOrDie(),
 
 				authorizationapi.NewRule("get").Groups(kapiGroup).Resources("namespaces").RuleOrDie(),
