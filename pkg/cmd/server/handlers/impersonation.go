@@ -64,19 +64,22 @@ func ImpersonationFilter(handler http.Handler, a kauthorizer.Authorizer, groupCa
 			}
 
 			switch subject.GetObjectKind().GroupVersionKind().GroupKind() {
-			case userapi.Kind(authorizationapi.GroupKind):
+			case userapi.Kind(authorizationapi.GroupKind),
+				userapi.LegacyKind(authorizationapi.GroupKind):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.GroupResource
 				actingAsAttributes.Name = subject.Name
 				groups = append(groups, subject.Name)
 
-			case userapi.Kind(authorizationapi.SystemGroupKind):
+			case userapi.Kind(authorizationapi.SystemGroupKind),
+				userapi.LegacyKind(authorizationapi.SystemGroupKind):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.SystemGroupResource
 				actingAsAttributes.Name = subject.Name
 				groups = append(groups, subject.Name)
 
-			case userapi.Kind(authorizationapi.UserKind):
+			case userapi.Kind(authorizationapi.UserKind),
+				userapi.LegacyKind(authorizationapi.UserKind):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.UserResource
 				actingAsAttributes.Name = subject.Name
@@ -90,7 +93,8 @@ func ImpersonationFilter(handler http.Handler, a kauthorizer.Authorizer, groupCa
 					groups = append(groups, bootstrappolicy.AuthenticatedGroup, bootstrappolicy.AuthenticatedOAuthGroup)
 				}
 
-			case userapi.Kind(authorizationapi.SystemUserKind):
+			case userapi.Kind(authorizationapi.SystemUserKind),
+				userapi.LegacyKind(authorizationapi.SystemUserKind):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.SystemUserResource
 				actingAsAttributes.Name = subject.Name
@@ -103,7 +107,8 @@ func ImpersonationFilter(handler http.Handler, a kauthorizer.Authorizer, groupCa
 					}
 				}
 
-			case kapi.Kind(authorizationapi.ServiceAccountKind):
+			case kapi.Kind(authorizationapi.ServiceAccountKind),
+				userapi.LegacyKind(authorizationapi.ServiceAccountKind):
 				actingAsAttributes.APIGroup = kapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.ServiceAccountResource
 				actingAsAttributes.Name = subject.Name
