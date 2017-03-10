@@ -1,11 +1,15 @@
 package api
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/openshift/origin/pkg/user/api/validation"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -37,16 +41,25 @@ func Convert_api_Role_To_rbac_Role(in *Role, out *rbac.Role, _ conversion.Scope)
 }
 
 func Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterRoleBinding, out *rbac.ClusterRoleBinding, _ conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = convertOriginSubjects(in.Subjects)
+	var err error
+	if out.Subjects, err = convertOriginSubjects(in.Subjects); err != nil {
+		return err
+	}
 	out.RoleRef = convertOriginRoleRef(&in.RoleRef)
+	out.ObjectMeta = in.ObjectMeta
 	return nil
 }
 
 func Convert_api_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac.RoleBinding, _ conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = convertOriginSubjects(in.Subjects)
+	if len(in.RoleRef.Namespace) != 0 && in.RoleRef.Namespace != in.Namespace {
+		return fmt.Errorf("invalid origin role binding %s: attempts to reference role in namespace %q instead of current namespace %q", in.Name, in.RoleRef.Namespace, in.Namespace)
+	}
+	var err error
+	if out.Subjects, err = convertOriginSubjects(in.Subjects); err != nil {
+		return err
+	}
 	out.RoleRef = convertOriginRoleRef(&in.RoleRef)
+	out.ObjectMeta = in.ObjectMeta
 	return nil
 }
 
@@ -65,24 +78,35 @@ func convertOriginPolicyRule(in []PolicyRule) []rbac.PolicyRule {
 	return rules
 }
 
-func convertOriginSubjects(in []api.ObjectReference) []rbac.Subject {
+func convertOriginSubjects(in []api.ObjectReference) ([]rbac.Subject, error) {
 	subjects := make([]rbac.Subject, 0, len(in))
 	for _, subject := range in {
 		s := rbac.Subject{
-			Kind:       subject.Kind,
-			APIVersion: subject.APIVersion,
 			Name:       subject.Name,
-			Namespace:  subject.Namespace,
+			APIVersion: rbac.GroupName, // TODO what to use here?
 		}
+
+		switch subject.Kind {
+		case ServiceAccountKind:
+			s.Kind = rbac.ServiceAccountKind
+			s.Namespace = subject.Namespace
+		case UserKind, SystemUserKind:
+			s.Kind = rbac.UserKind
+		case GroupKind, SystemGroupKind:
+			s.Kind = rbac.GroupKind
+		default:
+			return nil, fmt.Errorf("invalid kind for origin subject: %q", subject.Kind)
+		}
+
 		subjects = append(subjects, s)
 	}
-	return subjects
+	return subjects, nil
 }
 
 func convertOriginRoleRef(in *api.ObjectReference) rbac.RoleRef {
 	return rbac.RoleRef{
 		APIGroup: in.APIVersion,
-		Kind:     in.Kind,
+		Kind:     in.Kind, // TODO leave empty?
 		Name:     in.Name,
 	}
 }
@@ -100,38 +124,55 @@ func Convert_rbac_Role_To_api_Role(in *rbac.Role, out *Role, _ conversion.Scope)
 }
 
 func Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *ClusterRoleBinding, _ conversion.Scope) error {
+	var err error
+	if out.Subjects, err = convertRBACSubjects(in.Subjects); err != nil {
+		return err
+	}
+	out.RoleRef = convertRBACRoleRef(&in.RoleRef, "")
 	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = convertRBACSubjects(in.Subjects)
-	out.RoleRef = convertRBACRoleRef(&in.RoleRef)
 	return nil
 }
 
 func Convert_rbac_RoleBinding_To_api_RoleBinding(in *rbac.RoleBinding, out *RoleBinding, _ conversion.Scope) error {
+	var err error
+	if out.Subjects, err = convertRBACSubjects(in.Subjects); err != nil {
+		return err
+	}
+	out.RoleRef = convertRBACRoleRef(&in.RoleRef, in.Namespace)
 	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = convertRBACSubjects(in.Subjects)
-	out.RoleRef = convertRBACRoleRef(&in.RoleRef)
 	return nil
 }
 
-func convertRBACSubjects(in []rbac.Subject) []api.ObjectReference {
+func convertRBACSubjects(in []rbac.Subject) ([]api.ObjectReference, error) {
 	subjects := make([]api.ObjectReference, 0, len(in))
 	for _, subject := range in {
 		s := api.ObjectReference{
-			Kind:       subject.Kind,
-			APIVersion: subject.APIVersion,
+			APIVersion: rbac.GroupName, // TODO what do we want here?
 			Name:       subject.Name,
-			Namespace:  subject.Namespace,
 		}
+
+		switch subject.Kind {
+		case rbac.ServiceAccountKind:
+			s.Namespace = subject.Namespace
+		case rbac.UserKind:
+			s.Kind = determineUserKind(subject.Name, validation.ValidateUserName)
+		case rbac.GroupKind:
+			s.Kind = determineGroupKind(subject.Name, validation.ValidateGroupName)
+		default:
+			return nil, fmt.Errorf("invalid kind for rbac subject: %q", subject.Kind)
+		}
+
 		subjects = append(subjects, s)
 	}
-	return subjects
+	return subjects, nil
 }
 
-func convertRBACRoleRef(in *rbac.RoleRef) api.ObjectReference {
+func convertRBACRoleRef(in *rbac.RoleRef, namespace string) api.ObjectReference {
 	return api.ObjectReference{
 		APIVersion: in.APIGroup,
-		Kind:       in.Kind,
+		Kind:       in.Kind, // TODO leave empty?
 		Name:       in.Name,
+		Namespace:  namespace,
 	}
 }
 

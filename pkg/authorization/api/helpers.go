@@ -164,24 +164,32 @@ func BuildSubjects(users, groups []string, userNameValidator, groupNameValidator
 			continue
 		}
 
-		kind := UserKind
-		if len(userNameValidator(user, false)) != 0 {
-			kind = SystemUserKind
-		}
-
+		kind := determineUserKind(user, userNameValidator)
 		subjects = append(subjects, kapi.ObjectReference{Kind: kind, Name: user})
 	}
 
 	for _, group := range groups {
-		kind := GroupKind
-		if len(groupNameValidator(group, false)) != 0 {
-			kind = SystemGroupKind
-		}
-
+		kind := determineGroupKind(group, groupNameValidator)
 		subjects = append(subjects, kapi.ObjectReference{Kind: kind, Name: group})
 	}
 
 	return subjects
+}
+
+func determineUserKind(user string, userNameValidator validation.ValidateNameFunc) string {
+	return determineKind(UserKind, SystemUserKind, user, userNameValidator)
+}
+
+func determineGroupKind(group string, groupNameValidator validation.ValidateNameFunc) string {
+	return determineKind(GroupKind, SystemGroupKind, group, groupNameValidator)
+}
+
+func determineKind(base, fallback, name string, nameValidator validation.ValidateNameFunc) string {
+	kind := base
+	if len(nameValidator(name, false)) != 0 {
+		kind = fallback
+	}
+	return kind
 }
 
 // StringSubjectsFor returns users and groups for comparison against user.Info.  currentNamespace is used to
