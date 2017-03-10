@@ -18,12 +18,18 @@ import (
 
 func TestOriginClusterRoleFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0).Funcs(func(*runtime.Object, fuzz.Continue) {}) // Ignore AttributeRestrictions since they are deprecated
-	ocr := &ClusterRole{}
 	for i := 0; i < 100; i++ {
+		ocr := &ClusterRole{}
+		ocr2 := &ClusterRole{}
+		rcr := &rbac.ClusterRole{}
 		f.Fuzz(ocr)
 		ocr.TypeMeta = unversioned.TypeMeta{} // Ignore TypeMeta
-		rcr := Convert_api_ClusterRole_To_rbac_ClusterRole(ocr)
-		ocr2 := Convert_rbac_ClusterRole_To_api_ClusterRole(rcr)
+		if err := Convert_api_ClusterRole_To_rbac_ClusterRole(ocr, rcr, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_rbac_ClusterRole_To_api_ClusterRole(rcr, ocr2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(ocr, ocr2) {
 			t.Errorf("origin cluster data not preserved; the diff is %s", diff.ObjectDiff(ocr, ocr2))
 		}
@@ -32,12 +38,18 @@ func TestOriginClusterRoleFidelity(t *testing.T) {
 
 func TestOriginRoleFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0).Funcs(func(*runtime.Object, fuzz.Continue) {}) // Ignore AttributeRestrictions since they are deprecated
-	or := &Role{}
 	for i := 0; i < 100; i++ {
+		or := &Role{}
+		or2 := &Role{}
+		rr := &rbac.Role{}
 		f.Fuzz(or)
 		or.TypeMeta = unversioned.TypeMeta{} // Ignore TypeMeta
-		rr := Convert_api_Role_To_rbac_Role(or)
-		or2 := Convert_rbac_Role_To_api_Role(rr)
+		if err := Convert_api_Role_To_rbac_Role(or, rr, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_rbac_Role_To_api_Role(rr, or2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(or, or2) {
 			t.Errorf("origin local data not preserved; the diff is %s", diff.ObjectDiff(or, or2))
 		}
@@ -45,13 +57,19 @@ func TestOriginRoleFidelity(t *testing.T) {
 }
 func TestOriginClusterRoleBindingFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0)
-	ocrb := &ClusterRoleBinding{}
 	for i := 0; i < 100; i++ {
+		ocrb := &ClusterRoleBinding{}
+		ocrb2 := &ClusterRoleBinding{}
+		rcrb := &rbac.ClusterRoleBinding{}
 		f.Fuzz(ocrb)
 		ocrb.TypeMeta = unversioned.TypeMeta{}               // Ignore TypeMeta
 		unsetUnpreservedFields(ocrb.Subjects, &ocrb.RoleRef) // RBAC is missing these fields
-		rcrb := Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(ocrb)
-		ocrb2 := Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(rcrb)
+		if err := Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(ocrb, rcrb, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(rcrb, ocrb2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(ocrb, ocrb2) {
 			t.Errorf("origin cluster binding data not preserved; the diff is %s", diff.ObjectDiff(ocrb, ocrb2))
 		}
@@ -60,13 +78,19 @@ func TestOriginClusterRoleBindingFidelity(t *testing.T) {
 
 func TestOriginRoleBindingFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0)
-	orb := &RoleBinding{}
 	for i := 0; i < 100; i++ {
+		orb := &RoleBinding{}
+		orb2 := &RoleBinding{}
+		rrb := &rbac.RoleBinding{}
 		f.Fuzz(orb)
 		orb.TypeMeta = unversioned.TypeMeta{}              // Ignore TypeMeta
 		unsetUnpreservedFields(orb.Subjects, &orb.RoleRef) // RBAC is missing these fields
-		rrb := Convert_api_RoleBinding_To_rbac_RoleBinding(orb)
-		orb2 := Convert_rbac_RoleBinding_To_api_RoleBinding(rrb)
+		if err := Convert_api_RoleBinding_To_rbac_RoleBinding(orb, rrb, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_rbac_RoleBinding_To_api_RoleBinding(rrb, orb2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(orb, orb2) {
 			t.Errorf("origin local binding data not preserved; the diff is %s", diff.ObjectDiff(orb, orb2))
 		}
@@ -75,13 +99,19 @@ func TestOriginRoleBindingFidelity(t *testing.T) {
 
 func TestRBACClusterRoleFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0).Funcs(func(*runtime.Object, fuzz.Continue) {}) // TODO remove func after 1.6 rebase removes AttributeRestrictions
-	rcr := &rbac.ClusterRole{}
 	for i := 0; i < 100; i++ {
+		rcr := &rbac.ClusterRole{}
+		rcr2 := &rbac.ClusterRole{}
+		ocr := &ClusterRole{}
 		f.Fuzz(rcr)
 		rcr.TypeMeta = unversioned.TypeMeta{}    // Ignore TypeMeta
 		sortAndDeduplicateRulesFields(rcr.Rules) // []string <-> sets.String
-		ocr := Convert_rbac_ClusterRole_To_api_ClusterRole(rcr)
-		rcr2 := Convert_api_ClusterRole_To_rbac_ClusterRole(ocr)
+		if err := Convert_rbac_ClusterRole_To_api_ClusterRole(rcr, ocr, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_api_ClusterRole_To_rbac_ClusterRole(ocr, rcr2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(rcr, rcr2) {
 			t.Errorf("rbac cluster data not preserved; the diff is %s", diff.ObjectDiff(rcr, rcr2))
 		}
@@ -90,13 +120,19 @@ func TestRBACClusterRoleFidelity(t *testing.T) {
 
 func TestRBACRoleFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0).Funcs(func(*runtime.Object, fuzz.Continue) {}) // TODO remove func after 1.6 rebase removes AttributeRestrictions
-	rr := &rbac.Role{}
 	for i := 0; i < 100; i++ {
+		rr := &rbac.Role{}
+		rr2 := &rbac.Role{}
+		or := &Role{}
 		f.Fuzz(rr)
 		rr.TypeMeta = unversioned.TypeMeta{}    // Ignore TypeMeta
 		sortAndDeduplicateRulesFields(rr.Rules) // []string <-> sets.String
-		or := Convert_rbac_Role_To_api_Role(rr)
-		rr2 := Convert_api_Role_To_rbac_Role(or)
+		if err := Convert_rbac_Role_To_api_Role(rr, or, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_api_Role_To_rbac_Role(or, rr2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(rr, rr2) {
 			t.Errorf("rbac local data not preserved; the diff is %s", diff.ObjectDiff(rr, rr2))
 		}
@@ -105,12 +141,18 @@ func TestRBACRoleFidelity(t *testing.T) {
 
 func TestRBACClusterRoleBindingFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0)
-	rcrb := &rbac.ClusterRoleBinding{}
 	for i := 0; i < 100; i++ {
+		rcrb := &rbac.ClusterRoleBinding{}
+		rcrb2 := &rbac.ClusterRoleBinding{}
+		ocrb := &ClusterRoleBinding{}
 		f.Fuzz(rcrb)
 		rcrb.TypeMeta = unversioned.TypeMeta{} // Ignore TypeMeta
-		ocrb := Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(rcrb)
-		rcrb2 := Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(ocrb)
+		if err := Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(rcrb, ocrb, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(ocrb, rcrb2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(rcrb, rcrb2) {
 			t.Errorf("rbac cluster binding data not preserved; the diff is %s", diff.ObjectDiff(rcrb, rcrb2))
 		}
@@ -119,12 +161,18 @@ func TestRBACClusterRoleBindingFidelity(t *testing.T) {
 
 func TestRBACRoleBindingFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0)
-	rrb := &rbac.RoleBinding{}
 	for i := 0; i < 100; i++ {
+		rrb := &rbac.RoleBinding{}
+		rrb2 := &rbac.RoleBinding{}
+		orb := &RoleBinding{}
 		f.Fuzz(rrb)
 		rrb.TypeMeta = unversioned.TypeMeta{} // Ignore TypeMeta
-		orb := Convert_rbac_RoleBinding_To_api_RoleBinding(rrb)
-		rrb2 := Convert_api_RoleBinding_To_rbac_RoleBinding(orb)
+		if err := Convert_rbac_RoleBinding_To_api_RoleBinding(rrb, orb, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := Convert_api_RoleBinding_To_rbac_RoleBinding(orb, rrb2, nil); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(rrb, rrb2) {
 			t.Errorf("rbac local binding data not preserved; the diff is %s", diff.ObjectDiff(rrb, rrb2))
 		}

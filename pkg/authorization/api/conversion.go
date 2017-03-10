@@ -3,6 +3,7 @@ package api
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -23,40 +24,36 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_api_ClusterRole_To_rbac_ClusterRole(in *ClusterRole) *rbac.ClusterRole {
-	return &rbac.ClusterRole{
-		ObjectMeta: in.ObjectMeta,
-		Rules:      convertOriginPolicyRule(in.Rules),
-	}
+func Convert_api_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Rules = convertOriginPolicyRule(in.Rules)
+	return nil
 }
 
-func Convert_api_Role_To_rbac_Role(in *Role) *rbac.Role {
-	return &rbac.Role{
-		ObjectMeta: in.ObjectMeta,
-		Rules:      convertOriginPolicyRule(in.Rules),
-	}
+func Convert_api_Role_To_rbac_Role(in *Role, out *rbac.Role, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Rules = convertOriginPolicyRule(in.Rules)
+	return nil
 }
 
-func Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterRoleBinding) *rbac.ClusterRoleBinding {
-	return &rbac.ClusterRoleBinding{
-		ObjectMeta: in.ObjectMeta,
-		Subjects:   convertOriginSubjects(in.Subjects),
-		RoleRef:    convertOriginRoleRef(&in.RoleRef),
-	}
+func Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterRoleBinding, out *rbac.ClusterRoleBinding, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Subjects = convertOriginSubjects(in.Subjects)
+	out.RoleRef = convertOriginRoleRef(&in.RoleRef)
+	return nil
 }
 
-func Convert_api_RoleBinding_To_rbac_RoleBinding(in *RoleBinding) *rbac.RoleBinding {
-	return &rbac.RoleBinding{
-		ObjectMeta: in.ObjectMeta,
-		Subjects:   convertOriginSubjects(in.Subjects),
-		RoleRef:    convertOriginRoleRef(&in.RoleRef),
-	}
+func Convert_api_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac.RoleBinding, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Subjects = convertOriginSubjects(in.Subjects)
+	out.RoleRef = convertOriginRoleRef(&in.RoleRef)
+	return nil
 }
 
 func convertOriginPolicyRule(in []PolicyRule) []rbac.PolicyRule {
 	rules := make([]rbac.PolicyRule, 0, len(in))
 	for _, rule := range in {
-		r := rbac.PolicyRule{
+		r := rbac.PolicyRule{ // AttributeRestrictions is lost, but our authorizor ignores that field now
 			APIGroups:       rule.APIGroups,
 			Verbs:           rule.Verbs.List(),
 			Resources:       rule.Resources.List(),
@@ -90,34 +87,30 @@ func convertOriginRoleRef(in *api.ObjectReference) rbac.RoleRef {
 	}
 }
 
-func Convert_rbac_ClusterRole_To_api_ClusterRole(in *rbac.ClusterRole) *ClusterRole {
-	return &ClusterRole{
-		ObjectMeta: in.ObjectMeta,
-		Rules:      convertRBACPolicyRules(in.Rules),
-	}
+func Convert_rbac_ClusterRole_To_api_ClusterRole(in *rbac.ClusterRole, out *ClusterRole, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Rules = convertRBACPolicyRules(in.Rules)
+	return nil
 }
 
-func Convert_rbac_Role_To_api_Role(in *rbac.Role) *Role {
-	return &Role{
-		ObjectMeta: in.ObjectMeta,
-		Rules:      convertRBACPolicyRules(in.Rules),
-	}
+func Convert_rbac_Role_To_api_Role(in *rbac.Role, out *Role, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Rules = convertRBACPolicyRules(in.Rules)
+	return nil
 }
 
-func Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(in *rbac.ClusterRoleBinding) *ClusterRoleBinding {
-	return &ClusterRoleBinding{
-		ObjectMeta: in.ObjectMeta,
-		Subjects:   convertRBACSubjects(in.Subjects),
-		RoleRef:    convertRBACRoleRef(&in.RoleRef),
-	}
+func Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *ClusterRoleBinding, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Subjects = convertRBACSubjects(in.Subjects)
+	out.RoleRef = convertRBACRoleRef(&in.RoleRef)
+	return nil
 }
 
-func Convert_rbac_RoleBinding_To_api_RoleBinding(in *rbac.RoleBinding) *RoleBinding {
-	return &RoleBinding{
-		ObjectMeta: in.ObjectMeta,
-		Subjects:   convertRBACSubjects(in.Subjects),
-		RoleRef:    convertRBACRoleRef(&in.RoleRef),
-	}
+func Convert_rbac_RoleBinding_To_api_RoleBinding(in *rbac.RoleBinding, out *RoleBinding, _ conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.Subjects = convertRBACSubjects(in.Subjects)
+	out.RoleRef = convertRBACRoleRef(&in.RoleRef)
+	return nil
 }
 
 func convertRBACSubjects(in []rbac.Subject) []api.ObjectReference {
