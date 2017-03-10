@@ -1,4 +1,4 @@
-package util
+package api
 
 import (
 	"reflect"
@@ -11,8 +11,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 
-	"github.com/openshift/origin/pkg/authorization/api"
-
 	"github.com/google/gofuzz"
 )
 
@@ -20,7 +18,7 @@ import (
 
 func TestOriginClusterRoleFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0).Funcs(func(*runtime.Object, fuzz.Continue) {}) // Ignore AttributeRestrictions since they are deprecated
-	ocr := &api.ClusterRole{}
+	ocr := &ClusterRole{}
 	for i := 0; i < 100; i++ {
 		f.Fuzz(ocr)
 		ocr.TypeMeta = unversioned.TypeMeta{} // Ignore TypeMeta
@@ -34,7 +32,7 @@ func TestOriginClusterRoleFidelity(t *testing.T) {
 
 func TestOriginRoleFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0).Funcs(func(*runtime.Object, fuzz.Continue) {}) // Ignore AttributeRestrictions since they are deprecated
-	or := &api.Role{}
+	or := &Role{}
 	for i := 0; i < 100; i++ {
 		f.Fuzz(or)
 		or.TypeMeta = unversioned.TypeMeta{} // Ignore TypeMeta
@@ -47,7 +45,7 @@ func TestOriginRoleFidelity(t *testing.T) {
 }
 func TestOriginClusterRoleBindingFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0)
-	ocrb := &api.ClusterRoleBinding{}
+	ocrb := &ClusterRoleBinding{}
 	for i := 0; i < 100; i++ {
 		f.Fuzz(ocrb)
 		ocrb.TypeMeta = unversioned.TypeMeta{}               // Ignore TypeMeta
@@ -62,7 +60,7 @@ func TestOriginClusterRoleBindingFidelity(t *testing.T) {
 
 func TestOriginRoleBindingFidelity(t *testing.T) {
 	f := fuzz.New().NilChance(0)
-	orb := &api.RoleBinding{}
+	orb := &RoleBinding{}
 	for i := 0; i < 100; i++ {
 		f.Fuzz(orb)
 		orb.TypeMeta = unversioned.TypeMeta{}              // Ignore TypeMeta
