@@ -355,7 +355,7 @@ func (o MasterOptions) CreateCerts() error {
 
 func BuildKubernetesMasterConfig(openshiftConfig *origin.MasterConfig) (*kubernetes.MasterConfig, error) {
 	if openshiftConfig.Options.KubernetesMasterConfig == nil {
-		return nil, fmt.Errorf("external Kubernetes mode is not supported anymore")
+		return nil, fmt.Errorf("KubernetesMasterConfig is required to start this server - using an external Kubernetes is no longer supported.")
 	}
 	return kubernetes.BuildKubernetesMasterConfig(
 		openshiftConfig.Options,

@@ -1,6 +1,6 @@
 package integration
 
-// FIXME: This test is disabled until the generated client sets are not fixed to work
+// FIXME: This test is disabled until the generated client sets are fixed to work
 //        properly with API groups.
 
 /*
