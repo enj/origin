@@ -176,8 +176,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object) (*restclien
 }
 
 func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-	if mapping.GroupVersionKind.GroupKind() == deployapi.Kind("DeploymentConfig") ||
-		mapping.GroupVersionKind.GroupKind() == deployapi.LegacyKind("DeploymentConfig") {
+	if deployapi.IsKindOrLegacy("DeploymentConfig", mapping.GroupVersionKind.GroupKind()) {
 		oc, kc, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
@@ -188,26 +187,27 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 }
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-	switch mapping.GroupVersionKind.GroupKind() {
-	case deployapi.Kind("DeploymentConfig"), deployapi.LegacyKind("DeploymentConfig"):
+	gk := mapping.GroupVersionKind.GroupKind()
+	switch {
+	case deployapi.IsKindOrLegacy("DeploymentConfig", gk):
 		oc, kc, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
 		}
 		return deploycmd.NewDeploymentConfigReaper(oc, kc), nil
-	case authorizationapi.Kind("Role"), authorizationapi.LegacyKind("Role"):
+	case authorizationapi.IsKindOrLegacy("Role", gk):
 		oc, _, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
 		}
 		return authorizationreaper.NewRoleReaper(oc, oc), nil
-	case authorizationapi.Kind("ClusterRole"), authorizationapi.LegacyKind("ClusterRole"):
+	case authorizationapi.IsKindOrLegacy("ClusterRole", gk):
 		oc, _, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
 		}
 		return authorizationreaper.NewClusterRoleReaper(oc, oc, oc), nil
-	case userapi.Kind("User"), userapi.LegacyKind("User"):
+	case userapi.IsKindOrLegacy("User", gk):
 		oc, kc, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
@@ -220,7 +220,7 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 			client.OAuthClientAuthorizationsInterface(oc),
 			kc.Core(),
 		), nil
-	case userapi.Kind("Group"), userapi.LegacyKind("Group"):
+	case userapi.IsKindOrLegacy("Group", gk):
 		oc, kc, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
@@ -231,7 +231,7 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 			client.RoleBindingsNamespacer(oc),
 			kc.Core(),
 		), nil
-	case buildapi.Kind("BuildConfig"), buildapi.LegacyKind("BuildConfig"):
+	case buildapi.IsKindOrLegacy("BuildConfig", gk):
 		oc, _, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
@@ -242,8 +242,7 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	switch mapping.GroupVersionKind.GroupKind() {
-	case deployapi.Kind("DeploymentConfig"), deployapi.LegacyKind("DeploymentConfig"):
+	if deployapi.IsKindOrLegacy("DeploymentConfing", mapping.GroupVersionKind.GroupKind()) {
 		oc, kc, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
@@ -254,8 +253,7 @@ func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.History
 }
 
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
-	switch mapping.GroupVersionKind.GroupKind() {
-	case deployapi.Kind("DeploymentConfig"), deployapi.LegacyKind("DeploymentConfig"):
+	if deployapi.IsKindOrLegacy("DeploymentConfig", mapping.GroupVersionKind.GroupKind()) {
 		oc, _, err := f.clientAccessFactory.Clients()
 		if err != nil {
 			return nil, err
@@ -271,8 +269,7 @@ func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusVi
 		return nil, err
 	}
 
-	switch mapping.GroupVersionKind.GroupKind() {
-	case deployapi.Kind("DeploymentConfig"), deployapi.LegacyKind("DeploymentConfig"):
+	if deployapi.IsKindOrLegacy("DeploymentConfig", mapping.GroupVersionKind.GroupKind()) {
 		return deploycmd.NewDeploymentConfigStatusViewer(oc), nil
 	}
 	return f.kubeObjectMappingFactory.StatusViewer(mapping)

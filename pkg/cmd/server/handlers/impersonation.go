@@ -63,23 +63,21 @@ func ImpersonationFilter(handler http.Handler, a kauthorizer.Authorizer, groupCa
 				ResourceRequest: true,
 			}
 
-			switch subject.GetObjectKind().GroupVersionKind().GroupKind() {
-			case userapi.Kind(authorizationapi.GroupKind),
-				userapi.LegacyKind(authorizationapi.GroupKind):
+			gk := subject.GetObjectKind().GroupVersionKind().GroupKind()
+			switch {
+			case userapi.IsKindOrLegacy(authorizationapi.GroupKind, gk):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.GroupResource
 				actingAsAttributes.Name = subject.Name
 				groups = append(groups, subject.Name)
 
-			case userapi.Kind(authorizationapi.SystemGroupKind),
-				userapi.LegacyKind(authorizationapi.SystemGroupKind):
+			case userapi.IsKindOrLegacy(authorizationapi.SystemGroupKind, gk):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.SystemGroupResource
 				actingAsAttributes.Name = subject.Name
 				groups = append(groups, subject.Name)
 
-			case userapi.Kind(authorizationapi.UserKind),
-				userapi.LegacyKind(authorizationapi.UserKind):
+			case userapi.IsKindOrLegacy(authorizationapi.UserKind, gk):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.UserResource
 				actingAsAttributes.Name = subject.Name
@@ -93,8 +91,7 @@ func ImpersonationFilter(handler http.Handler, a kauthorizer.Authorizer, groupCa
 					groups = append(groups, bootstrappolicy.AuthenticatedGroup, bootstrappolicy.AuthenticatedOAuthGroup)
 				}
 
-			case userapi.Kind(authorizationapi.SystemUserKind),
-				userapi.LegacyKind(authorizationapi.SystemUserKind):
+			case userapi.IsKindOrLegacy(authorizationapi.SystemUserKind, gk):
 				actingAsAttributes.APIGroup = userapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.SystemUserResource
 				actingAsAttributes.Name = subject.Name
@@ -107,8 +104,7 @@ func ImpersonationFilter(handler http.Handler, a kauthorizer.Authorizer, groupCa
 					}
 				}
 
-			case kapi.Kind(authorizationapi.ServiceAccountKind),
-				userapi.LegacyKind(authorizationapi.ServiceAccountKind):
+			case gk == kapi.Kind(authorizationapi.ServiceAccountKind):
 				actingAsAttributes.APIGroup = kapi.GroupName
 				actingAsAttributes.Resource = authorizationapi.ServiceAccountResource
 				actingAsAttributes.Name = subject.Name

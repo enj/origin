@@ -42,6 +42,18 @@ func LegacyResource(resource string) unversioned.GroupResource {
 	return LegacySchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
+// IsKindOrLegacy checks if the provided GroupKind matches with the given kind by looking
+// up the API group and also the legacy API.
+func IsKindOrLegacy(kind string, gk unversioned.GroupKind) bool {
+	return gk == Kind(kind) || gk == LegacyKind(kind)
+}
+
+// IsResourceOrLegacy checks if the provided GroupResources matches with the given
+// resource by looking up the API group and also the legacy API.
+func IsResourceOrLegacy(resource string, gr unversioned.GroupResource) bool {
+	return gr == Resource(resource) || gr == LegacyResource(resource)
+}
+
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	types := []runtime.Object{

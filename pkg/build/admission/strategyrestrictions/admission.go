@@ -36,29 +36,14 @@ func NewBuildByStrategy() admission.Interface {
 	}
 }
 
-var (
-	buildsResource       = buildapi.Resource("builds")
-	buildConfigsResource = buildapi.Resource("buildconfigs")
-
-	legacyBuildsResource       = buildapi.LegacyResource("builds")
-	legacyBuildConfigsResource = buildapi.LegacyResource("buildconfigs")
-)
-
-func isBuildResource(gvr unversioned.GroupResource) bool {
-	return gvr == buildsResource || gvr == legacyBuildsResource
-}
-
-func isBuildConfigResource(gvr unversioned.GroupResource) bool {
-	return gvr == buildConfigsResource || gvr == legacyBuildConfigsResource
-}
-
 func (a *buildByStrategy) Admit(attr admission.Attributes) error {
-	if resource := attr.GetResource().GroupResource(); !isBuildConfigResource(resource) && !isBuildResource(resource) {
+	gr := attr.GetResource().GroupResource()
+	if !buildapi.IsResourceOrLegacy("buildconfigs", gr) && !buildapi.IsResourceOrLegacy("builds", gr) {
 		return nil
 	}
 	// Explicitly exclude the builds/details subresource because it's only
 	// updating commit info and cannot change build type.
-	if isBuildResource(attr.GetResource().GroupResource()) && attr.GetSubresource() == "details" {
+	if buildapi.IsResourceOrLegacy("builds", gr) && attr.GetSubresource() == "details" {
 		return nil
 	}
 	switch obj := attr.GetObject().(type) {
@@ -145,14 +130,15 @@ func (a *buildByStrategy) checkBuildConfigAuthorization(buildConfig *buildapi.Bu
 }
 
 func (a *buildByStrategy) checkBuildRequestAuthorization(req *buildapi.BuildRequest, attr admission.Attributes) error {
-	switch attr.GetResource().GroupResource() {
-	case buildsResource, legacyBuildsResource:
+	gr := attr.GetResource().GroupResource()
+	switch {
+	case buildapi.IsResourceOrLegacy("builds", gr):
 		build, err := a.client.Builds(attr.GetNamespace()).Get(req.Name)
 		if err != nil {
 			return admission.NewForbidden(attr, err)
 		}
 		return a.checkBuildAuthorization(build, attr)
-	case buildConfigsResource, legacyBuildConfigsResource:
+	case buildapi.IsResourceOrLegacy("buildconfigs", gr):
 		build, err := a.client.BuildConfigs(attr.GetNamespace()).Get(req.Name)
 		if err != nil {
 			return admission.NewForbidden(attr, err)
