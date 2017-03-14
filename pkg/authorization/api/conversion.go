@@ -83,7 +83,7 @@ func convertOriginSubjects(in []api.ObjectReference) ([]rbac.Subject, error) {
 	for _, subject := range in {
 		s := rbac.Subject{
 			Name:       subject.Name,
-			APIVersion: rbac.GroupName, // TODO what to use here?
+			APIVersion: rbac.GroupName,
 		}
 
 		switch subject.Kind {
@@ -105,10 +105,18 @@ func convertOriginSubjects(in []api.ObjectReference) ([]rbac.Subject, error) {
 
 func convertOriginRoleRef(in *api.ObjectReference) rbac.RoleRef {
 	return rbac.RoleRef{
-		APIGroup: in.APIVersion,
-		Kind:     in.Kind, // TODO leave empty?
+		APIGroup: rbac.GroupName,
+		Kind:     getKind(in.Namespace),
 		Name:     in.Name,
 	}
+}
+
+func getKind(namespace string) string {
+	kind := "ClusterRole"
+	if len(namespace) != 0 {
+		kind = "Role"
+	}
+	return kind
 }
 
 func Convert_rbac_ClusterRole_To_api_ClusterRole(in *rbac.ClusterRole, out *ClusterRole, _ conversion.Scope) error {
@@ -147,12 +155,12 @@ func convertRBACSubjects(in []rbac.Subject) ([]api.ObjectReference, error) {
 	subjects := make([]api.ObjectReference, 0, len(in))
 	for _, subject := range in {
 		s := api.ObjectReference{
-			APIVersion: rbac.GroupName, // TODO what do we want here?
-			Name:       subject.Name,
+			Name: subject.Name,
 		}
 
 		switch subject.Kind {
 		case rbac.ServiceAccountKind:
+			s.Kind = ServiceAccountKind
 			s.Namespace = subject.Namespace
 		case rbac.UserKind:
 			s.Kind = determineUserKind(subject.Name, validation.ValidateUserName)
@@ -169,10 +177,9 @@ func convertRBACSubjects(in []rbac.Subject) ([]api.ObjectReference, error) {
 
 func convertRBACRoleRef(in *rbac.RoleRef, namespace string) api.ObjectReference {
 	return api.ObjectReference{
-		APIVersion: in.APIGroup,
-		Kind:       in.Kind, // TODO leave empty?
-		Name:       in.Name,
-		Namespace:  namespace,
+		Kind:      getKind(namespace),
+		Name:      in.Name,
+		Namespace: namespace,
 	}
 }
 

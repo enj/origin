@@ -177,17 +177,17 @@ func BuildSubjects(users, groups []string, userNameValidator, groupNameValidator
 }
 
 func determineUserKind(user string, userNameValidator validation.ValidateNameFunc) string {
-	return determineKind(UserKind, SystemUserKind, user, userNameValidator)
+	kind := UserKind
+	if len(userNameValidator(user, false)) != 0 {
+		kind = SystemUserKind
+	}
+	return kind
 }
 
 func determineGroupKind(group string, groupNameValidator validation.ValidateNameFunc) string {
-	return determineKind(GroupKind, SystemGroupKind, group, groupNameValidator)
-}
-
-func determineKind(base, fallback, name string, nameValidator validation.ValidateNameFunc) string {
-	kind := base
-	if len(nameValidator(name, false)) != 0 {
-		kind = fallback
+	kind := GroupKind
+	if len(groupNameValidator(group, false)) != 0 {
+		kind = SystemGroupKind
 	}
 	return kind
 }
