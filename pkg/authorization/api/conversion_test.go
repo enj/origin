@@ -164,6 +164,51 @@ func TestRBACRoleBindingFidelity(t *testing.T) {
 	}
 }
 
+func TestConversionErrors(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		expected string
+		f        func() error
+	}{
+		{
+			name:     "invalid origin role ref",
+			expected: `invalid origin role binding rolebindingname: attempts to reference role in namespace "ns1" instead of current namespace "ns0"`,
+			f: func() error {
+				return Convert_api_RoleBinding_To_rbac_RoleBinding(&RoleBinding{
+					ObjectMeta: api.ObjectMeta{Name: "rolebindingname", Namespace: "ns0"},
+					RoleRef:    api.ObjectReference{Namespace: "ns1"},
+				}, &rbac.RoleBinding{}, nil)
+			},
+		},
+		{
+			name:     "invalid origin subject kind",
+			expected: `invalid kind for origin subject: "fancyuser"`,
+			f: func() error {
+				return Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(&ClusterRoleBinding{
+					Subjects: []api.ObjectReference{
+						{Kind: "fancyuser"},
+					},
+				}, &rbac.ClusterRoleBinding{}, nil)
+			},
+		},
+		{
+			name:     "invalid RBAC subject kind",
+			expected: `invalid kind for rbac subject: "evenfancieruser"`,
+			f: func() error {
+				return Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(&rbac.ClusterRoleBinding{
+					Subjects: []rbac.Subject{
+						{Kind: "evenfancieruser"},
+					},
+				}, &ClusterRoleBinding{}, nil)
+			},
+		},
+	} {
+		if err := test.f(); err == nil || test.expected != err.Error() {
+			t.Errorf("%s failed: expected %q got %v", test.name, test.expected, err)
+		}
+	}
+}
+
 var fuzzer = fuzz.New().NilChance(0).Funcs(
 	func(*unversioned.TypeMeta, fuzz.Continue) {}, // Ignore TypeMeta
 	func(*runtime.Object, fuzz.Continue) {},       // Ignore AttributeRestrictions since they are deprecated
