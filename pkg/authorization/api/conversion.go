@@ -30,22 +30,22 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 
 func Convert_api_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = convertOriginPolicyRule(in.Rules)
+	out.Rules = convert_api_PolicyRules_To_rbac_PolicyRules(in.Rules)
 	return nil
 }
 
 func Convert_api_Role_To_rbac_Role(in *Role, out *rbac.Role, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = convertOriginPolicyRule(in.Rules)
+	out.Rules = convert_api_PolicyRules_To_rbac_PolicyRules(in.Rules)
 	return nil
 }
 
 func Convert_api_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterRoleBinding, out *rbac.ClusterRoleBinding, _ conversion.Scope) error {
 	var err error
-	if out.Subjects, err = convertOriginSubjects(in.Subjects); err != nil {
+	if out.Subjects, err = convert_api_Subjects_To_rbac_Subjects(in.Subjects); err != nil {
 		return err
 	}
-	out.RoleRef = convertOriginRoleRef(&in.RoleRef)
+	out.RoleRef = convert_api_RoleRef_To_rbac_RoleRef(&in.RoleRef)
 	out.ObjectMeta = in.ObjectMeta
 	return nil
 }
@@ -55,15 +55,15 @@ func Convert_api_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac.Role
 		return fmt.Errorf("invalid origin role binding %s: attempts to reference role in namespace %q instead of current namespace %q", in.Name, in.RoleRef.Namespace, in.Namespace)
 	}
 	var err error
-	if out.Subjects, err = convertOriginSubjects(in.Subjects); err != nil {
+	if out.Subjects, err = convert_api_Subjects_To_rbac_Subjects(in.Subjects); err != nil {
 		return err
 	}
-	out.RoleRef = convertOriginRoleRef(&in.RoleRef)
+	out.RoleRef = convert_api_RoleRef_To_rbac_RoleRef(&in.RoleRef)
 	out.ObjectMeta = in.ObjectMeta
 	return nil
 }
 
-func convertOriginPolicyRule(in []PolicyRule) []rbac.PolicyRule {
+func convert_api_PolicyRules_To_rbac_PolicyRules(in []PolicyRule) []rbac.PolicyRule {
 	rules := make([]rbac.PolicyRule, 0, len(in))
 	for _, rule := range in {
 		r := rbac.PolicyRule{ // AttributeRestrictions is lost, but our authorizor ignores that field now
@@ -78,7 +78,7 @@ func convertOriginPolicyRule(in []PolicyRule) []rbac.PolicyRule {
 	return rules
 }
 
-func convertOriginSubjects(in []api.ObjectReference) ([]rbac.Subject, error) {
+func convert_api_Subjects_To_rbac_Subjects(in []api.ObjectReference) ([]rbac.Subject, error) {
 	subjects := make([]rbac.Subject, 0, len(in))
 	for _, subject := range in {
 		s := rbac.Subject{
@@ -103,15 +103,16 @@ func convertOriginSubjects(in []api.ObjectReference) ([]rbac.Subject, error) {
 	return subjects, nil
 }
 
-func convertOriginRoleRef(in *api.ObjectReference) rbac.RoleRef {
+func convert_api_RoleRef_To_rbac_RoleRef(in *api.ObjectReference) rbac.RoleRef {
 	return rbac.RoleRef{
 		APIGroup: rbac.GroupName,
-		Kind:     getKind(in.Namespace),
+		Kind:     getRBACRoleRefKind(in.Namespace),
 		Name:     in.Name,
 	}
 }
 
-func getKind(namespace string) string {
+// Infers the scope of the kind based on the presence of the namespace
+func getRBACRoleRefKind(namespace string) string {
 	kind := "ClusterRole"
 	if len(namespace) != 0 {
 		kind = "Role"
@@ -121,37 +122,37 @@ func getKind(namespace string) string {
 
 func Convert_rbac_ClusterRole_To_api_ClusterRole(in *rbac.ClusterRole, out *ClusterRole, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = convertRBACPolicyRules(in.Rules)
+	out.Rules = convert_rbac_PolicyRules_To_api_PolicyRules(in.Rules)
 	return nil
 }
 
 func Convert_rbac_Role_To_api_Role(in *rbac.Role, out *Role, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = convertRBACPolicyRules(in.Rules)
+	out.Rules = convert_rbac_PolicyRules_To_api_PolicyRules(in.Rules)
 	return nil
 }
 
 func Convert_rbac_ClusterRoleBinding_To_api_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *ClusterRoleBinding, _ conversion.Scope) error {
 	var err error
-	if out.Subjects, err = convertRBACSubjects(in.Subjects); err != nil {
+	if out.Subjects, err = convert_rbac_Subjects_To_api_Subjects(in.Subjects); err != nil {
 		return err
 	}
-	out.RoleRef = convertRBACRoleRef(&in.RoleRef, "")
+	out.RoleRef = convert_rbac_RoleRef_To_api_RoleRef(&in.RoleRef, "")
 	out.ObjectMeta = in.ObjectMeta
 	return nil
 }
 
 func Convert_rbac_RoleBinding_To_api_RoleBinding(in *rbac.RoleBinding, out *RoleBinding, _ conversion.Scope) error {
 	var err error
-	if out.Subjects, err = convertRBACSubjects(in.Subjects); err != nil {
+	if out.Subjects, err = convert_rbac_Subjects_To_api_Subjects(in.Subjects); err != nil {
 		return err
 	}
-	out.RoleRef = convertRBACRoleRef(&in.RoleRef, in.Namespace)
+	out.RoleRef = convert_rbac_RoleRef_To_api_RoleRef(&in.RoleRef, in.Namespace)
 	out.ObjectMeta = in.ObjectMeta
 	return nil
 }
 
-func convertRBACSubjects(in []rbac.Subject) ([]api.ObjectReference, error) {
+func convert_rbac_Subjects_To_api_Subjects(in []rbac.Subject) ([]api.ObjectReference, error) {
 	subjects := make([]api.ObjectReference, 0, len(in))
 	for _, subject := range in {
 		s := api.ObjectReference{
@@ -175,15 +176,17 @@ func convertRBACSubjects(in []rbac.Subject) ([]api.ObjectReference, error) {
 	return subjects, nil
 }
 
-func convertRBACRoleRef(in *rbac.RoleRef, namespace string) api.ObjectReference {
+// rbac.RoleRef has no namespace field since that can be inferred.
+// The Origin role ref (api.ObjectReference) requires its namespace value to match the binding's namespace.
+// Thus we have to explicitly provide that value as a parameter.
+func convert_rbac_RoleRef_To_api_RoleRef(in *rbac.RoleRef, namespace string) api.ObjectReference {
 	return api.ObjectReference{
-		Kind:      getKind(namespace),
 		Name:      in.Name,
 		Namespace: namespace,
 	}
 }
 
-func convertRBACPolicyRules(in []rbac.PolicyRule) []PolicyRule {
+func convert_rbac_PolicyRules_To_api_PolicyRules(in []rbac.PolicyRule) []PolicyRule {
 	rules := make([]PolicyRule, 0, len(in))
 	for _, rule := range in {
 		r := PolicyRule{

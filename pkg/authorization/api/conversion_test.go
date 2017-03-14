@@ -245,7 +245,7 @@ func setRandomRBACRoleBindingData(subjects []rbac.Subject, roleRef *rbac.RoleRef
 		setValidRBACKindAndNamespace(subject, i, c)
 	}
 	roleRef.APIGroup = rbac.GroupName
-	roleRef.Kind = getKind(namespace)
+	roleRef.Kind = getRBACRoleRefKind(namespace)
 }
 
 func setValidRBACKindAndNamespace(subject *rbac.Subject, i int, c fuzz.Continue) {
@@ -255,41 +255,21 @@ func setValidRBACKindAndNamespace(subject *rbac.Subject, i int, c fuzz.Continue)
 
 	if subject.Kind != rbac.ServiceAccountKind {
 		subject.Namespace = ""
-	}
-
-	switch subject.Kind {
-
-	case rbac.UserKind:
-		if len(uservalidation.ValidateUserName(subject.Name, false)) != 0 {
-			subject.Name = fmt.Sprintf("validusername%d", i)
-		}
-
-	case rbac.GroupKind:
-		if len(uservalidation.ValidateGroupName(subject.Name, false)) != 0 {
-			subject.Name = fmt.Sprintf("validgroupname%d", i)
-		}
-
-	case rbac.ServiceAccountKind:
-		if len(validation.ValidateNamespaceName(subject.Namespace, false)) != 0 {
-			subject.Namespace = fmt.Sprintf("sanamespacehere%d", i)
-		}
+	} else {
 		if len(validation.ValidateServiceAccountName(subject.Name, false)) != 0 {
 			subject.Name = fmt.Sprintf("sanamehere%d", i)
 		}
-
-	default:
-		panic("invalid kind")
 	}
 }
 
 func setRandomOriginRoleBindingData(subjects []api.ObjectReference, roleRef *api.ObjectReference, namespace string, c fuzz.Continue) {
 	for i := range subjects {
 		subject := &subjects[i]
-		unsetUnpreservedOriginFields(subject)
+		unsetUnusedOriginFields(subject)
 		setValidOriginKindAndNamespace(subject, i, c)
 	}
-	unsetUnpreservedOriginFields(roleRef)
-	roleRef.Kind = getKind(namespace)
+	unsetUnusedOriginFields(roleRef)
+	roleRef.Kind = ""
 	roleRef.Namespace = namespace
 }
 
@@ -318,9 +298,6 @@ func setValidOriginKindAndNamespace(subject *api.ObjectReference, i int, c fuzz.
 		subject.Name = ":" + subject.Name
 
 	case ServiceAccountKind:
-		if len(validation.ValidateNamespaceName(subject.Namespace, false)) != 0 {
-			subject.Namespace = fmt.Sprintf("sanamespacehere%d", i)
-		}
 		if len(validation.ValidateServiceAccountName(subject.Name, false)) != 0 {
 			subject.Name = fmt.Sprintf("sanamehere%d", i)
 		}
@@ -330,7 +307,7 @@ func setValidOriginKindAndNamespace(subject *api.ObjectReference, i int, c fuzz.
 	}
 }
 
-func unsetUnpreservedOriginFields(ref *api.ObjectReference) {
+func unsetUnusedOriginFields(ref *api.ObjectReference) {
 	ref.UID = ""
 	ref.ResourceVersion = ""
 	ref.FieldPath = ""
@@ -339,14 +316,10 @@ func unsetUnpreservedOriginFields(ref *api.ObjectReference) {
 
 func sortAndDeduplicateRBACRulesFields(in []rbac.PolicyRule) {
 	for i := range in {
-		rule := reflect.ValueOf(&in[i]).Elem()
-		for f := 0; f < rule.NumField(); f++ {
-			field := rule.Field(f)
-			if field.Kind() == reflect.Slice && field.Len() > 0 {
-				s := field.Interface().([]string)
-				vs := sets.NewString(s...).List()
-				field.Set(reflect.ValueOf(vs))
-			}
-		}
+		rule := &in[i]
+		rule.Verbs = sets.NewString(rule.Verbs...).List()
+		rule.Resources = sets.NewString(rule.Resources...).List()
+		rule.ResourceNames = sets.NewString(rule.ResourceNames...).List()
+		rule.NonResourceURLs = sets.NewString(rule.NonResourceURLs...).List()
 	}
 }
