@@ -209,6 +209,40 @@ func TestConversionErrors(t *testing.T) {
 	}
 }
 
+// rules with AttributeRestrictions should not be preserved during conversion
+func TestAttributeRestrictionsRuleLoss(t *testing.T) {
+	ocr := &ClusterRole{
+		Rules: []PolicyRule{
+			{Resources: sets.NewString("a")},
+			{Resources: sets.NewString("b"), AttributeRestrictions: &Role{}},
+			{Resources: sets.NewString("c")},
+			{Resources: sets.NewString("d"), AttributeRestrictions: &IsPersonalSubjectAccessReview{}},
+		},
+	}
+	ocr2 := &ClusterRole{}
+	rcr := &rbac.ClusterRole{}
+	if err := Convert_api_ClusterRole_To_rbac_ClusterRole(ocr, rcr, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := Convert_rbac_ClusterRole_To_api_ClusterRole(rcr, ocr2, nil); err != nil {
+		t.Fatal(err)
+	}
+	expectedOriginRules := []PolicyRule{
+		{Resources: sets.NewString("a"), Verbs: sets.NewString(), ResourceNames: sets.NewString(), NonResourceURLs: sets.NewString()},
+		{Resources: sets.NewString("c"), Verbs: sets.NewString(), ResourceNames: sets.NewString(), NonResourceURLs: sets.NewString()},
+	}
+	if !reflect.DeepEqual(expectedOriginRules, ocr2.Rules) {
+		t.Errorf("origin rules expected AttributeRestrictions loss not seen; the diff is %s", diff.ObjectDiff(expectedOriginRules, ocr2.Rules))
+	}
+	expectedRBACRules := []rbac.PolicyRule{
+		{Resources: []string{"a"}, Verbs: []string{}, ResourceNames: []string{}, NonResourceURLs: []string{}},
+		{Resources: []string{"c"}, Verbs: []string{}, ResourceNames: []string{}, NonResourceURLs: []string{}},
+	}
+	if !reflect.DeepEqual(expectedRBACRules, rcr.Rules) {
+		t.Errorf("rbac rules expected AttributeRestrictions loss not seen; the diff is %s", diff.ObjectDiff(expectedRBACRules, rcr.Rules))
+	}
+}
+
 var fuzzer = fuzz.New().NilChance(0).Funcs(
 	func(*unversioned.TypeMeta, fuzz.Continue) {}, // Ignore TypeMeta
 	func(*runtime.Object, fuzz.Continue) {},       // Ignore AttributeRestrictions since they are deprecated

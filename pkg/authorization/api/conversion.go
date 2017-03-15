@@ -66,7 +66,12 @@ func Convert_api_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac.Role
 func convert_api_PolicyRules_To_rbac_PolicyRules(in []PolicyRule) []rbac.PolicyRule {
 	rules := make([]rbac.PolicyRule, 0, len(in))
 	for _, rule := range in {
-		r := rbac.PolicyRule{ // AttributeRestrictions is lost, but our authorizor ignores that field now
+		// Origin's authorizer's RuleMatches func ignores rules that have AttributeRestrictions.
+		// Since we know this rule will never be respected in Origin, we do not preserve it during conversion.
+		if rule.AttributeRestrictions != nil {
+			continue
+		}
+		r := rbac.PolicyRule{
 			APIGroups:       rule.APIGroups,
 			Verbs:           rule.Verbs.List(),
 			Resources:       rule.Resources.List(),
