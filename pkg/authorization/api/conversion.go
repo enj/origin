@@ -74,8 +74,8 @@ func convert_api_PolicyRules_To_rbac_PolicyRules(in []PolicyRule) []rbac.PolicyR
 		}
 		r := rbac.PolicyRule{
 			APIGroups:       normalizeList(rule.APIGroups),
-			Verbs:           normalizeList(rule.Verbs.List()),
-			Resources:       normalizeList(rule.Resources.List()),
+			Verbs:           normalizeList(rule.Verbs.UnsortedList()),
+			Resources:       normalizeList(rule.Resources.UnsortedList()),
 			ResourceNames:   rule.ResourceNames.List(),
 			NonResourceURLs: rule.NonResourceURLs.List(),
 		}
@@ -84,13 +84,13 @@ func convert_api_PolicyRules_To_rbac_PolicyRules(in []PolicyRule) []rbac.PolicyR
 	return rules
 }
 
-// downcase all values since rbac expects them to be lowercase
+// downcase, deduplicate and sort all values since rbac expects them to be lowercase
 func normalizeList(in []string) []string {
-	out := make([]string, 0, len(in))
+	out := sets.NewString()
 	for _, s := range in {
-		out = append(out, strings.ToLower(s))
+		out.Insert(strings.ToLower(s))
 	}
-	return out
+	return out.List()
 }
 
 func convert_api_Subjects_To_rbac_Subjects(in []api.ObjectReference) ([]rbac.Subject, error) {

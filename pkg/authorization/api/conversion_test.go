@@ -277,9 +277,9 @@ func TestOriginRuleNormalization(t *testing.T) {
 		t.Errorf("origin rules expected downcasing not seen; the diff is %s", diff.ObjectDiff(expectedOriginRules, or2.Rules))
 	}
 	expectedRBACRules := []rbac.PolicyRule{
-		{ // this looks a bit strange because the sets.String is converted to a slice and then normalized
-			Resources:       []string{"b", "c", "a"},
-			Verbs:           []string{"s", "t", "t"},
+		{
+			Resources:       []string{"a", "b", "c"},
+			Verbs:           []string{"s", "t"},
 			ResourceNames:   []string{"B", "c"},
 			NonResourceURLs: []string{"FOO"},
 			APIGroups:       []string{"d", "e"},
