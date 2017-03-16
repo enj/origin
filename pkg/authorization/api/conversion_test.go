@@ -228,24 +228,79 @@ func TestAttributeRestrictionsRuleLoss(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedOriginRules := []PolicyRule{
-		{Resources: sets.NewString("a"), Verbs: sets.NewString(), ResourceNames: sets.NewString(), NonResourceURLs: sets.NewString()},
-		{Resources: sets.NewString("c"), Verbs: sets.NewString(), ResourceNames: sets.NewString(), NonResourceURLs: sets.NewString()},
+		{Resources: sets.NewString("a"), Verbs: sets.NewString(), ResourceNames: sets.NewString(), NonResourceURLs: sets.NewString(), APIGroups: []string{}},
+		{Resources: sets.NewString("c"), Verbs: sets.NewString(), ResourceNames: sets.NewString(), NonResourceURLs: sets.NewString(), APIGroups: []string{}},
 	}
 	if !reflect.DeepEqual(expectedOriginRules, ocr2.Rules) {
 		t.Errorf("origin rules expected AttributeRestrictions loss not seen; the diff is %s", diff.ObjectDiff(expectedOriginRules, ocr2.Rules))
 	}
 	expectedRBACRules := []rbac.PolicyRule{
-		{Resources: []string{"a"}, Verbs: []string{}, ResourceNames: []string{}, NonResourceURLs: []string{}},
-		{Resources: []string{"c"}, Verbs: []string{}, ResourceNames: []string{}, NonResourceURLs: []string{}},
+		{Resources: []string{"a"}, Verbs: []string{}, ResourceNames: []string{}, NonResourceURLs: []string{}, APIGroups: []string{}},
+		{Resources: []string{"c"}, Verbs: []string{}, ResourceNames: []string{}, NonResourceURLs: []string{}, APIGroups: []string{}},
 	}
 	if !reflect.DeepEqual(expectedRBACRules, rcr.Rules) {
 		t.Errorf("rbac rules expected AttributeRestrictions loss not seen; the diff is %s", diff.ObjectDiff(expectedRBACRules, rcr.Rules))
 	}
 }
 
+// Check that APIGroups, Verbs, and Resources are downcased
+func TestOriginRuleNormalization(t *testing.T) {
+	or := &Role{
+		Rules: []PolicyRule{
+			{
+				Resources:       sets.NewString("a", "B", "C"),
+				Verbs:           sets.NewString("S", "t", "T"),
+				ResourceNames:   sets.NewString("B", "c"),
+				NonResourceURLs: sets.NewString("FOO"),
+				APIGroups:       []string{"D", "e"},
+			},
+		},
+	}
+	or2 := &Role{}
+	rr := &rbac.Role{}
+	if err := Convert_api_Role_To_rbac_Role(or, rr, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := Convert_rbac_Role_To_api_Role(rr, or2, nil); err != nil {
+		t.Fatal(err)
+	}
+	expectedOriginRules := []PolicyRule{
+		{
+			Resources:       sets.NewString("a", "b", "c"),
+			Verbs:           sets.NewString("s", "t"),
+			ResourceNames:   sets.NewString("B", "c"),
+			NonResourceURLs: sets.NewString("FOO"),
+			APIGroups:       []string{"d", "e"},
+		},
+	}
+	if !reflect.DeepEqual(expectedOriginRules, or2.Rules) {
+		t.Errorf("origin rules expected downcasing not seen; the diff is %s", diff.ObjectDiff(expectedOriginRules, or2.Rules))
+	}
+	expectedRBACRules := []rbac.PolicyRule{
+		{ // this looks a bit strange because the sets.String is converted to a slice and then normalized
+			Resources:       []string{"b", "c", "a"},
+			Verbs:           []string{"s", "t", "t"},
+			ResourceNames:   []string{"B", "c"},
+			NonResourceURLs: []string{"FOO"},
+			APIGroups:       []string{"d", "e"},
+		},
+	}
+	if !reflect.DeepEqual(expectedRBACRules, rr.Rules) {
+		t.Errorf("rbac rules expected downcasing not seen; the diff is %s", diff.ObjectDiff(expectedRBACRules, rr.Rules))
+	}
+}
+
 var fuzzer = fuzz.New().NilChance(0).Funcs(
 	func(*unversioned.TypeMeta, fuzz.Continue) {}, // Ignore TypeMeta
 	func(*runtime.Object, fuzz.Continue) {},       // Ignore AttributeRestrictions since they are deprecated
+	func(ocr *ClusterRole, c fuzz.Continue) {
+		c.FuzzNoCustom(ocr)
+		normalizeOriginRulesFields(ocr.Rules)
+	},
+	func(or *Role, c fuzz.Continue) {
+		c.FuzzNoCustom(or)
+		normalizeOriginRulesFields(or.Rules)
+	},
 	func(ocrb *ClusterRoleBinding, c fuzz.Continue) {
 		c.FuzzNoCustom(ocrb)
 		setRandomOriginRoleBindingData(ocrb.Subjects, &ocrb.RoleRef, "", c)
@@ -264,11 +319,11 @@ var fuzzer = fuzz.New().NilChance(0).Funcs(
 	},
 	func(rr *rbac.Role, c fuzz.Continue) {
 		c.FuzzNoCustom(rr)
-		sortAndDeduplicateRBACRulesFields(rr.Rules) // []string <-> sets.String
+		sortNormalizeDeduplicateRBACRulesFields(rr.Rules) // []string <-> sets.String
 	},
 	func(rcr *rbac.ClusterRole, c fuzz.Continue) {
 		c.FuzzNoCustom(rcr)
-		sortAndDeduplicateRBACRulesFields(rcr.Rules) // []string <-> sets.String
+		sortNormalizeDeduplicateRBACRulesFields(rcr.Rules) // []string <-> sets.String
 	},
 )
 
@@ -348,12 +403,22 @@ func unsetUnusedOriginFields(ref *api.ObjectReference) {
 	ref.APIVersion = ""
 }
 
-func sortAndDeduplicateRBACRulesFields(in []rbac.PolicyRule) {
+func sortNormalizeDeduplicateRBACRulesFields(in []rbac.PolicyRule) {
 	for i := range in {
 		rule := &in[i]
-		rule.Verbs = sets.NewString(rule.Verbs...).List()
-		rule.Resources = sets.NewString(rule.Resources...).List()
+		rule.APIGroups = normalizeList(rule.APIGroups)
+		rule.Verbs = sets.NewString(normalizeList(rule.Verbs)...).List()
+		rule.Resources = sets.NewString(normalizeList(rule.Resources)...).List()
 		rule.ResourceNames = sets.NewString(rule.ResourceNames...).List()
 		rule.NonResourceURLs = sets.NewString(rule.NonResourceURLs...).List()
+	}
+}
+
+func normalizeOriginRulesFields(in []PolicyRule) {
+	for i := range in {
+		rule := &in[i]
+		rule.APIGroups = normalizeList(rule.APIGroups)
+		rule.Verbs = sets.NewString(normalizeList(rule.Verbs.List())...)
+		rule.Resources = sets.NewString(normalizeList(rule.Resources.List())...)
 	}
 }

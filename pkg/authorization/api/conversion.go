@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -72,15 +73,24 @@ func convert_api_PolicyRules_To_rbac_PolicyRules(in []PolicyRule) []rbac.PolicyR
 			continue
 		}
 		r := rbac.PolicyRule{
-			APIGroups:       rule.APIGroups,
-			Verbs:           rule.Verbs.List(),
-			Resources:       rule.Resources.List(),
+			APIGroups:       normalizeList(rule.APIGroups),
+			Verbs:           normalizeList(rule.Verbs.List()),
+			Resources:       normalizeList(rule.Resources.List()),
 			ResourceNames:   rule.ResourceNames.List(),
 			NonResourceURLs: rule.NonResourceURLs.List(),
 		}
 		rules = append(rules, r)
 	}
 	return rules
+}
+
+// downcase all values since rbac expects them to be lowercase
+func normalizeList(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		out = append(out, strings.ToLower(s))
+	}
+	return out
 }
 
 func convert_api_Subjects_To_rbac_Subjects(in []api.ObjectReference) ([]rbac.Subject, error) {
