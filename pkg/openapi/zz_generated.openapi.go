@@ -6659,6 +6659,125 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.ActiveDirectoryConfig": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ActiveDirectoryConfig holds the necessary configuration options to define how an LDAP group sync interacts with an LDAP server using the Active Directory schema",
+					Properties: map[string]spec.Schema{
+						"usersQuery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllUsersQuery holds the template for an LDAP query that returns user entries.",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"),
+							},
+						},
+						"userNameAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UserNameAttributes defines which attributes on an LDAP user entry will be interpreted as its OpenShift user name.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"groupMembershipAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupMembershipAttributes defines which attributes on an LDAP user entry will be interpreted as the groups it is a member of",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"usersQuery", "userNameAttributes", "groupMembershipAttributes"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"},
+		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.AugmentedActiveDirectoryConfig": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "AugmentedActiveDirectoryConfig holds the necessary configuration options to define how an LDAP group sync interacts with an LDAP server using the augmented Active Directory schema",
+					Properties: map[string]spec.Schema{
+						"usersQuery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllUsersQuery holds the template for an LDAP query that returns user entries.",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"),
+							},
+						},
+						"userNameAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UserNameAttributes defines which attributes on an LDAP user entry will be interpreted as its OpenShift user name.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"groupMembershipAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupMembershipAttributes defines which attributes on an LDAP user entry will be interpreted as the groups it is a member of",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"groupsQuery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllGroupsQuery holds the template for an LDAP query that returns group entries.",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"),
+							},
+						},
+						"groupUIDAttribute": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupUIDAttributes defines which attribute on an LDAP group entry will be interpreted as its unique identifier. (ldapGroupUID)",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groupNameAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupNameAttributes defines which attributes on an LDAP group entry will be interpreted as its name to use for an OpenShift group",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"usersQuery", "userNameAttributes", "groupMembershipAttributes", "groupsQuery", "groupUIDAttribute", "groupNameAttributes"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"},
+		},
 		"github.com/openshift/origin/pkg/oauth/api/v1.ClusterRoleScopeRestriction": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -6704,6 +6823,196 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{},
+		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "LDAPQuery holds the options necessary to build an LDAP query",
+					Properties: map[string]spec.Schema{
+						"baseDN": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The DN of the branch of the directory where all searches should start from",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"scope": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The (optional) scope of the search. Can be: base: only the base object, one:  all object on the base level, sub:  the entire subtree Defaults to the entire subtree if not set",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"derefAliases": {
+							SchemaProps: spec.SchemaProps{
+								Description: "The (optional) behavior of the search with regards to alisases. Can be: never:  never dereference aliases, search: only dereference in searching, base:   only dereference in finding the base object, always: always dereference Defaults to always dereferencing if not set",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"timeout": {
+							SchemaProps: spec.SchemaProps{
+								Description: "TimeLimit holds the limit of time in seconds that any request to the server can remain outstanding before the wait for a response is given up. If this is 0, no client-side limit is imposed",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
+						"filter": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Filter is a valid LDAP search filter that retrieves all relevant entries from the LDAP server with the base DN",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"pageSize": {
+							SchemaProps: spec.SchemaProps{
+								Description: "PageSize is the maximum preferred page size, measured in LDAP entries. A page size of 0 means no paging will be done.",
+								Type:        []string{"integer"},
+								Format:      "int64",
+							},
+						},
+					},
+					Required: []string{"baseDN", "scope", "derefAliases", "timeout", "filter", "pageSize"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.LDAPSyncConfig": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "LDAPSyncConfig holds the necessary configuration options to define an LDAP group sync",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"url": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Host is the scheme, host and port of the LDAP server to connect to: scheme://host:port",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"bindDN": {
+							SchemaProps: spec.SchemaProps{
+								Description: "BindDN is an optional DN to bind to the LDAP server with",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"bindPassword": {
+							SchemaProps: spec.SchemaProps{
+								Description: "BindPassword is an optional password to bind with during the search phase.",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.StringSource"),
+							},
+						},
+						"insecure": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Insecure, if true, indicates the connection should not use TLS. Cannot be set to true with a URL scheme of \"ldaps://\" If false, \"ldaps://\" URLs connect using TLS, and \"ldap://\" URLs are upgraded to a TLS connection using StartTLS as specified in https://tools.ietf.org/html/rfc2830",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"ca": {
+							SchemaProps: spec.SchemaProps{
+								Description: "CA is the optional trusted certificate authority bundle to use when making requests to the server If empty, the default system roots are used",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groupUIDNameMapping": {
+							SchemaProps: spec.SchemaProps{
+								Description: "LDAPGroupUIDToOpenShiftGroupNameMapping is an optional direct mapping of LDAP group UIDs to OpenShift Group names",
+								Type:        []string{"object"},
+								AdditionalProperties: &spec.SchemaOrBool{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"rfc2307": {
+							SchemaProps: spec.SchemaProps{
+								Description: "RFC2307Config holds the configuration for extracting data from an LDAP server set up in a fashion similar to RFC2307: first-class group and user entries, with group membership determined by a multi-valued attribute on the group entry listing its members",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.RFC2307Config"),
+							},
+						},
+						"activeDirectory": {
+							SchemaProps: spec.SchemaProps{
+								Description: "ActiveDirectoryConfig holds the configuration for extracting data from an LDAP server set up in a fashion similar to that used in Active Directory: first-class user entries, with group membership determined by a multi-valued attribute on members listing groups they are a member of",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.ActiveDirectoryConfig"),
+							},
+						},
+						"augmentedActiveDirectory": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AugmentedActiveDirectoryConfig holds the configuration for extracting data from an LDAP server set up in a fashion similar to that used in Active Directory as described above, with one addition: first-class group entries exist and are used to hold metadata but not group membership",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.AugmentedActiveDirectoryConfig"),
+							},
+						},
+					},
+					Required: []string{"url", "bindDN", "bindPassword", "insecure", "ca", "groupUIDNameMapping"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/origin/pkg/oauth/api/v1.ActiveDirectoryConfig", "github.com/openshift/origin/pkg/oauth/api/v1.AugmentedActiveDirectoryConfig", "github.com/openshift/origin/pkg/oauth/api/v1.RFC2307Config", "github.com/openshift/origin/pkg/oauth/api/v1.StringSource"},
+		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.LDAPSyncConfigList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "LDAPSyncConfigList us cool",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items is the list of LDAPSyncConfig",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("github.com/openshift/origin/pkg/oauth/api/v1.LDAPSyncConfig"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/origin/pkg/oauth/api/v1.LDAPSyncConfig", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 		},
 		"github.com/openshift/origin/pkg/oauth/api/v1.OAuthAccessToken": {
 			Schema: spec.Schema{
@@ -7276,6 +7585,100 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"github.com/openshift/origin/pkg/oauth/api/v1.RedirectReference", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.RFC2307Config": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "RFC2307Config holds the necessary configuration options to define how an LDAP group sync interacts with an LDAP server using the RFC2307 schema",
+					Properties: map[string]spec.Schema{
+						"groupsQuery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllGroupsQuery holds the template for an LDAP query that returns group entries.",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"),
+							},
+						},
+						"groupUIDAttribute": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupUIDAttributes defines which attribute on an LDAP group entry will be interpreted as its unique identifier. (ldapGroupUID)",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"groupNameAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupNameAttributes defines which attributes on an LDAP group entry will be interpreted as its name to use for an OpenShift group",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"groupMembershipAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupMembershipAttributes defines which attributes on an LDAP group entry will be interpreted  as its members. The values contained in those attributes must be queryable by your UserUIDAttribute",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"usersQuery": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllUsersQuery holds the template for an LDAP query that returns user entries.",
+								Ref:         ref("github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"),
+							},
+						},
+						"userUIDAttribute": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UserUIDAttribute defines which attribute on an LDAP user entry will be interpreted as its unique identifier. It must correspond to values that will be found from the GroupMembershipAttributes",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"userNameAttributes": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UserNameAttributes defines which attributes on an LDAP user entry will be used, in order, as its OpenShift user name. The first attribute with a non-empty value is used. This should match your PreferredUsername setting for your LDAPPasswordIdentityProvider",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+						"tolerateMemberNotFoundErrors": {
+							SchemaProps: spec.SchemaProps{
+								Description: "TolerateMemberNotFoundErrors determines the behavior of the LDAP sync job when missing user entries are encountered. If 'true', an LDAP query for users that doesn't find any will be tolerated and an only and error will be logged. If 'false', the LDAP sync job will fail if a query for users doesn't find any. The default value is 'false'. Misconfigured LDAP sync jobs with this flag set to 'true' can cause group membership to be removed, so it is recommended to use this flag with caution.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"tolerateMemberOutOfScopeErrors": {
+							SchemaProps: spec.SchemaProps{
+								Description: "TolerateMemberOutOfScopeErrors determines the behavior of the LDAP sync job when out-of-scope user entries are encountered. If 'true', an LDAP query for a user that falls outside of the base DN given for the all user query will be tolerated and only an error will be logged. If 'false', the LDAP sync job will fail if a user query would search outside of the base DN specified by the all user query. Misconfigured LDAP sync jobs with this flag set to 'true' can result in groups missing users, so it is recommended to use this flag with caution.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"groupsQuery", "groupUIDAttribute", "groupNameAttributes", "groupMembershipAttributes", "usersQuery", "userUIDAttribute", "userNameAttributes", "tolerateMemberNotFoundErrors", "tolerateMemberOutOfScopeErrors"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/origin/pkg/oauth/api/v1.LDAPQuery"},
+		},
 		"github.com/openshift/origin/pkg/oauth/api/v1.RedirectReference": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -7338,6 +7741,84 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{
 				"github.com/openshift/origin/pkg/oauth/api/v1.ClusterRoleScopeRestriction"},
+		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.StringSource": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "StringSource allows specifying a string inline, or externally via env var or file. When it contains only a string value, it marshals to a simple JSON string.",
+					Properties: map[string]spec.Schema{
+						"value": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Value specifies the cleartext value, or an encrypted value if keyFile is specified.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"env": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Env specifies an envvar containing the cleartext value, or an encrypted value if the keyFile is specified.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"file": {
+							SchemaProps: spec.SchemaProps{
+								Description: "File references a file containing the cleartext value, or an encrypted value if a keyFile is specified.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"keyFile": {
+							SchemaProps: spec.SchemaProps{
+								Description: "KeyFile references a file containing the key to use to decrypt the value.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"value", "env", "file", "keyFile"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"github.com/openshift/origin/pkg/oauth/api/v1.StringSourceSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "StringSourceSpec specifies a string value, or external location",
+					Properties: map[string]spec.Schema{
+						"value": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Value specifies the cleartext value, or an encrypted value if keyFile is specified.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"env": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Env specifies an envvar containing the cleartext value, or an encrypted value if the keyFile is specified.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"file": {
+							SchemaProps: spec.SchemaProps{
+								Description: "File references a file containing the cleartext value, or an encrypted value if a keyFile is specified.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"keyFile": {
+							SchemaProps: spec.SchemaProps{
+								Description: "KeyFile references a file containing the key to use to decrypt the value.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"value", "env", "file", "keyFile"},
+				},
+			},
+			Dependencies: []string{},
 		},
 		"github.com/openshift/origin/pkg/project/api/v1.Project": {
 			Schema: spec.Schema{

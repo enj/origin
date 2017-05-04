@@ -58,6 +58,7 @@ func StorageOptions(options configapi.MasterConfig) (restoptions.Getter, error) 
 			{"apps.openshift.io", "v1", "deploymentconfigs"},
 			{"image.openshift.io", "v1", "imagestreams"},
 			{"image.openshift.io", "v1", "images"},
+			{"oauth.openshift.io", "v1", "ldapsyncconfigs"},
 			{"oauth.openshift.io", "v1", "oauthclientauthorizations"},
 			{"oauth.openshift.io", "v1", "oauthaccesstokens"},
 			{"oauth.openshift.io", "v1", "oauthauthorizetokens"},

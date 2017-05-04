@@ -185,9 +185,9 @@ func LegacyStorage(storage map[schema.GroupVersion]map[string]rest.Storage) map[
 	legacyStorage := map[string]rest.Storage{}
 	for _, gvStorage := range storage {
 		for resource, s := range gvStorage {
-			if OriginLegacyResources.Has(resource) || OriginLegacySubresources.Has(resource) {
-				legacyStorage[resource] = s
-			}
+			//if OriginLegacyResources.Has(resource) || OriginLegacySubresources.Has(resource) {
+			legacyStorage[resource] = s
+			//}
 		}
 	}
 	return legacyStorage

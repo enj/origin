@@ -93,6 +93,7 @@ var (
 	}
 
 	OriginAPIGroupsToAllowedVersions = map[string][]string{
+		"": {"v1"},
 		OriginAPIGroupAuthorization: {"v1"},
 		OriginAPIGroupBuild:         {"v1"},
 		OriginAPIGroupDeploy:        {"v1"},
@@ -1224,6 +1225,12 @@ type StringSourceSpec struct {
 
 	// KeyFile references a file containing the key to use to decrypt the value.
 	KeyFile string
+}
+
+type LDAPSyncConfigList struct {
+	metav1.TypeMeta
+	metav1.ListMeta
+	Items []LDAPSyncConfig
 }
 
 type LDAPSyncConfig struct {

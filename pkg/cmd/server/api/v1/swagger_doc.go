@@ -425,6 +425,16 @@ func (LDAPSyncConfig) SwaggerDoc() map[string]string {
 	return map_LDAPSyncConfig
 }
 
+var map_LDAPSyncConfigList = map[string]string{
+	"":         "LDAPSyncConfigList us cool",
+	"metadata": "Standard object's metadata.",
+	"items":    "Items is the list of LDAPSyncConfig",
+}
+
+func (LDAPSyncConfigList) SwaggerDoc() map[string]string {
+	return map_LDAPSyncConfigList
+}
+
 var map_LocalQuota = map[string]string{
 	"":           "LocalQuota contains options for controlling local volume quota on the node.",
 	"perFSGroup": "FSGroup can be specified to enable a quota on local storage use per unique FSGroup ID. At present this is only implemented for emptyDir volumes, and if the underlying volumeDirectory is on an XFS filesystem.",

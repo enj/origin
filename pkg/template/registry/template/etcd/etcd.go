@@ -9,6 +9,8 @@ import (
 	"github.com/openshift/origin/pkg/template/api"
 	rest "github.com/openshift/origin/pkg/template/registry/template"
 	"github.com/openshift/origin/pkg/util/restoptions"
+
+	ok "github.com/openshift/origin/pkg/cmd/server/api"
 )
 
 // REST implements a RESTStorage for templates against etcd
@@ -24,6 +26,29 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 		NewListFunc:       func() runtime.Object { return &api.TemplateList{} },
 		PredicateFunc:     rest.Matcher,
 		QualifiedResource: api.Resource("templates"),
+
+		CreateStrategy: rest.Strategy,
+		UpdateStrategy: rest.Strategy,
+
+		ReturnDeletedObject: true,
+	}
+
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: rest.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		return nil, err
+	}
+
+	return &REST{store}, nil
+}
+
+// NewREST returns a RESTStorage object that will work against templates.
+func NewREST2(optsGetter restoptions.Getter) (*REST, error) {
+	store := &registry.Store{
+		Copier:            kapi.Scheme,
+		NewFunc:           func() runtime.Object { return &ok.LDAPSyncConfig{} },
+		NewListFunc:       func() runtime.Object { return &ok.LDAPSyncConfigList{} },
+		PredicateFunc:     rest.Matcher,
+		QualifiedResource: ok.Resource("ldapsyncconfigs"),
 
 		CreateStrategy: rest.Strategy,
 		UpdateStrategy: rest.Strategy,

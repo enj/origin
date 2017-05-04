@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 
+	"github.com/golang/glog"
 	"github.com/emicklei/go-restful"
 )
 
@@ -189,6 +190,7 @@ func (a *APIInstaller) restMapping(resource string) (*meta.RESTMapping, error) {
 }
 
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*metav1.APIResource, error) {
+	glog.Errorf("%s %#v %s", path, storage.New(), ws.Documentation())
 	admit := a.group.Admit
 	context := a.group.Context
 

@@ -14,6 +14,45 @@ import "k8s.io/apiserver/pkg/apis/example/v1/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
+// ActiveDirectoryConfig holds the necessary configuration options to define how an LDAP group sync interacts with an LDAP
+// server using the Active Directory schema
+message ActiveDirectoryConfig {
+  // AllUsersQuery holds the template for an LDAP query that returns user entries.
+  optional LDAPQuery usersQuery = 1;
+
+  // UserNameAttributes defines which attributes on an LDAP user entry will be interpreted as its OpenShift user name.
+  repeated string userNameAttributes = 2;
+
+  // GroupMembershipAttributes defines which attributes on an LDAP user entry will be interpreted
+  // as the groups it is a member of
+  repeated string groupMembershipAttributes = 3;
+}
+
+// AugmentedActiveDirectoryConfig holds the necessary configuration options to define how an LDAP group sync interacts with an LDAP
+// server using the augmented Active Directory schema
+message AugmentedActiveDirectoryConfig {
+  // AllUsersQuery holds the template for an LDAP query that returns user entries.
+  optional LDAPQuery usersQuery = 1;
+
+  // UserNameAttributes defines which attributes on an LDAP user entry will be interpreted as its OpenShift user name.
+  repeated string userNameAttributes = 2;
+
+  // GroupMembershipAttributes defines which attributes on an LDAP user entry will be interpreted
+  // as the groups it is a member of
+  repeated string groupMembershipAttributes = 3;
+
+  // AllGroupsQuery holds the template for an LDAP query that returns group entries.
+  optional LDAPQuery groupsQuery = 4;
+
+  // GroupUIDAttributes defines which attribute on an LDAP group entry will be interpreted as its unique identifier.
+  // (ldapGroupUID)
+  optional string groupUIDAttribute = 5;
+
+  // GroupNameAttributes defines which attributes on an LDAP group entry will be interpreted as its name to use for
+  // an OpenShift group
+  repeated string groupNameAttributes = 6;
+}
+
 // ClusterRoleScopeRestriction describes restrictions on cluster role scopes
 message ClusterRoleScopeRestriction {
   // RoleNames is the list of cluster roles that can referenced.  * means anything
@@ -24,6 +63,87 @@ message ClusterRoleScopeRestriction {
 
   // AllowEscalation indicates whether you can request roles and their escalating resources
   optional bool allowEscalation = 3;
+}
+
+// LDAPQuery holds the options necessary to build an LDAP query
+message LDAPQuery {
+  // The DN of the branch of the directory where all searches should start from
+  optional string baseDN = 1;
+
+  // The (optional) scope of the search. Can be:
+  // base: only the base object,
+  // one:  all object on the base level,
+  // sub:  the entire subtree
+  // Defaults to the entire subtree if not set
+  optional string scope = 2;
+
+  // The (optional) behavior of the search with regards to alisases. Can be:
+  // never:  never dereference aliases,
+  // search: only dereference in searching,
+  // base:   only dereference in finding the base object,
+  // always: always dereference
+  // Defaults to always dereferencing if not set
+  optional string derefAliases = 3;
+
+  // TimeLimit holds the limit of time in seconds that any request to the server can remain outstanding
+  // before the wait for a response is given up. If this is 0, no client-side limit is imposed
+  optional int64 timeout = 4;
+
+  // Filter is a valid LDAP search filter that retrieves all relevant entries from the LDAP server with the base DN
+  optional string filter = 5;
+
+  // PageSize is the maximum preferred page size, measured in LDAP entries. A page size of 0 means no paging will be done.
+  optional int64 pageSize = 6;
+}
+
+// LDAPSyncConfig holds the necessary configuration options to define an LDAP group sync
+message LDAPSyncConfig {
+  // Host is the scheme, host and port of the LDAP server to connect to:
+  // scheme://host:port
+  optional string url = 1;
+
+  // BindDN is an optional DN to bind to the LDAP server with
+  optional string bindDN = 2;
+
+  // BindPassword is an optional password to bind with during the search phase.
+  optional StringSource bindPassword = 3;
+
+  // Insecure, if true, indicates the connection should not use TLS.
+  // Cannot be set to true with a URL scheme of "ldaps://"
+  // If false, "ldaps://" URLs connect using TLS, and "ldap://" URLs are upgraded to a TLS connection using StartTLS as specified in https://tools.ietf.org/html/rfc2830
+  optional bool insecure = 4;
+
+  // CA is the optional trusted certificate authority bundle to use when making requests to the server
+  // If empty, the default system roots are used
+  optional string ca = 5;
+
+  // LDAPGroupUIDToOpenShiftGroupNameMapping is an optional direct mapping of LDAP group UIDs to
+  // OpenShift Group names
+  map<string, string> groupUIDNameMapping = 6;
+
+  // RFC2307Config holds the configuration for extracting data from an LDAP server set up in a fashion
+  // similar to RFC2307: first-class group and user entries, with group membership determined by a
+  // multi-valued attribute on the group entry listing its members
+  optional RFC2307Config rfc2307 = 7;
+
+  // ActiveDirectoryConfig holds the configuration for extracting data from an LDAP server set up in a
+  // fashion similar to that used in Active Directory: first-class user entries, with group membership
+  // determined by a multi-valued attribute on members listing groups they are a member of
+  optional ActiveDirectoryConfig activeDirectory = 8;
+
+  // AugmentedActiveDirectoryConfig holds the configuration for extracting data from an LDAP server
+  // set up in a fashion similar to that used in Active Directory as described above, with one addition:
+  // first-class group entries exist and are used to hold metadata but not group membership
+  optional AugmentedActiveDirectoryConfig augmentedActiveDirectory = 9;
+}
+
+// LDAPSyncConfigList us cool
+message LDAPSyncConfigList {
+  // Standard object's metadata.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of LDAPSyncConfig
+  repeated LDAPSyncConfig items = 2;
 }
 
 // OAuthAccessToken describes an OAuth access token
@@ -185,6 +305,51 @@ message OAuthRedirectReference {
   optional RedirectReference reference = 2;
 }
 
+// RFC2307Config holds the necessary configuration options to define how an LDAP group sync interacts with an LDAP
+// server using the RFC2307 schema
+message RFC2307Config {
+  // AllGroupsQuery holds the template for an LDAP query that returns group entries.
+  optional LDAPQuery groupsQuery = 1;
+
+  // GroupUIDAttributes defines which attribute on an LDAP group entry will be interpreted as its unique identifier.
+  // (ldapGroupUID)
+  optional string groupUIDAttribute = 2;
+
+  // GroupNameAttributes defines which attributes on an LDAP group entry will be interpreted as its name to use for
+  // an OpenShift group
+  repeated string groupNameAttributes = 3;
+
+  // GroupMembershipAttributes defines which attributes on an LDAP group entry will be interpreted  as its members.
+  // The values contained in those attributes must be queryable by your UserUIDAttribute
+  repeated string groupMembershipAttributes = 4;
+
+  // AllUsersQuery holds the template for an LDAP query that returns user entries.
+  optional LDAPQuery usersQuery = 5;
+
+  // UserUIDAttribute defines which attribute on an LDAP user entry will be interpreted as its unique identifier.
+  // It must correspond to values that will be found from the GroupMembershipAttributes
+  optional string userUIDAttribute = 6;
+
+  // UserNameAttributes defines which attributes on an LDAP user entry will be used, in order, as its OpenShift user name.
+  // The first attribute with a non-empty value is used. This should match your PreferredUsername setting for your LDAPPasswordIdentityProvider
+  repeated string userNameAttributes = 7;
+
+  // TolerateMemberNotFoundErrors determines the behavior of the LDAP sync job when missing user entries are
+  // encountered. If 'true', an LDAP query for users that doesn't find any will be tolerated and an only
+  // and error will be logged. If 'false', the LDAP sync job will fail if a query for users doesn't find
+  // any. The default value is 'false'. Misconfigured LDAP sync jobs with this flag set to 'true' can cause
+  // group membership to be removed, so it is recommended to use this flag with caution.
+  optional bool tolerateMemberNotFoundErrors = 8;
+
+  // TolerateMemberOutOfScopeErrors determines the behavior of the LDAP sync job when out-of-scope user entries
+  // are encountered. If 'true', an LDAP query for a user that falls outside of the base DN given for the all
+  // user query will be tolerated and only an error will be logged. If 'false', the LDAP sync job will fail
+  // if a user query would search outside of the base DN specified by the all user query. Misconfigured LDAP
+  // sync jobs with this flag set to 'true' can result in groups missing users, so it is recommended to use
+  // this flag with caution.
+  optional bool tolerateMemberOutOfScopeErrors = 9;
+}
+
 // RedirectReference specifies the target in the current namespace that resolves into redirect URIs.  Only the 'Route' kind is currently allowed.
 message RedirectReference {
   // The group of the target that is being referred to.
@@ -204,5 +369,27 @@ message ScopeRestriction {
 
   // ClusterRole describes a set of restrictions for cluster role scoping.
   optional ClusterRoleScopeRestriction clusterRole = 2;
+}
+
+// StringSource allows specifying a string inline, or externally via env var or file.
+// When it contains only a string value, it marshals to a simple JSON string.
+message StringSource {
+  // StringSourceSpec specifies the string value, or external location
+  optional StringSourceSpec stringSourceSpec = 1;
+}
+
+// StringSourceSpec specifies a string value, or external location
+message StringSourceSpec {
+  // Value specifies the cleartext value, or an encrypted value if keyFile is specified.
+  optional string value = 1;
+
+  // Env specifies an envvar containing the cleartext value, or an encrypted value if the keyFile is specified.
+  optional string env = 2;
+
+  // File references a file containing the cleartext value, or an encrypted value if a keyFile is specified.
+  optional string file = 3;
+
+  // KeyFile references a file containing the key to use to decrypt the value.
+  optional string keyFile = 4;
 }
 

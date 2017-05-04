@@ -66,6 +66,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OAuthClientAuthorization{},
 		&OAuthClientAuthorizationList{},
 		&OAuthRedirectReference{},
+		&LDAPSyncConfig{},
+		&LDAPSyncConfigList{},
 	)
 	return nil
 }
@@ -81,6 +83,8 @@ func addLegacyKnownTypes(scheme *runtime.Scheme) error {
 		&OAuthClientAuthorization{},
 		&OAuthClientAuthorizationList{},
 		&OAuthRedirectReference{},
+		&LDAPSyncConfig{},
+		&LDAPSyncConfigList{},
 	}
 	scheme.AddKnownTypes(LegacySchemeGroupVersion, types...)
 	return nil

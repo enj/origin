@@ -35,6 +35,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&OAuthClientAuthorization{},
 		&OAuthClientAuthorizationList{},
 		&OAuthRedirectReference{},
+		&LDAPSyncConfig{},
+		&LDAPSyncConfigList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
@@ -51,6 +53,8 @@ func addLegacyKnownTypes(scheme *runtime.Scheme) error {
 		&OAuthClientAuthorization{},
 		&OAuthClientAuthorizationList{},
 		&OAuthRedirectReference{},
+		&LDAPSyncConfig{},
+		&LDAPSyncConfigList{},
 	}
 	scheme.AddKnownTypes(LegacySchemeGroupVersion, types...)
 	return nil

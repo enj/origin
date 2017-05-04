@@ -19,7 +19,12 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ActiveDirectoryConfig, InType: reflect.TypeOf(&ActiveDirectoryConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AugmentedActiveDirectoryConfig, InType: reflect.TypeOf(&AugmentedActiveDirectoryConfig{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ClusterRoleScopeRestriction, InType: reflect.TypeOf(&ClusterRoleScopeRestriction{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LDAPQuery, InType: reflect.TypeOf(&LDAPQuery{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LDAPSyncConfig, InType: reflect.TypeOf(&LDAPSyncConfig{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LDAPSyncConfigList, InType: reflect.TypeOf(&LDAPSyncConfigList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OAuthAccessToken, InType: reflect.TypeOf(&OAuthAccessToken{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OAuthAccessTokenList, InType: reflect.TypeOf(&OAuthAccessTokenList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OAuthAuthorizeToken, InType: reflect.TypeOf(&OAuthAuthorizeToken{})},
@@ -29,9 +34,55 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OAuthClientAuthorizationList, InType: reflect.TypeOf(&OAuthClientAuthorizationList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OAuthClientList, InType: reflect.TypeOf(&OAuthClientList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OAuthRedirectReference, InType: reflect.TypeOf(&OAuthRedirectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RFC2307Config, InType: reflect.TypeOf(&RFC2307Config{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RedirectReference, InType: reflect.TypeOf(&RedirectReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ScopeRestriction, InType: reflect.TypeOf(&ScopeRestriction{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_StringSource, InType: reflect.TypeOf(&StringSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_StringSourceSpec, InType: reflect.TypeOf(&StringSourceSpec{})},
 	)
+}
+
+func DeepCopy_v1_ActiveDirectoryConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ActiveDirectoryConfig)
+		out := out.(*ActiveDirectoryConfig)
+		*out = *in
+		if in.UserNameAttributes != nil {
+			in, out := &in.UserNameAttributes, &out.UserNameAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.GroupMembershipAttributes != nil {
+			in, out := &in.GroupMembershipAttributes, &out.GroupMembershipAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_AugmentedActiveDirectoryConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AugmentedActiveDirectoryConfig)
+		out := out.(*AugmentedActiveDirectoryConfig)
+		*out = *in
+		if in.UserNameAttributes != nil {
+			in, out := &in.UserNameAttributes, &out.UserNameAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.GroupMembershipAttributes != nil {
+			in, out := &in.GroupMembershipAttributes, &out.GroupMembershipAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.GroupNameAttributes != nil {
+			in, out := &in.GroupNameAttributes, &out.GroupNameAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
 }
 
 func DeepCopy_v1_ClusterRoleScopeRestriction(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -48,6 +99,70 @@ func DeepCopy_v1_ClusterRoleScopeRestriction(in interface{}, out interface{}, c 
 			in, out := &in.Namespaces, &out.Namespaces
 			*out = make([]string, len(*in))
 			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_LDAPQuery(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LDAPQuery)
+		out := out.(*LDAPQuery)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_LDAPSyncConfig(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LDAPSyncConfig)
+		out := out.(*LDAPSyncConfig)
+		*out = *in
+		if in.LDAPGroupUIDToOpenShiftGroupNameMapping != nil {
+			in, out := &in.LDAPGroupUIDToOpenShiftGroupNameMapping, &out.LDAPGroupUIDToOpenShiftGroupNameMapping
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.RFC2307Config != nil {
+			in, out := &in.RFC2307Config, &out.RFC2307Config
+			*out = new(RFC2307Config)
+			if err := DeepCopy_v1_RFC2307Config(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.ActiveDirectoryConfig != nil {
+			in, out := &in.ActiveDirectoryConfig, &out.ActiveDirectoryConfig
+			*out = new(ActiveDirectoryConfig)
+			if err := DeepCopy_v1_ActiveDirectoryConfig(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		if in.AugmentedActiveDirectoryConfig != nil {
+			in, out := &in.AugmentedActiveDirectoryConfig, &out.AugmentedActiveDirectoryConfig
+			*out = new(AugmentedActiveDirectoryConfig)
+			if err := DeepCopy_v1_AugmentedActiveDirectoryConfig(*in, *out, c); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_LDAPSyncConfigList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LDAPSyncConfigList)
+		out := out.(*LDAPSyncConfigList)
+		*out = *in
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]LDAPSyncConfig, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_LDAPSyncConfig(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}
@@ -229,6 +344,30 @@ func DeepCopy_v1_OAuthRedirectReference(in interface{}, out interface{}, c *conv
 	}
 }
 
+func DeepCopy_v1_RFC2307Config(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*RFC2307Config)
+		out := out.(*RFC2307Config)
+		*out = *in
+		if in.GroupNameAttributes != nil {
+			in, out := &in.GroupNameAttributes, &out.GroupNameAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.GroupMembershipAttributes != nil {
+			in, out := &in.GroupMembershipAttributes, &out.GroupMembershipAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		if in.UserNameAttributes != nil {
+			in, out := &in.UserNameAttributes, &out.UserNameAttributes
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_RedirectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RedirectReference)
@@ -255,6 +394,24 @@ func DeepCopy_v1_ScopeRestriction(in interface{}, out interface{}, c *conversion
 				return err
 			}
 		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_StringSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*StringSource)
+		out := out.(*StringSource)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_StringSourceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*StringSourceSpec)
+		out := out.(*StringSourceSpec)
+		*out = *in
 		return nil
 	}
 }

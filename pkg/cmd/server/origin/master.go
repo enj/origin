@@ -15,8 +15,9 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/natefinch/lumberjack.v2"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 
+	okv1 "github.com/openshift/origin/pkg/cmd/server/api/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -779,6 +780,9 @@ func (c *MasterConfig) GetRestStorage() map[schema.GroupVersion]map[string]rest.
 
 	clientStorage, err := clientetcd.NewREST(c.RESTOptionsGetter)
 	checkStorageErr(err)
+
+	clientStorage2, err := clientetcd.NewREST2(c.RESTOptionsGetter)
+	checkStorageErr(err)
 	clientRegistry := clientregistry.NewRegistry(clientStorage)
 
 	// If OAuth is disabled, set the strategy to Deny
@@ -798,6 +802,9 @@ func (c *MasterConfig) GetRestStorage() map[schema.GroupVersion]map[string]rest.
 	checkStorageErr(err)
 
 	templateStorage, err := templateetcd.NewREST(c.RESTOptionsGetter)
+	checkStorageErr(err)
+
+	templateStorage2, err := templateetcd.NewREST2(c.RESTOptionsGetter)
 	checkStorageErr(err)
 
 	clusterResourceQuotaStorage, clusterResourceQuotaStatusStorage, err := clusterresourcequotaetcd.NewREST(c.RESTOptionsGetter)
@@ -841,6 +848,7 @@ func (c *MasterConfig) GetRestStorage() map[schema.GroupVersion]map[string]rest.
 		"oAuthAuthorizeTokens":      authorizeTokenStorage,
 		"oAuthAccessTokens":         accessTokenStorage,
 		"oAuthClients":              clientStorage,
+		"ldapsyncconfigs":           clientStorage2,
 		"oAuthClientAuthorizations": clientAuthorizationStorage,
 	}
 
@@ -888,6 +896,10 @@ func (c *MasterConfig) GetRestStorage() map[schema.GroupVersion]map[string]rest.
 	storage[templateapiv1.SchemeGroupVersion] = map[string]rest.Storage{
 		"processedTemplates": templateregistry.NewREST(),
 		"templates":          templateStorage,
+	}
+
+	storage[okv1.SchemeGroupVersion] = map[string]rest.Storage{
+		"ldapsyncconfigs": templateStorage2,
 	}
 
 	storage[imageapiv1.SchemeGroupVersion] = map[string]rest.Storage{

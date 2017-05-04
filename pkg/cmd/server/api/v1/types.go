@@ -1150,6 +1150,15 @@ type StringSourceSpec struct {
 	KeyFile string `json:"keyFile"`
 }
 
+// LDAPSyncConfigList us cool
+type LDAPSyncConfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// Items is the list of LDAPSyncConfig
+	Items []LDAPSyncConfig `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
 // LDAPSyncConfig holds the necessary configuration options to define an LDAP group sync
 type LDAPSyncConfig struct {
 	metav1.TypeMeta `json:",inline"`

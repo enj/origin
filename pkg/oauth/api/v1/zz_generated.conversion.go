@@ -19,8 +19,18 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1_ActiveDirectoryConfig_To_api_ActiveDirectoryConfig,
+		Convert_api_ActiveDirectoryConfig_To_v1_ActiveDirectoryConfig,
+		Convert_v1_AugmentedActiveDirectoryConfig_To_api_AugmentedActiveDirectoryConfig,
+		Convert_api_AugmentedActiveDirectoryConfig_To_v1_AugmentedActiveDirectoryConfig,
 		Convert_v1_ClusterRoleScopeRestriction_To_api_ClusterRoleScopeRestriction,
 		Convert_api_ClusterRoleScopeRestriction_To_v1_ClusterRoleScopeRestriction,
+		Convert_v1_LDAPQuery_To_api_LDAPQuery,
+		Convert_api_LDAPQuery_To_v1_LDAPQuery,
+		Convert_v1_LDAPSyncConfig_To_api_LDAPSyncConfig,
+		Convert_api_LDAPSyncConfig_To_v1_LDAPSyncConfig,
+		Convert_v1_LDAPSyncConfigList_To_api_LDAPSyncConfigList,
+		Convert_api_LDAPSyncConfigList_To_v1_LDAPSyncConfigList,
 		Convert_v1_OAuthAccessToken_To_api_OAuthAccessToken,
 		Convert_api_OAuthAccessToken_To_v1_OAuthAccessToken,
 		Convert_v1_OAuthAccessTokenList_To_api_OAuthAccessTokenList,
@@ -39,11 +49,119 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_OAuthClientList_To_v1_OAuthClientList,
 		Convert_v1_OAuthRedirectReference_To_api_OAuthRedirectReference,
 		Convert_api_OAuthRedirectReference_To_v1_OAuthRedirectReference,
+		Convert_v1_RFC2307Config_To_api_RFC2307Config,
+		Convert_api_RFC2307Config_To_v1_RFC2307Config,
 		Convert_v1_RedirectReference_To_api_RedirectReference,
 		Convert_api_RedirectReference_To_v1_RedirectReference,
 		Convert_v1_ScopeRestriction_To_api_ScopeRestriction,
 		Convert_api_ScopeRestriction_To_v1_ScopeRestriction,
+		Convert_v1_StringSource_To_api_StringSource,
+		Convert_api_StringSource_To_v1_StringSource,
+		Convert_v1_StringSourceSpec_To_api_StringSourceSpec,
+		Convert_api_StringSourceSpec_To_v1_StringSourceSpec,
 	)
+}
+
+func autoConvert_v1_ActiveDirectoryConfig_To_api_ActiveDirectoryConfig(in *ActiveDirectoryConfig, out *api.ActiveDirectoryConfig, s conversion.Scope) error {
+	if err := Convert_v1_LDAPQuery_To_api_LDAPQuery(&in.AllUsersQuery, &out.AllUsersQuery, s); err != nil {
+		return err
+	}
+	if in.UserNameAttributes == nil {
+		out.UserNameAttributes = make([]string, 0)
+	} else {
+		out.UserNameAttributes = *(*[]string)(unsafe.Pointer(&in.UserNameAttributes))
+	}
+	if in.GroupMembershipAttributes == nil {
+		out.GroupMembershipAttributes = make([]string, 0)
+	} else {
+		out.GroupMembershipAttributes = *(*[]string)(unsafe.Pointer(&in.GroupMembershipAttributes))
+	}
+	return nil
+}
+
+func Convert_v1_ActiveDirectoryConfig_To_api_ActiveDirectoryConfig(in *ActiveDirectoryConfig, out *api.ActiveDirectoryConfig, s conversion.Scope) error {
+	return autoConvert_v1_ActiveDirectoryConfig_To_api_ActiveDirectoryConfig(in, out, s)
+}
+
+func autoConvert_api_ActiveDirectoryConfig_To_v1_ActiveDirectoryConfig(in *api.ActiveDirectoryConfig, out *ActiveDirectoryConfig, s conversion.Scope) error {
+	if err := Convert_api_LDAPQuery_To_v1_LDAPQuery(&in.AllUsersQuery, &out.AllUsersQuery, s); err != nil {
+		return err
+	}
+	if in.UserNameAttributes == nil {
+		out.UserNameAttributes = make([]string, 0)
+	} else {
+		out.UserNameAttributes = *(*[]string)(unsafe.Pointer(&in.UserNameAttributes))
+	}
+	if in.GroupMembershipAttributes == nil {
+		out.GroupMembershipAttributes = make([]string, 0)
+	} else {
+		out.GroupMembershipAttributes = *(*[]string)(unsafe.Pointer(&in.GroupMembershipAttributes))
+	}
+	return nil
+}
+
+func Convert_api_ActiveDirectoryConfig_To_v1_ActiveDirectoryConfig(in *api.ActiveDirectoryConfig, out *ActiveDirectoryConfig, s conversion.Scope) error {
+	return autoConvert_api_ActiveDirectoryConfig_To_v1_ActiveDirectoryConfig(in, out, s)
+}
+
+func autoConvert_v1_AugmentedActiveDirectoryConfig_To_api_AugmentedActiveDirectoryConfig(in *AugmentedActiveDirectoryConfig, out *api.AugmentedActiveDirectoryConfig, s conversion.Scope) error {
+	if err := Convert_v1_LDAPQuery_To_api_LDAPQuery(&in.AllUsersQuery, &out.AllUsersQuery, s); err != nil {
+		return err
+	}
+	if in.UserNameAttributes == nil {
+		out.UserNameAttributes = make([]string, 0)
+	} else {
+		out.UserNameAttributes = *(*[]string)(unsafe.Pointer(&in.UserNameAttributes))
+	}
+	if in.GroupMembershipAttributes == nil {
+		out.GroupMembershipAttributes = make([]string, 0)
+	} else {
+		out.GroupMembershipAttributes = *(*[]string)(unsafe.Pointer(&in.GroupMembershipAttributes))
+	}
+	if err := Convert_v1_LDAPQuery_To_api_LDAPQuery(&in.AllGroupsQuery, &out.AllGroupsQuery, s); err != nil {
+		return err
+	}
+	out.GroupUIDAttribute = in.GroupUIDAttribute
+	if in.GroupNameAttributes == nil {
+		out.GroupNameAttributes = make([]string, 0)
+	} else {
+		out.GroupNameAttributes = *(*[]string)(unsafe.Pointer(&in.GroupNameAttributes))
+	}
+	return nil
+}
+
+func Convert_v1_AugmentedActiveDirectoryConfig_To_api_AugmentedActiveDirectoryConfig(in *AugmentedActiveDirectoryConfig, out *api.AugmentedActiveDirectoryConfig, s conversion.Scope) error {
+	return autoConvert_v1_AugmentedActiveDirectoryConfig_To_api_AugmentedActiveDirectoryConfig(in, out, s)
+}
+
+func autoConvert_api_AugmentedActiveDirectoryConfig_To_v1_AugmentedActiveDirectoryConfig(in *api.AugmentedActiveDirectoryConfig, out *AugmentedActiveDirectoryConfig, s conversion.Scope) error {
+	if err := Convert_api_LDAPQuery_To_v1_LDAPQuery(&in.AllUsersQuery, &out.AllUsersQuery, s); err != nil {
+		return err
+	}
+	if in.UserNameAttributes == nil {
+		out.UserNameAttributes = make([]string, 0)
+	} else {
+		out.UserNameAttributes = *(*[]string)(unsafe.Pointer(&in.UserNameAttributes))
+	}
+	if in.GroupMembershipAttributes == nil {
+		out.GroupMembershipAttributes = make([]string, 0)
+	} else {
+		out.GroupMembershipAttributes = *(*[]string)(unsafe.Pointer(&in.GroupMembershipAttributes))
+	}
+	if err := Convert_api_LDAPQuery_To_v1_LDAPQuery(&in.AllGroupsQuery, &out.AllGroupsQuery, s); err != nil {
+		return err
+	}
+	out.GroupUIDAttribute = in.GroupUIDAttribute
+	if in.GroupNameAttributes == nil {
+		out.GroupNameAttributes = make([]string, 0)
+	} else {
+		out.GroupNameAttributes = *(*[]string)(unsafe.Pointer(&in.GroupNameAttributes))
+	}
+	return nil
+}
+
+func Convert_api_AugmentedActiveDirectoryConfig_To_v1_AugmentedActiveDirectoryConfig(in *api.AugmentedActiveDirectoryConfig, out *AugmentedActiveDirectoryConfig, s conversion.Scope) error {
+	return autoConvert_api_AugmentedActiveDirectoryConfig_To_v1_AugmentedActiveDirectoryConfig(in, out, s)
 }
 
 func autoConvert_v1_ClusterRoleScopeRestriction_To_api_ClusterRoleScopeRestriction(in *ClusterRoleScopeRestriction, out *api.ClusterRoleScopeRestriction, s conversion.Scope) error {
@@ -74,6 +192,96 @@ func autoConvert_api_ClusterRoleScopeRestriction_To_v1_ClusterRoleScopeRestricti
 
 func Convert_api_ClusterRoleScopeRestriction_To_v1_ClusterRoleScopeRestriction(in *api.ClusterRoleScopeRestriction, out *ClusterRoleScopeRestriction, s conversion.Scope) error {
 	return autoConvert_api_ClusterRoleScopeRestriction_To_v1_ClusterRoleScopeRestriction(in, out, s)
+}
+
+func autoConvert_v1_LDAPQuery_To_api_LDAPQuery(in *LDAPQuery, out *api.LDAPQuery, s conversion.Scope) error {
+	out.BaseDN = in.BaseDN
+	out.Scope = in.Scope
+	out.DerefAliases = in.DerefAliases
+	out.TimeLimit = in.TimeLimit
+	out.Filter = in.Filter
+	out.PageSize = in.PageSize
+	return nil
+}
+
+func Convert_v1_LDAPQuery_To_api_LDAPQuery(in *LDAPQuery, out *api.LDAPQuery, s conversion.Scope) error {
+	return autoConvert_v1_LDAPQuery_To_api_LDAPQuery(in, out, s)
+}
+
+func autoConvert_api_LDAPQuery_To_v1_LDAPQuery(in *api.LDAPQuery, out *LDAPQuery, s conversion.Scope) error {
+	out.BaseDN = in.BaseDN
+	out.Scope = in.Scope
+	out.DerefAliases = in.DerefAliases
+	out.TimeLimit = in.TimeLimit
+	out.Filter = in.Filter
+	out.PageSize = in.PageSize
+	return nil
+}
+
+func Convert_api_LDAPQuery_To_v1_LDAPQuery(in *api.LDAPQuery, out *LDAPQuery, s conversion.Scope) error {
+	return autoConvert_api_LDAPQuery_To_v1_LDAPQuery(in, out, s)
+}
+
+func autoConvert_v1_LDAPSyncConfig_To_api_LDAPSyncConfig(in *LDAPSyncConfig, out *api.LDAPSyncConfig, s conversion.Scope) error {
+	out.URL = in.URL
+	out.BindDN = in.BindDN
+	if err := Convert_v1_StringSource_To_api_StringSource(&in.BindPassword, &out.BindPassword, s); err != nil {
+		return err
+	}
+	out.Insecure = in.Insecure
+	out.CA = in.CA
+	out.LDAPGroupUIDToOpenShiftGroupNameMapping = *(*map[string]string)(unsafe.Pointer(&in.LDAPGroupUIDToOpenShiftGroupNameMapping))
+	out.RFC2307Config = (*api.RFC2307Config)(unsafe.Pointer(in.RFC2307Config))
+	out.ActiveDirectoryConfig = (*api.ActiveDirectoryConfig)(unsafe.Pointer(in.ActiveDirectoryConfig))
+	out.AugmentedActiveDirectoryConfig = (*api.AugmentedActiveDirectoryConfig)(unsafe.Pointer(in.AugmentedActiveDirectoryConfig))
+	return nil
+}
+
+func Convert_v1_LDAPSyncConfig_To_api_LDAPSyncConfig(in *LDAPSyncConfig, out *api.LDAPSyncConfig, s conversion.Scope) error {
+	return autoConvert_v1_LDAPSyncConfig_To_api_LDAPSyncConfig(in, out, s)
+}
+
+func autoConvert_api_LDAPSyncConfig_To_v1_LDAPSyncConfig(in *api.LDAPSyncConfig, out *LDAPSyncConfig, s conversion.Scope) error {
+	out.URL = in.URL
+	out.BindDN = in.BindDN
+	if err := Convert_api_StringSource_To_v1_StringSource(&in.BindPassword, &out.BindPassword, s); err != nil {
+		return err
+	}
+	out.Insecure = in.Insecure
+	out.CA = in.CA
+	out.LDAPGroupUIDToOpenShiftGroupNameMapping = *(*map[string]string)(unsafe.Pointer(&in.LDAPGroupUIDToOpenShiftGroupNameMapping))
+	out.RFC2307Config = (*RFC2307Config)(unsafe.Pointer(in.RFC2307Config))
+	out.ActiveDirectoryConfig = (*ActiveDirectoryConfig)(unsafe.Pointer(in.ActiveDirectoryConfig))
+	out.AugmentedActiveDirectoryConfig = (*AugmentedActiveDirectoryConfig)(unsafe.Pointer(in.AugmentedActiveDirectoryConfig))
+	return nil
+}
+
+func Convert_api_LDAPSyncConfig_To_v1_LDAPSyncConfig(in *api.LDAPSyncConfig, out *LDAPSyncConfig, s conversion.Scope) error {
+	return autoConvert_api_LDAPSyncConfig_To_v1_LDAPSyncConfig(in, out, s)
+}
+
+func autoConvert_v1_LDAPSyncConfigList_To_api_LDAPSyncConfigList(in *LDAPSyncConfigList, out *api.LDAPSyncConfigList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]api.LDAPSyncConfig)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+func Convert_v1_LDAPSyncConfigList_To_api_LDAPSyncConfigList(in *LDAPSyncConfigList, out *api.LDAPSyncConfigList, s conversion.Scope) error {
+	return autoConvert_v1_LDAPSyncConfigList_To_api_LDAPSyncConfigList(in, out, s)
+}
+
+func autoConvert_api_LDAPSyncConfigList_To_v1_LDAPSyncConfigList(in *api.LDAPSyncConfigList, out *LDAPSyncConfigList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items == nil {
+		out.Items = make([]LDAPSyncConfig, 0)
+	} else {
+		out.Items = *(*[]LDAPSyncConfig)(unsafe.Pointer(&in.Items))
+	}
+	return nil
+}
+
+func Convert_api_LDAPSyncConfigList_To_v1_LDAPSyncConfigList(in *api.LDAPSyncConfigList, out *LDAPSyncConfigList, s conversion.Scope) error {
+	return autoConvert_api_LDAPSyncConfigList_To_v1_LDAPSyncConfigList(in, out, s)
 }
 
 func autoConvert_v1_OAuthAccessToken_To_api_OAuthAccessToken(in *OAuthAccessToken, out *api.OAuthAccessToken, s conversion.Scope) error {
@@ -322,6 +530,72 @@ func Convert_api_OAuthRedirectReference_To_v1_OAuthRedirectReference(in *api.OAu
 	return autoConvert_api_OAuthRedirectReference_To_v1_OAuthRedirectReference(in, out, s)
 }
 
+func autoConvert_v1_RFC2307Config_To_api_RFC2307Config(in *RFC2307Config, out *api.RFC2307Config, s conversion.Scope) error {
+	if err := Convert_v1_LDAPQuery_To_api_LDAPQuery(&in.AllGroupsQuery, &out.AllGroupsQuery, s); err != nil {
+		return err
+	}
+	out.GroupUIDAttribute = in.GroupUIDAttribute
+	if in.GroupNameAttributes == nil {
+		out.GroupNameAttributes = make([]string, 0)
+	} else {
+		out.GroupNameAttributes = *(*[]string)(unsafe.Pointer(&in.GroupNameAttributes))
+	}
+	if in.GroupMembershipAttributes == nil {
+		out.GroupMembershipAttributes = make([]string, 0)
+	} else {
+		out.GroupMembershipAttributes = *(*[]string)(unsafe.Pointer(&in.GroupMembershipAttributes))
+	}
+	if err := Convert_v1_LDAPQuery_To_api_LDAPQuery(&in.AllUsersQuery, &out.AllUsersQuery, s); err != nil {
+		return err
+	}
+	out.UserUIDAttribute = in.UserUIDAttribute
+	if in.UserNameAttributes == nil {
+		out.UserNameAttributes = make([]string, 0)
+	} else {
+		out.UserNameAttributes = *(*[]string)(unsafe.Pointer(&in.UserNameAttributes))
+	}
+	out.TolerateMemberNotFoundErrors = in.TolerateMemberNotFoundErrors
+	out.TolerateMemberOutOfScopeErrors = in.TolerateMemberOutOfScopeErrors
+	return nil
+}
+
+func Convert_v1_RFC2307Config_To_api_RFC2307Config(in *RFC2307Config, out *api.RFC2307Config, s conversion.Scope) error {
+	return autoConvert_v1_RFC2307Config_To_api_RFC2307Config(in, out, s)
+}
+
+func autoConvert_api_RFC2307Config_To_v1_RFC2307Config(in *api.RFC2307Config, out *RFC2307Config, s conversion.Scope) error {
+	if err := Convert_api_LDAPQuery_To_v1_LDAPQuery(&in.AllGroupsQuery, &out.AllGroupsQuery, s); err != nil {
+		return err
+	}
+	out.GroupUIDAttribute = in.GroupUIDAttribute
+	if in.GroupNameAttributes == nil {
+		out.GroupNameAttributes = make([]string, 0)
+	} else {
+		out.GroupNameAttributes = *(*[]string)(unsafe.Pointer(&in.GroupNameAttributes))
+	}
+	if in.GroupMembershipAttributes == nil {
+		out.GroupMembershipAttributes = make([]string, 0)
+	} else {
+		out.GroupMembershipAttributes = *(*[]string)(unsafe.Pointer(&in.GroupMembershipAttributes))
+	}
+	if err := Convert_api_LDAPQuery_To_v1_LDAPQuery(&in.AllUsersQuery, &out.AllUsersQuery, s); err != nil {
+		return err
+	}
+	out.UserUIDAttribute = in.UserUIDAttribute
+	if in.UserNameAttributes == nil {
+		out.UserNameAttributes = make([]string, 0)
+	} else {
+		out.UserNameAttributes = *(*[]string)(unsafe.Pointer(&in.UserNameAttributes))
+	}
+	out.TolerateMemberNotFoundErrors = in.TolerateMemberNotFoundErrors
+	out.TolerateMemberOutOfScopeErrors = in.TolerateMemberOutOfScopeErrors
+	return nil
+}
+
+func Convert_api_RFC2307Config_To_v1_RFC2307Config(in *api.RFC2307Config, out *RFC2307Config, s conversion.Scope) error {
+	return autoConvert_api_RFC2307Config_To_v1_RFC2307Config(in, out, s)
+}
+
 func autoConvert_v1_RedirectReference_To_api_RedirectReference(in *RedirectReference, out *api.RedirectReference, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Kind = in.Kind
@@ -362,4 +636,50 @@ func autoConvert_api_ScopeRestriction_To_v1_ScopeRestriction(in *api.ScopeRestri
 
 func Convert_api_ScopeRestriction_To_v1_ScopeRestriction(in *api.ScopeRestriction, out *ScopeRestriction, s conversion.Scope) error {
 	return autoConvert_api_ScopeRestriction_To_v1_ScopeRestriction(in, out, s)
+}
+
+func autoConvert_v1_StringSource_To_api_StringSource(in *StringSource, out *api.StringSource, s conversion.Scope) error {
+	if err := Convert_v1_StringSourceSpec_To_api_StringSourceSpec(&in.StringSourceSpec, &out.StringSourceSpec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_StringSource_To_api_StringSource(in *StringSource, out *api.StringSource, s conversion.Scope) error {
+	return autoConvert_v1_StringSource_To_api_StringSource(in, out, s)
+}
+
+func autoConvert_api_StringSource_To_v1_StringSource(in *api.StringSource, out *StringSource, s conversion.Scope) error {
+	if err := Convert_api_StringSourceSpec_To_v1_StringSourceSpec(&in.StringSourceSpec, &out.StringSourceSpec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_StringSource_To_v1_StringSource(in *api.StringSource, out *StringSource, s conversion.Scope) error {
+	return autoConvert_api_StringSource_To_v1_StringSource(in, out, s)
+}
+
+func autoConvert_v1_StringSourceSpec_To_api_StringSourceSpec(in *StringSourceSpec, out *api.StringSourceSpec, s conversion.Scope) error {
+	out.Value = in.Value
+	out.Env = in.Env
+	out.File = in.File
+	out.KeyFile = in.KeyFile
+	return nil
+}
+
+func Convert_v1_StringSourceSpec_To_api_StringSourceSpec(in *StringSourceSpec, out *api.StringSourceSpec, s conversion.Scope) error {
+	return autoConvert_v1_StringSourceSpec_To_api_StringSourceSpec(in, out, s)
+}
+
+func autoConvert_api_StringSourceSpec_To_v1_StringSourceSpec(in *api.StringSourceSpec, out *StringSourceSpec, s conversion.Scope) error {
+	out.Value = in.Value
+	out.Env = in.Env
+	out.File = in.File
+	out.KeyFile = in.KeyFile
+	return nil
+}
+
+func Convert_api_StringSourceSpec_To_v1_StringSourceSpec(in *api.StringSourceSpec, out *StringSourceSpec, s conversion.Scope) error {
+	return autoConvert_api_StringSourceSpec_To_v1_StringSourceSpec(in, out, s)
 }

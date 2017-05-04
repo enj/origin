@@ -36,3 +36,24 @@ func NewREST(optsGetter restoptions.Getter) (*REST, error) {
 
 	return &REST{store}, nil
 }
+
+// NewREST returns a RESTStorage object that will work against oauth clients
+func NewREST2(optsGetter restoptions.Getter) (*REST, error) {
+	store := &registry.Store{
+		Copier:            kapi.Scheme,
+		NewFunc:           func() runtime.Object { return &api.LDAPSyncConfig{} },
+		NewListFunc:       func() runtime.Object { return &api.LDAPSyncConfigList{} },
+		PredicateFunc:     oauthclient.Matcher,
+		QualifiedResource: api.Resource("ldapsyncconfigs"),
+
+		CreateStrategy: oauthclient.Strategy,
+		UpdateStrategy: oauthclient.Strategy,
+	}
+
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: oauthclient.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		return nil, err
+	}
+
+	return &REST{store}, nil
+}

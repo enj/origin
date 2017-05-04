@@ -108,6 +108,9 @@ func fieldName(field *ast.Field) string {
 		if field.Names != nil {
 			return field.Names[0].Name
 		}
+		if sel, ok := field.Type.(*ast.SelectorExpr); ok {
+			return sel.Sel.Name
+		}
 		return field.Type.(*ast.Ident).Name
 	}
 	return jsonTag

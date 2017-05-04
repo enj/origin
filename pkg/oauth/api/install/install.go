@@ -89,7 +89,7 @@ func addVersionsToScheme(externalVersions ...schema.GroupVersion) {
 }
 
 func newRESTMapper(externalVersions []schema.GroupVersion) meta.RESTMapper {
-	rootScoped := sets.NewString("OAuthAccessToken", "OAuthAuthorizeToken", "OAuthClient", "OAuthClientAuthorization")
+	rootScoped := sets.NewString("OAuthAccessToken", "OAuthAuthorizeToken", "OAuthClient", "OAuthClientAuthorization", "LDAPSyncConfig")
 	ignoredKinds := sets.NewString()
 	return meta.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, kapi.Scheme)
 }
