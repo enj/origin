@@ -38,7 +38,7 @@ func init() {
 var url string
 
 type EtcdTestServer struct {
-	*etcdtest.EtcdTestServer
+	e *etcdtest.EtcdTestServer
 	t *testing.T
 }
 
@@ -53,13 +53,13 @@ func RequireEtcd(t *testing.T) EtcdTestServer {
 func RequireEtcd2(t *testing.T) EtcdTestServer {
 	s := etcdtest.NewUnsecuredEtcdTestClientServer(t)
 	url = s.Client.Endpoints()[0]
-	return EtcdTestServer{EtcdTestServer: s, t: t}
+	return EtcdTestServer{e: s, t: t}
 }
 
 func RequireEtcd3(t *testing.T) EtcdTestServer {
 	s, _ := etcdtest.NewUnsecuredEtcd3TestClientServer(t, kapi.Scheme)
 	url = s.V3Client.Endpoints()[0]
-	return EtcdTestServer{EtcdTestServer: s, t: t}
+	return EtcdTestServer{e: s, t: t}
 }
 
 func GetEtcdURL() string {
@@ -71,13 +71,13 @@ func GetEtcdURL() string {
 
 func (s EtcdTestServer) DumpEtcdOnFailure() {
 	defer func() {
-		s.Terminate(s.t)
-		os.RemoveAll(s.DataDir)
+		s.e.Terminate(s.t)
+		os.RemoveAll(s.e.DataDir)
 	}()
 	if !s.t.Failed() {
 		return
 	}
-	v3 := s.V3Client != nil
+	v3 := s.V3() != nil
 	if v3 {
 		s.dumpEtcd3()
 	} else {
@@ -85,8 +85,16 @@ func (s EtcdTestServer) DumpEtcdOnFailure() {
 	}
 }
 
+func (s EtcdTestServer) V3() *etcdclientv3.Client {
+	return s.e.V3Client
+}
+
+func (s EtcdTestServer) V2() etcdclient.Client {
+	return s.e.Client
+}
+
 func (s EtcdTestServer) dumpEtcd2() {
-	response, err := etcdclient.NewKeysAPI(s.Client).Get(context.Background(), "/", &etcdclient.GetOptions{Recursive: true, Sort: true})
+	response, err := etcdclient.NewKeysAPI(s.V2()).Get(context.Background(), "/", &etcdclient.GetOptions{Recursive: true, Sort: true})
 	if err != nil {
 		s.t.Logf("error dumping etcd: %v", err)
 		return
@@ -96,7 +104,7 @@ func (s EtcdTestServer) dumpEtcd2() {
 }
 
 func (s EtcdTestServer) dumpEtcd3() {
-	response, err := s.V3Client.KV.Get(context.Background(), "/", etcdclientv3.WithPrefix(), etcdclientv3.WithSort(etcdclientv3.SortByKey, etcdclientv3.SortDescend))
+	response, err := etcdclientv3.NewKV(s.V3()).Get(context.Background(), "/", etcdclientv3.WithPrefix(), etcdclientv3.WithSort(etcdclientv3.SortByKey, etcdclientv3.SortDescend))
 	if err != nil {
 		s.t.Logf("error dumping etcd: %v", err)
 		return

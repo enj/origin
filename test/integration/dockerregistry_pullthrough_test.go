@@ -18,6 +18,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kapi "k8s.io/kubernetes/pkg/api"
 
+	"context"
+
 	"github.com/openshift/origin/pkg/cmd/dockerregistry"
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
 	"github.com/openshift/origin/pkg/cmd/util/tokencmd"
@@ -130,7 +132,11 @@ func testPullThroughStatBlob(stream *imageapi.ImageStreamImport, user, token, di
 }
 
 func TestPullThroughInsecure(t *testing.T) {
-	defer testutil.RequireEtcd(t).DumpEtcdOnFailure()
+	t.Fail()
+	ee := testutil.RequireEtcd(t)
+	defer ee.DumpEtcdOnFailure()
+	ee.V2().Sync(context.Background())
+	t.Log(ee.V2().Endpoints())
 
 	_, clusterAdminKubeConfig, err := testserver.StartTestMasterAPI()
 	if err != nil {
@@ -335,4 +341,5 @@ func TestPullThroughInsecure(t *testing.T) {
 			t.Logf("%#+v", err)
 		}
 	}
+	time.Sleep(1 * time.Hour)
 }

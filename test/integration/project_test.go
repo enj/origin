@@ -96,7 +96,7 @@ func TestProjectIsNamespace(t *testing.T) {
 // TestProjectLifecycle verifies that content cannot be added in a project that does not exist
 // and that openshift content is cleaned up when a project is deleted.
 func TestProjectLifecycle(t *testing.T) {
-	etcdServer := testutil.RequireEtcd(t)
+	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
 	masterConfig, clusterAdminKubeConfig, err := testserver.StartTestMaster()
 	if err != nil {
@@ -177,7 +177,7 @@ func TestProjectLifecycle(t *testing.T) {
 	}
 
 	// confirm that we see the build in etcd
-	keys := etcd.NewKeysAPI(etcdServer.Client)
+	keys := etcd.NewKeysAPI(etcdServer.V2())
 	buildEtcdKey := path.Join(masterConfig.EtcdStorageConfig.OpenShiftStoragePrefix, "builds", "test", "buildid")
 	if _, err := keys.Get(context.TODO(), buildEtcdKey, nil); err != nil {
 		t.Fatal(err)

@@ -16,7 +16,7 @@ import (
 func TestLeaderLeaseAcquire(t *testing.T) {
 	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
-	client := etcdclient.NewKeysAPI(etcdServer.Client)
+	client := etcdclient.NewKeysAPI(etcdServer.V2())
 
 	key := "/random/key"
 	held := make(chan struct{})
@@ -28,7 +28,7 @@ func TestLeaderLeaseAcquire(t *testing.T) {
 		glog.Infof("Deleted key")
 	}()
 
-	lease := leaderlease.NewEtcd(etcdServer.Client, key, "holder", 10)
+	lease := leaderlease.NewEtcd(etcdServer.V2(), key, "holder", 10)
 	ch := make(chan error, 1)
 	go lease.AcquireAndHold(ch)
 
@@ -54,7 +54,7 @@ func TestLeaderLeaseAcquire(t *testing.T) {
 func TestLeaderLeaseWait(t *testing.T) {
 	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
-	client := etcdclient.NewKeysAPI(etcdServer.Client)
+	client := etcdclient.NewKeysAPI(etcdServer.V2())
 
 	key := "/random/key"
 
@@ -71,7 +71,7 @@ func TestLeaderLeaseWait(t *testing.T) {
 		glog.Infof("Deleted key")
 	}()
 
-	lease := leaderlease.NewEtcd(etcdServer.Client, key, "holder", 10)
+	lease := leaderlease.NewEtcd(etcdServer.V2(), key, "holder", 10)
 	ch := make(chan error, 1)
 	go lease.AcquireAndHold(ch)
 
@@ -97,7 +97,7 @@ func TestLeaderLeaseWait(t *testing.T) {
 func TestLeaderLeaseSwapWhileWaiting(t *testing.T) {
 	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
-	client := etcdclient.NewKeysAPI(etcdServer.Client)
+	client := etcdclient.NewKeysAPI(etcdServer.V2())
 
 	key := "/random/key"
 
@@ -113,7 +113,7 @@ func TestLeaderLeaseSwapWhileWaiting(t *testing.T) {
 		glog.Infof("Changed key ownership")
 	}()
 
-	lease := leaderlease.NewEtcd(etcdServer.Client, key, "other", 10)
+	lease := leaderlease.NewEtcd(etcdServer.V2(), key, "other", 10)
 	ch := make(chan error, 1)
 	go lease.AcquireAndHold(ch)
 
@@ -130,7 +130,7 @@ func TestLeaderLeaseSwapWhileWaiting(t *testing.T) {
 func TestLeaderLeaseReacquire(t *testing.T) {
 	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
-	client := etcdclient.NewKeysAPI(etcdServer.Client)
+	client := etcdclient.NewKeysAPI(etcdServer.V2())
 
 	key := "/random/key"
 
@@ -147,7 +147,7 @@ func TestLeaderLeaseReacquire(t *testing.T) {
 		glog.Infof("Deleted key")
 	}()
 
-	lease := leaderlease.NewEtcd(etcdServer.Client, key, "holder", 1)
+	lease := leaderlease.NewEtcd(etcdServer.V2(), key, "holder", 1)
 	ch := make(chan error, 1)
 	go lease.AcquireAndHold(ch)
 

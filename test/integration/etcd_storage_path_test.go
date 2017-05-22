@@ -810,7 +810,7 @@ func TestEtcd2StoragePath(t *testing.T) {
 	defer etcdServer.DumpEtcdOnFailure()
 
 	getter := &etcd2Getter{
-		keys: etcd.NewKeysAPI(etcdServer.Client),
+		keys: etcd.NewKeysAPI(etcdServer.V2()),
 	}
 	testEtcdStoragePath(t, etcdServer, getter)
 }
@@ -845,7 +845,7 @@ func testEtcdStoragePath(t *testing.T, etcdServer testutil.EtcdTestServer, gette
 		Configuration: &serverapi.DefaultAdmissionConfig{Disable: true},
 	}
 	masterConfig.EnableTemplateServiceBroker = true
-	if etcdServer.V3Client == nil {
+	if etcdServer.V3() == nil {
 		masterConfig.KubernetesMasterConfig.APIServerArguments = serverapi.ExtendedArguments{"storage-backend": []string{"etcd2"}}
 	}
 	masterConfig.EtcdClientInfo.URLs[0] = testutil.GetEtcdURL()

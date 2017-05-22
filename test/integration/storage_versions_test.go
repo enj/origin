@@ -98,7 +98,7 @@ func TestStorageVersions(t *testing.T) {
 	autoscalingVersion := autoscaling_v1.SchemeGroupVersion
 	batchVersion := batch_v1.SchemeGroupVersion
 
-	etcdServer := testutil.RequireEtcd(t)
+	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
 	masterConfig, kubeClient := setupStorageTests(t, ns)
 
@@ -126,7 +126,7 @@ func TestStorageVersions(t *testing.T) {
 		}
 
 		// Ensure it is persisted correctly
-		if gvk, err := getGVKFromEtcd(etcdServer.Client, masterConfig, "jobs", ns, job.Name); err != nil {
+		if gvk, err := getGVKFromEtcd(etcdServer.V2(), masterConfig, "jobs", ns, job.Name); err != nil {
 			t.Fatalf("%s: unexpected error reading Job: %v", name, err)
 		} else if *gvk != batchVersion.WithKind("Job") {
 			t.Fatalf("%s: expected api version %s in etcd, got %s reading Job", name, batchVersion, gvk)
@@ -166,7 +166,7 @@ func TestStorageVersions(t *testing.T) {
 		}
 
 		// Make sure it is persisted correctly
-		if gvk, err := getGVKFromEtcd(etcdServer.Client, masterConfig, "horizontalpodautoscalers", ns, hpa.Name); err != nil {
+		if gvk, err := getGVKFromEtcd(etcdServer.V2(), masterConfig, "horizontalpodautoscalers", ns, hpa.Name); err != nil {
 			t.Fatalf("%s: unexpected error reading HPA: %v", name, err)
 		} else if *gvk != autoscalingVersion.WithKind("HorizontalPodAutoscaler") {
 			t.Fatalf("%s: expected api version %s in etcd, got %s reading HPA", name, autoscalingVersion, gvk)
@@ -190,12 +190,12 @@ func TestStorageMigration(t *testing.T) {
 	hpaName := "extensionsv1beta1hpa"
 	autoscalingVersion := autoscaling_v1.SchemeGroupVersion
 
-	etcdServer := testutil.RequireEtcd(t)
+	etcdServer := testutil.RequireEtcd2(t)
 	defer etcdServer.DumpEtcdOnFailure()
 	masterConfig, kubeClient := setupStorageTests(t, ns)
 
 	// Save an extensions/v1beta1.HorizontalPodAutoscaler directly in etcd
-	keys := etcd.NewKeysAPI(etcdServer.Client)
+	keys := etcd.NewKeysAPI(etcdServer.V2())
 	key := path.Join(masterConfig.EtcdStorageConfig.KubernetesStoragePrefix, prefix, ns, hpaName)
 	if _, err := keys.Create(context.TODO(), key, extensionsv1beta1HPA); err != nil {
 		t.Fatalf("Unexpected error saving extensions/v1beta1.HorizontalPodAutoscaler: %v", err)
@@ -235,7 +235,7 @@ func TestStorageMigration(t *testing.T) {
 	}
 
 	// Ensure it is persisted as autoscaling/v1.HorizontalPodAutoscaler
-	if gvk, err := getGVKFromEtcd(etcdServer.Client, masterConfig, prefix, ns, hpaName); err != nil {
+	if gvk, err := getGVKFromEtcd(etcdServer.V2(), masterConfig, prefix, ns, hpaName); err != nil {
 		t.Fatalf("Unexpected error reading HPA from etcd: %v", err)
 	} else if *gvk != autoscalingVersion.WithKind("HorizontalPodAutoscaler") {
 		t.Fatalf("Expected api version %s in etcd, got %s reading HPA", autoscalingVersion, gvk)
