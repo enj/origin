@@ -507,7 +507,10 @@ func StartAPI(oc *origin.MasterConfig, kc *kubernetes.MasterConfig) error {
 	// Must start policy caching immediately
 	oc.Informers.StartCore(utilwait.NeverStop)
 	oc.AuthorizationInformers.Start(utilwait.NeverStop)
-	oc.RunClusterQuotaMappingController()
+	clusterQuotaMapping := origincontrollers.ClusterQuotaMappingControllerConfig{
+		ClusterQuotaMappingController: oc.ClusterQuotaMappingController,
+	}
+	clusterQuotaMapping.RunController(origincontrollers.ControllerContext{Stop: utilwait.NeverStop})
 	oc.RunGroupCache()
 	oc.RunProjectCache()
 
@@ -722,35 +725,17 @@ func startControllers(oc *origin.MasterConfig, kc *kubernetes.MasterConfig) erro
 
 	oc.RunSecurityAllocationController()
 
-	// These controllers are special-cased upstream.  We'll need custom init functions for them downstream.
-	// As we make them less special, we should re-visit this
-	kc.RunNodeController()
-	kc.RunScheduler()
-
-	_, _, _, binderClient, err := oc.GetServiceAccountClients(bootstrappolicy.InfraPersistentVolumeBinderControllerServiceAccountName)
+	kubernetesControllerInitializers, err := oc.NewKubernetesControllerInitalizers(kc)
 	if err != nil {
-		glog.Fatalf("Could not get client for persistent volume binder controller: %v", err)
+		return err
 	}
-
-	_, _, _, attachDetachControllerClient, err := oc.GetServiceAccountClients(bootstrappolicy.InfraPersistentVolumeAttachDetachControllerServiceAccountName)
-	if err != nil {
-		glog.Fatalf("Could not get client for attach detach controller: %v", err)
-	}
-
-	_, _, _, serviceLoadBalancerClient, err := oc.GetServiceAccountClients(bootstrappolicy.InfraServiceLoadBalancerControllerServiceAccountName)
-	if err != nil {
-		glog.Fatalf("Could not get client for pod gc controller: %v", err)
-	}
-	kc.RunPersistentVolumeController(binderClient, oc.Options.PolicyConfig.OpenShiftInfrastructureNamespace, oc.ImageFor("recycler"), bootstrappolicy.InfraPersistentVolumeRecyclerControllerServiceAccountName)
-	kc.RunPersistentVolumeAttachDetachController(attachDetachControllerClient)
-	kc.RunServiceLoadBalancerController(serviceLoadBalancerClient)
-
 	openshiftControllerInitializers, err := oc.NewOpenshiftControllerInitializers()
 	if err != nil {
 		return err
 	}
-	for name, initFn := range kctrlmgr.NewControllerInitializers() {
-		if _, ok := openshiftControllerInitializers[name]; ok {
+	// Add kubernetes controllers initialized from Origin
+	for name, initFn := range kubernetesControllerInitializers {
+		if _, exists := openshiftControllerInitializers[name]; exists {
 			// don't overwrite, openshift takes priority
 			continue
 		}
@@ -758,6 +743,11 @@ func startControllers(oc *origin.MasterConfig, kc *kubernetes.MasterConfig) erro
 	}
 
 	allowedControllers := sets.NewString(
+		"k8s.io/persistent-volume",
+		"k8s.io/persistent-volume-attach-detach",
+		"k8s.io/node",
+		"k8s.io/scheduler",
+		"k8s.io/service-loadbalancer",
 		// TODO I think this kube part should become a blacklist kept in sync during rebases with a unit test.
 		"endpoint",
 		"replicationcontroller",
@@ -793,6 +783,12 @@ func startControllers(oc *origin.MasterConfig, kc *kubernetes.MasterConfig) erro
 		"openshift.io/image-trigger",
 		"openshift.io/image-import",
 		"openshift.io/service-serving-cert",
+		"openshift.io/sdn",
+		"openshift.io/resource-quota-manager",
+		"openshift.io/cluster-quota-reconciliation",
+		"openshift.io/cluster-quota-mapping",
+		"openshift.io/unidling",
+		"openshift.io/ingress-ip",
 	)
 
 	if configapi.IsBuildEnabled(&oc.Options) {
@@ -817,7 +813,7 @@ func startControllers(oc *origin.MasterConfig, kc *kubernetes.MasterConfig) erro
 		glog.V(1).Infof("Starting %q", controllerName)
 		started, err := initFn(openshiftControllerContext)
 		if err != nil {
-			glog.Fatalf("Error starting %q", controllerName)
+			glog.Fatalf("Error starting %q (%v)", controllerName, err)
 			return err
 		}
 		if !started {
@@ -827,21 +823,7 @@ func startControllers(oc *origin.MasterConfig, kc *kubernetes.MasterConfig) erro
 		glog.Infof("Started %q", controllerName)
 	}
 
-	oc.RunSDNController()
 	oc.RunOriginToRBACSyncControllers()
-
-	// initializes quota docs used by admission
-	oc.RunResourceQuotaManager(controllerManagerOptions)
-	oc.RunClusterQuotaReconciliationController()
-	oc.RunClusterQuotaMappingController()
-
-	oc.RunUnidlingController()
-
-	_, _, ingressIPClientInternal, ingressIPClientExternal, err := oc.GetServiceAccountClients(bootstrappolicy.InfraServiceIngressIPControllerServiceAccountName)
-	if err != nil {
-		glog.Fatalf("Could not get client: %v", err)
-	}
-	oc.RunIngressIPController(ingressIPClientInternal, ingressIPClientExternal)
 
 	glog.Infof("Started Origin Controllers")
 

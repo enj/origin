@@ -1074,11 +1074,6 @@ func (c *MasterConfig) SecurityAllocationControllerClient() kclientsetinternal.I
 	return c.PrivilegedLoopbackKubernetesClientsetInternal
 }
 
-// SDNControllerClients returns the SDN controller client objects
-func (c *MasterConfig) SDNControllerClients() (*osclient.Client, kclientsetinternal.Interface) {
-	return c.PrivilegedLoopbackOpenShiftClient, c.PrivilegedLoopbackKubernetesClientsetInternal
-}
-
 // RouteAllocatorClients returns the route allocator client objects
 func (c *MasterConfig) RouteAllocatorClients() (*osclient.Client, kclientsetinternal.Interface) {
 	return c.PrivilegedLoopbackOpenShiftClient, c.PrivilegedLoopbackKubernetesClientsetInternal
