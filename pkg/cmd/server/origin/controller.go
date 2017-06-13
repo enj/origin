@@ -7,16 +7,61 @@ import (
 
 	"github.com/golang/glog"
 
+	kubernetes "github.com/openshift/origin/pkg/cmd/server/kubernetes/master"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/cert"
+	kubecontroller "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kapi "k8s.io/kubernetes/pkg/api"
-	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	kcontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	configapi "github.com/openshift/origin/pkg/cmd/server/api"
 	"github.com/openshift/origin/pkg/cmd/server/crypto"
 	"github.com/openshift/origin/pkg/cmd/server/origin/controller"
 )
+
+func (c *MasterConfig) NewKubernetesControllerInitalizers(kc *kubernetes.MasterConfig) (map[string]kubecontroller.InitFunc, error) {
+	ret := map[string]kubecontroller.InitFunc{}
+
+	persistentVolumeController := kubernetes.PersistentVolumeControllerConfig{
+		OpenShiftInfrastructureNamespace: c.Options.PolicyConfig.OpenShiftInfrastructureNamespace,
+		RecyclerImage:                    c.ImageFor("recycler"),
+		// TODO: In 3.7 this is renamed to 'Cloud' and is part of kubernetes ControllerContext
+		CloudProvider: kc.CloudProvider,
+	}
+	ret["k8s.io/persistent-volume"] = persistentVolumeController.RunController
+
+	persistentVolumeAttachDetachController := kubernetes.PersistentVolumeAttachDetachControllerConfig{
+		// TODO: In 3.7 this is renamed to 'Cloud' and is part of kubernetes ControllerContext
+		CloudProvider: kc.CloudProvider,
+	}
+	ret["k8s.io/persistent-volume-attach-detach"] = persistentVolumeAttachDetachController.RunController
+
+	// TODO: Move this to origin controllers and replace the privileged client with SA
+	// client.
+	schedulerController := kubernetes.SchedulerControllerConfig{
+		PrivilegedClient:               kc.KubeClient,
+		SchedulerName:                  kc.SchedulerServer.SchedulerName,
+		HardPodAffinitySymmetricWeight: int(kc.SchedulerServer.HardPodAffinitySymmetricWeight),
+		PolicyConfigFile:               kc.SchedulerServer.PolicyConfigFile,
+		SchedulerConfigFile:            kc.Options.SchedulerConfigFile,
+	}
+	ret["k8s.io/scheduler"] = schedulerController.RunController
+
+	nodeController := kubernetes.NodeControllerConfig{
+		// TODO: In 3.7 this is renamed to 'Cloud' and is part of kubernetes ControllerContext
+		CloudProvider: kc.CloudProvider,
+	}
+	ret["k8s.io/node"] = nodeController.RunController
+
+	serviceLoadBalancerController := kubernetes.ServiceLoadBalancerControllerConfig{
+		// TODO: In 3.7 this is renamed to 'Cloud' and is part of kubernetes ControllerContext
+		CloudProvider: kc.CloudProvider,
+	}
+	ret["k8s.io/service-loadbalancer"] = serviceLoadBalancerController.RunController
+
+	return ret, nil
+}
 
 // NewOpenShiftControllerPreStartInitializers returns list of initializers for controllers
 // that needed to be run before any other controller is started.
@@ -26,7 +71,7 @@ func (c *MasterConfig) NewOpenShiftControllerPreStartInitializers() (map[string]
 	ret := map[string]controller.InitFunc{}
 
 	saToken := controller.ServiceAccountTokenControllerOptions{
-		RootClientBuilder: kubecontroller.SimpleControllerClientBuilder{
+		RootClientBuilder: kcontroller.SimpleControllerClientBuilder{
 			ClientConfig: &c.PrivilegedLoopbackClientConfig,
 		},
 	}
@@ -148,5 +193,34 @@ func (c *MasterConfig) NewOpenshiftControllerInitializers() (map[string]controll
 	}
 	ret["openshift.io/service-serving-cert"] = serviceServingCert.RunController
 
+	sdnController := controller.SDNControllerConfig{
+		NetworkConfig: c.Options.NetworkConfig,
+	}
+	ret["openshift.io/sdn"] = sdnController.RunController
+
+	ret["openshift.io/resource-quota-manager"] = controller.RunResourceQuotaManager
+
+	clusterQuotaReconciliationController := controller.ClusterQuotaReconciliationControllerConfig{
+		Mapper:                         c.ClusterQuotaMappingController.GetClusterQuotaMapper(),
+		DefaultResyncPeriod:            5 * time.Minute,
+		DefaultReplenishmentSyncPeriod: 12 * time.Hour,
+	}
+	ret["openshift.io/cluster-quota-reconciliation"] = clusterQuotaReconciliationController.RunController
+
+	clusterQuotaMappingController := controller.ClusterQuotaMappingControllerConfig{
+		ClusterQuotaMappingController: c.ClusterQuotaMappingController,
+	}
+	ret["openshift.io/cluster-quota-mapping"] = clusterQuotaMappingController.RunController
+
+	unidlingController := controller.UnidlingControllerConfig{
+		ResyncPeriod: 2 * time.Hour,
+	}
+	ret["openshift.io/unidling"] = unidlingController.RunController
+
+	ingressIPController := controller.IngressIPControllerConfig{
+		IngressIPSyncPeriod:  10 * time.Minute,
+		IngressIPNetworkCIDR: c.Options.NetworkConfig.IngressIPNetworkCIDR,
+	}
+	ret["openshift.io/ingress-ip"] = ingressIPController.RunController
 	return ret, nil
 }

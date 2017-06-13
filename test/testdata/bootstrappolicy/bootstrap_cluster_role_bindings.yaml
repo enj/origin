@@ -821,6 +821,146 @@ items:
   userNames:
   - system:serviceaccount:openshift-infra:image-import-controller
 - apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:sdn-controller
+  roleRef:
+    name: system:openshift:controller:sdn-controller
+  subjects:
+  - kind: ServiceAccount
+    name: sdn-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:sdn-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:resource-quota-controller
+  roleRef:
+    name: system:openshift:controller:resource-quota-controller
+  subjects:
+  - kind: ServiceAccount
+    name: resource-quota-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:resource-quota-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:cluster-quota-reconciliation-controller
+  roleRef:
+    name: system:openshift:controller:cluster-quota-reconciliation-controller
+  subjects:
+  - kind: ServiceAccount
+    name: cluster-quota-reconciliation-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:cluster-quota-reconciliation-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:unidling-controller
+  roleRef:
+    name: system:openshift:controller:unidling-controller
+  subjects:
+  - kind: ServiceAccount
+    name: unidling-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:unidling-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:service-ingress-ip-controller
+  roleRef:
+    name: system:openshift:controller:service-ingress-ip-controller
+  subjects:
+  - kind: ServiceAccount
+    name: service-ingress-ip-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:service-ingress-ip-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:persistent-volume-controller
+  roleRef:
+    name: system:openshift:controller:persistent-volume-controller
+  subjects:
+  - kind: ServiceAccount
+    name: persistent-volume-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:persistent-volume-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:persistent-volume-recycler-controller
+  roleRef:
+    name: system:openshift:controller:persistent-volume-recycler-controller
+  subjects:
+  - kind: ServiceAccount
+    name: persistent-volume-recycler-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:persistent-volume-recycler-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:persistent-volume-attach-detach-controller
+  roleRef:
+    name: system:openshift:controller:persistent-volume-attach-detach-controller
+  subjects:
+  - kind: ServiceAccount
+    name: persistent-volume-attach-detach-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:persistent-volume-attach-detach-controller
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:scheduler
+  roleRef:
+    name: system:openshift:controller:scheduler
+  subjects:
+  - kind: ServiceAccount
+    name: scheduler
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:scheduler
+- apiVersion: v1
+  groupNames: null
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    name: system:openshift:controller:service-load-balancer-controller
+  roleRef:
+    name: system:openshift:controller:service-load-balancer-controller
+  subjects:
+  - kind: ServiceAccount
+    name: service-load-balancer-controller
+    namespace: openshift-infra
+  userNames:
+  - system:serviceaccount:openshift-infra:service-load-balancer-controller
+- apiVersion: v1
   groupNames:
   - system:masters
   kind: ClusterRoleBinding

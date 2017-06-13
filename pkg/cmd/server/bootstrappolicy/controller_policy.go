@@ -188,6 +188,128 @@ func init() {
 			eventsRule(),
 		},
 	})
+
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraSDNControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "create", "update").Groups(networkGroup, legacyNetworkGroup).Resources("clusterNetworks").RuleOrDie(),
+			rbac.NewRule("get", "list").Groups(networkGroup, legacyNetworkGroup).Resources("egressNetworkPolicies").RuleOrDie(),
+			rbac.NewRule("get", "list", "create", "delete").Groups(networkGroup, legacyNetworkGroup).Resources("hostSubnets").RuleOrDie(),
+			rbac.NewRule("get", "list", "create", "update", "delete").Groups(networkGroup, legacyNetworkGroup).Resources("netNamespaces").RuleOrDie(),
+			rbac.NewRule("get", "list").Groups(kapiGroup).Resources("pods").RuleOrDie(),
+			rbac.NewRule("list").Groups(kapiGroup).Resources("services").RuleOrDie(),
+			rbac.NewRule("list").Groups(kapiGroup).Resources("namespaces").RuleOrDie(),
+			rbac.NewRule("get").Groups(kapiGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("update").Groups(kapiGroup).Resources("nodes/status").RuleOrDie(),
+			rbac.NewRule("list").Groups(extensionsGroup).Resources("networkPolicies").RuleOrDie(),
+
+			eventsRule(),
+		},
+	})
+
+	// resource-quota-manager
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraResourceQuotaControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			// TODO: Add rules
+			eventsRule(),
+		},
+	})
+
+	// cluster-quota-reconciliation
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraClusterQuotaReconciliationControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			// TODO: Add rules
+			eventsRule(),
+		},
+	})
+
+	// unidling-controller
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraUnidlingControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "update").Groups(kapiGroup).Resources("replicationcontrollers/scale", "endpoints").RuleOrDie(),
+			rbac.NewRule("get", "update", "patch").Groups(kapiGroup).Resources("replicationcontrollers").RuleOrDie(),
+			rbac.NewRule("get", "update").Groups(extensionsGroup, appsGroup).Resources("replicasets/scale", "deployments/scale").RuleOrDie(),
+			rbac.NewRule("get", "update").Groups(deployGroup, legacyDeployGroup).Resources("deploymentconfigs/scale").RuleOrDie(),
+
+			rbac.NewRule("watch", "list").Groups(kapiGroup).Resources("events").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
+	// ingress-ip-controller
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraServiceIngressIPControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("list", "watch", "update").Groups(kapiGroup).Resources("services").RuleOrDie(),
+			rbac.NewRule("update").Groups(kapiGroup).Resources("services/status").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraPersistentVolumeControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "update", "create", "delete", "list", "watch").Groups(kapiGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbac.NewRule("update").Groups(kapiGroup).Resources("persistentvolumes/status").RuleOrDie(),
+			rbac.NewRule("get", "update", "list", "watch").Groups(kapiGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			rbac.NewRule("get", "create", "delete").Groups(kapiGroup).Resources("pods").RuleOrDie(),
+			rbac.NewRule("get", "create", "delete").Groups(kapiGroup).Resources("services").RuleOrDie(),
+			rbac.NewRule("get", "create", "delete").Groups(kapiGroup).Resources("endpoints").RuleOrDie(),
+			rbac.NewRule("get").Groups(kapiGroup).Resources("secrets").RuleOrDie(),
+			rbac.NewRule("watch", "list").Groups(kapiGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("watch", "list").Groups(kapiGroup).Resources("events").RuleOrDie(),
+			rbac.NewRule("get", "watch", "list").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+
+			eventsRule(),
+		},
+	})
+
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraPersistentVolumeRecyclerControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "update", "create", "delete", "list", "watch").Groups(kapiGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbac.NewRule("update").Groups(kapiGroup).Resources("persistentvolumes/status").RuleOrDie(),
+			rbac.NewRule("get", "update", "list", "watch").Groups(kapiGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			rbac.NewRule("update").Groups(kapiGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
+			rbac.NewRule("get", "create", "delete", "list", "watch").Groups(kapiGroup).Resources("pods").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraPersistentVolumeAttachDetachControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("list", "watch").Groups(kapiGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbac.NewRule("list", "watch").Groups(kapiGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			rbac.NewRule("list", "watch").Groups(kapiGroup).Resources("pods").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch").Groups(kapiGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("update", "patch").Groups(kapiGroup).Resources("nodes/status").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
+	// scheduler
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraSchedulerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			// TODO: Add rules
+			rbac.NewRule("get").Groups(kapiGroup).Resources("pods").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + InfraServiceLoadBalancerControllerServiceAccountName},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch").Groups(kapiGroup).Resources("services").RuleOrDie(),
+			rbac.NewRule("update").Groups(kapiGroup).Resources("services/status").RuleOrDie(),
+			rbac.NewRule("list", "watch").Groups(kapiGroup).Resources("nodes").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 }
 
 // ControllerRoles returns the cluster roles used by controllers
