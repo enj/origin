@@ -174,7 +174,6 @@ func setupBuildControllerTest(counts controllerCount, t *testing.T) (*client.Cli
 	}
 
 	openshiftControllerContext := origincontrollers.ControllerContext{
-		ImageInformers:        openshiftConfig.ImageInformers,
 		KubeControllerContext: controllerContext,
 		ClientBuilder: origincontrollers.OpenshiftControllerClientBuilder{
 			ControllerClientBuilder: controller.SAControllerClientBuilder{
