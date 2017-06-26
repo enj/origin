@@ -15,29 +15,11 @@ import (
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	_ "github.com/openshift/origin/pkg/authorization/api/install"
-	clusterpolicyregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy"
 	roleregistry "github.com/openshift/origin/pkg/authorization/registry/role"
 	"github.com/openshift/origin/pkg/authorization/registry/test"
 	"github.com/openshift/origin/pkg/authorization/rulevalidation"
 )
 
-func testNewClusterPolicies() []authorizationapi.ClusterPolicy {
-	return []authorizationapi.ClusterPolicy{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: authorizationapi.PolicyName},
-			Roles: map[string]*authorizationapi.ClusterRole{
-				"cluster-admin": {
-					ObjectMeta: metav1.ObjectMeta{Name: "cluster-admin"},
-					Rules:      []authorizationapi.PolicyRule{{Verbs: sets.NewString("*"), Resources: sets.NewString("*")}},
-				},
-				"admin": {
-					ObjectMeta: metav1.ObjectMeta{Name: "admin"},
-					Rules:      []authorizationapi.PolicyRule{{Verbs: sets.NewString("*"), Resources: sets.NewString("*")}},
-				},
-			},
-		},
-	}
-}
 func testNewLocalPolicies() []authorizationapi.Policy {
 	return []authorizationapi.Policy{
 		{
@@ -50,14 +32,7 @@ func testNewLocalPolicies() []authorizationapi.Policy {
 func makeLocalTestStorage() roleregistry.Storage {
 	policyRegistry := test.NewPolicyRegistry(testNewLocalPolicies(), nil)
 
-	return NewVirtualStorage(policyRegistry, rulevalidation.NewDefaultRuleResolver(policyRegistry, &test.PolicyBindingRegistry{}, &test.ClusterPolicyRegistry{}, &test.ClusterPolicyBindingRegistry{}), nil, authorizationapi.Resource("role"))
-}
-
-func makeClusterTestStorage() roleregistry.Storage {
-	clusterPolicyRegistry := test.NewClusterPolicyRegistry(testNewClusterPolicies(), nil)
-	policyRegistry := clusterpolicyregistry.NewSimulatedRegistry(clusterPolicyRegistry)
-
-	return NewVirtualStorage(policyRegistry, rulevalidation.NewDefaultRuleResolver(nil, &test.PolicyBindingRegistry{}, clusterPolicyRegistry, &test.ClusterPolicyBindingRegistry{}), nil, authorizationapi.Resource("clusterrole"))
+	return NewVirtualStorage(policyRegistry, &test.PolicyBindingRegistry{}, &test.ClusterPolicyRegistry{}, &test.ClusterPolicyBindingRegistry{}, rulevalidation.NewDefaultRuleResolver(policyRegistry, &test.PolicyBindingRegistry{}, &test.ClusterPolicyRegistry{}, &test.ClusterPolicyBindingRegistry{}), authorizationapi.Resource("role"))
 }
 
 func TestCreateValidationError(t *testing.T) {
