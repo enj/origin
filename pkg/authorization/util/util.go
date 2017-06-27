@@ -10,10 +10,23 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 
 	clusterpolicyregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy"
+	clusterpolicyetcd "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy/etcd"
 	clusterpolicybindingregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicybinding"
+	clusterpolicybindingetcd "github.com/openshift/origin/pkg/authorization/registry/clusterpolicybinding/etcd"
+	"github.com/openshift/origin/pkg/authorization/registry/clusterrole"
+	clusterrolestorage "github.com/openshift/origin/pkg/authorization/registry/clusterrole/proxy"
+	"github.com/openshift/origin/pkg/authorization/registry/clusterrolebinding"
+	clusterrolebindingstorage "github.com/openshift/origin/pkg/authorization/registry/clusterrolebinding/proxy"
 	policyregistry "github.com/openshift/origin/pkg/authorization/registry/policy"
+	policyetcd "github.com/openshift/origin/pkg/authorization/registry/policy/etcd"
 	policybindingregistry "github.com/openshift/origin/pkg/authorization/registry/policybinding"
+	policybindingetcd "github.com/openshift/origin/pkg/authorization/registry/policybinding/etcd"
+	"github.com/openshift/origin/pkg/authorization/registry/role"
+	rolestorage "github.com/openshift/origin/pkg/authorization/registry/role/policybased"
+	"github.com/openshift/origin/pkg/authorization/registry/rolebinding"
+	rolebindingstorage "github.com/openshift/origin/pkg/authorization/registry/rolebinding/policybased"
 	"github.com/openshift/origin/pkg/authorization/rulevalidation"
+	"github.com/openshift/origin/pkg/util/restoptions"
 )
 
 // AddUserToSAR adds the requisite user information to a SubjectAccessReview.
@@ -68,4 +81,39 @@ func NewReadOnlyRuleResolver(policyRegistry policyregistry.Registry, policyBindi
 			ReadOnlyClusterPolicyBinding: clusterpolicybindingregistry.ReadOnlyClusterPolicyBinding{Registry: clusterBindingRegistry},
 		},
 	)
+}
+
+func GetAuthorizationStorage(optsGetter restoptions.Getter, cachedRuleResolver rulevalidation.AuthorizationRuleResolver) (role.Storage, rolebinding.Storage, clusterrole.Storage, clusterrolebinding.Storage, error) {
+	policyStorage, err := policyetcd.NewREST(optsGetter)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	policyRegistry := policyregistry.NewRegistry(policyStorage)
+
+	policyBindingStorage, err := policybindingetcd.NewREST(optsGetter)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	policyBindingRegistry := policybindingregistry.NewRegistry(policyBindingStorage)
+
+	clusterPolicyStorage, err := clusterpolicyetcd.NewREST(optsGetter)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	clusterPolicyRegistry := clusterpolicyregistry.NewRegistry(clusterPolicyStorage)
+
+	clusterPolicyBindingStorage, err := clusterpolicybindingetcd.NewREST(optsGetter)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	clusterPolicyBindingRegistry := clusterpolicybindingregistry.NewRegistry(clusterPolicyBindingStorage)
+
+	liveRuleResolver := NewReadOnlyRuleResolver(policyRegistry, policyBindingRegistry, clusterPolicyRegistry, clusterPolicyBindingRegistry)
+
+	roleStorage := rolestorage.NewVirtualStorage(policyRegistry, liveRuleResolver, cachedRuleResolver)
+	roleBindingStorage := rolebindingstorage.NewVirtualStorage(policyBindingRegistry, liveRuleResolver, cachedRuleResolver)
+	clusterRoleStorage := clusterrolestorage.NewClusterRoleStorage(clusterPolicyRegistry, liveRuleResolver, cachedRuleResolver)
+	clusterRoleBindingStorage := clusterrolebindingstorage.NewClusterRoleBindingStorage(clusterPolicyBindingRegistry, liveRuleResolver, cachedRuleResolver)
+
+	return roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, nil
 }

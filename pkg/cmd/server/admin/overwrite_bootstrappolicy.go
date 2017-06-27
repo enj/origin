@@ -18,20 +18,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
-	policyregistry "github.com/openshift/origin/pkg/authorization/registry/policy"
-	policyetcd "github.com/openshift/origin/pkg/authorization/registry/policy/etcd"
-	policybindingregistry "github.com/openshift/origin/pkg/authorization/registry/policybinding"
-	policybindingetcd "github.com/openshift/origin/pkg/authorization/registry/policybinding/etcd"
-	rolestorage "github.com/openshift/origin/pkg/authorization/registry/role/policybased"
-	rolebindingstorage "github.com/openshift/origin/pkg/authorization/registry/rolebinding/policybased"
 	"github.com/openshift/origin/pkg/authorization/util"
-
-	clusterpolicyregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy"
-	clusterpolicyetcd "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy/etcd"
-	clusterpolicybindingregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicybinding"
-	clusterpolicybindingetcd "github.com/openshift/origin/pkg/authorization/registry/clusterpolicybinding/etcd"
-	clusterrolestorage "github.com/openshift/origin/pkg/authorization/registry/clusterrole/proxy"
-	clusterrolebindingstorage "github.com/openshift/origin/pkg/authorization/registry/clusterrolebinding/proxy"
 
 	"github.com/openshift/origin/pkg/cmd/cli/describe"
 	configapilatest "github.com/openshift/origin/pkg/cmd/server/api/latest"
@@ -131,36 +118,10 @@ func OverwriteBootstrapPolicy(optsGetter restoptions.Getter, policyFile, createB
 		return r.Err()
 	}
 
-	policyStorage, err := policyetcd.NewREST(optsGetter)
+	roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, err := util.GetAuthorizationStorage(optsGetter, nil)
 	if err != nil {
 		return err
 	}
-	policyRegistry := policyregistry.NewRegistry(policyStorage)
-
-	policyBindingStorage, err := policybindingetcd.NewREST(optsGetter)
-	if err != nil {
-		return err
-	}
-	policyBindingRegistry := policybindingregistry.NewRegistry(policyBindingStorage)
-
-	clusterPolicyStorage, err := clusterpolicyetcd.NewREST(optsGetter)
-	if err != nil {
-		return err
-	}
-	clusterPolicyRegistry := clusterpolicyregistry.NewRegistry(clusterPolicyStorage)
-
-	clusterPolicyBindingStorage, err := clusterpolicybindingetcd.NewREST(optsGetter)
-	if err != nil {
-		return err
-	}
-	clusterPolicyBindingRegistry := clusterpolicybindingregistry.NewRegistry(clusterPolicyBindingStorage)
-
-	liveRuleResolver := util.NewReadOnlyRuleResolver(policyRegistry, policyBindingRegistry, clusterPolicyRegistry, clusterPolicyBindingRegistry)
-
-	roleStorage := rolestorage.NewVirtualStorage(policyRegistry, liveRuleResolver, nil)
-	roleBindingStorage := rolebindingstorage.NewVirtualStorage(policyBindingRegistry, liveRuleResolver, nil)
-	clusterRoleStorage := clusterrolestorage.NewClusterRoleStorage(clusterPolicyRegistry, liveRuleResolver, nil)
-	clusterRoleBindingStorage := clusterrolebindingstorage.NewClusterRoleBindingStorage(clusterPolicyBindingRegistry, liveRuleResolver, nil)
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
