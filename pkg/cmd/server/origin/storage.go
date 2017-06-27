@@ -203,7 +203,9 @@ func (c OpenshiftAPIConfig) GetRestStorage() (map[schema.GroupVersion]map[string
 	selfSubjectRulesReviewStorage := selfsubjectrulesreview.NewREST(c.RuleResolver, clusterPolicies)
 	subjectRulesReviewStorage := subjectrulesreview.NewREST(c.RuleResolver, clusterPolicies)
 
-	roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, err := util.GetAuthorizationStorage(c.GenericConfig.RESTOptionsGetter, c.RuleResolver)
+	policyStorage, policyBindingStorage, clusterPolicyStorage, clusterPolicyBindingStorage,
+		roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage,
+		err := util.GetAuthorizationStorage(c.GenericConfig.RESTOptionsGetter, c.RuleResolver)
 	if err != nil {
 		return nil, fmt.Errorf("error building authorization REST storage: %v", err)
 	}

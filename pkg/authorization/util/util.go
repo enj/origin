@@ -83,28 +83,38 @@ func NewReadOnlyRuleResolver(policyRegistry policyregistry.Registry, policyBindi
 	)
 }
 
-func GetAuthorizationStorage(optsGetter restoptions.Getter, cachedRuleResolver rulevalidation.AuthorizationRuleResolver) (role.Storage, rolebinding.Storage, clusterrole.Storage, clusterrolebinding.Storage, error) {
+func GetAuthorizationStorage(optsGetter restoptions.Getter, cachedRuleResolver rulevalidation.AuthorizationRuleResolver) (
+	policyregistry.Storage,
+	policybindingregistry.Storage,
+	clusterpolicyregistry.Storage,
+	clusterpolicybindingregistry.Storage,
+	role.Storage,
+	rolebinding.Storage,
+	clusterrole.Storage,
+	clusterrolebinding.Storage,
+	error,
+) {
 	policyStorage, err := policyetcd.NewREST(optsGetter)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	policyRegistry := policyregistry.NewRegistry(policyStorage)
 
 	policyBindingStorage, err := policybindingetcd.NewREST(optsGetter)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	policyBindingRegistry := policybindingregistry.NewRegistry(policyBindingStorage)
 
 	clusterPolicyStorage, err := clusterpolicyetcd.NewREST(optsGetter)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	clusterPolicyRegistry := clusterpolicyregistry.NewRegistry(clusterPolicyStorage)
 
 	clusterPolicyBindingStorage, err := clusterpolicybindingetcd.NewREST(optsGetter)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, err
 	}
 	clusterPolicyBindingRegistry := clusterpolicybindingregistry.NewRegistry(clusterPolicyBindingStorage)
 
@@ -115,5 +125,5 @@ func GetAuthorizationStorage(optsGetter restoptions.Getter, cachedRuleResolver r
 	clusterRoleStorage := clusterrolestorage.NewClusterRoleStorage(clusterPolicyRegistry, liveRuleResolver, cachedRuleResolver)
 	clusterRoleBindingStorage := clusterrolebindingstorage.NewClusterRoleBindingStorage(clusterPolicyBindingRegistry, liveRuleResolver, cachedRuleResolver)
 
-	return roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, nil
+	return policyStorage, policyBindingStorage, clusterPolicyStorage, clusterPolicyBindingStorage, roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, nil
 }

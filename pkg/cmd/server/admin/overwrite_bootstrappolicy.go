@@ -118,7 +118,7 @@ func OverwriteBootstrapPolicy(optsGetter restoptions.Getter, policyFile, createB
 		return r.Err()
 	}
 
-	roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, err := util.GetAuthorizationStorage(optsGetter, nil)
+	_, _, _, _, roleStorage, roleBindingStorage, clusterRoleStorage, clusterRoleBindingStorage, err := util.GetAuthorizationStorage(optsGetter, nil)
 	if err != nil {
 		return err
 	}
