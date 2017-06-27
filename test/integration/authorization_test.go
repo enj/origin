@@ -1640,3 +1640,78 @@ func TestOldLocalResourceAccessReviewEndpoint(t *testing.T) {
 		}
 	}
 }
+
+// TestClusterPolicyCache confirms that the creation of cluster role bindings fallback to live lookups when the referenced cluster role is not cached
+func TestClusterPolicyCache(t *testing.T) {
+	testutil.RequireEtcd(t)
+	defer testutil.DumpEtcdOnFailure(t)
+
+	_, clusterAdminKubeConfig, err := testserver.StartTestMasterAPI()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	clusterAdminClient, err := testutil.GetClusterAdminClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for i := 0; i < 300; i++ {
+		clusterRole := &authorizationapi.ClusterRole{ObjectMeta: metav1.ObjectMeta{GenerateName: time.Now().String()}}
+		clusterRole, err = clusterAdminClient.ClusterRoles().Create(clusterRole)
+		if err != nil {
+			t.Fatalf("unexpected error creating cluster role %q: %v", clusterRole.Name, err)
+		}
+		clusterRoleBinding := &authorizationapi.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterRole.Name},
+			Subjects:   []kapi.ObjectReference{{Name: "user", Kind: authorizationapi.UserKind}},
+			RoleRef:    kapi.ObjectReference{Name: clusterRole.Name}}
+		if _, err := clusterAdminClient.ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
+			t.Fatalf("cache error creating cluster role binding %d %q: %v", i, clusterRoleBinding.Name, err)
+		}
+	}
+}
+
+// TestPolicyCache confirms that the creation of role bindings fallback to live lookups when the referenced role is not cached
+func TestPolicyCache(t *testing.T) {
+	testutil.RequireEtcd(t)
+	defer testutil.DumpEtcdOnFailure(t)
+
+	_, clusterAdminKubeConfig, err := testserver.StartTestMasterAPI()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	clusterAdminClient, err := testutil.GetClusterAdminClient(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	clusterAdminClientConfig, err := testutil.GetClusterAdminClientConfig(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user := "harold"
+	namespace := "hammer-project"
+
+	haroldClient, err := testserver.CreateNewProject(clusterAdminClient, *clusterAdminClientConfig, namespace, user)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for i := 0; i < 300; i++ {
+		role := &authorizationapi.Role{ObjectMeta: metav1.ObjectMeta{GenerateName: time.Now().String()}}
+		role, err = haroldClient.Roles(namespace).Create(role)
+		if err != nil {
+			t.Fatalf("unexpected error creating role %q: %v", role.Name, err)
+		}
+		roleBinding := &authorizationapi.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: role.Name},
+			Subjects:   []kapi.ObjectReference{{Name: user, Kind: authorizationapi.UserKind}},
+			RoleRef:    kapi.ObjectReference{Name: role.Name, Namespace: namespace}}
+		if _, err := haroldClient.RoleBindings(namespace).Create(roleBinding); err != nil {
+			t.Fatalf("cache error creating role binding %d %q: %v", i, roleBinding.Name, err)
+		}
+	}
+}
