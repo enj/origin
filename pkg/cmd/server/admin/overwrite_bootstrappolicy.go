@@ -24,6 +24,7 @@ import (
 	policybindingetcd "github.com/openshift/origin/pkg/authorization/registry/policybinding/etcd"
 	rolestorage "github.com/openshift/origin/pkg/authorization/registry/role/policybased"
 	rolebindingstorage "github.com/openshift/origin/pkg/authorization/registry/rolebinding/policybased"
+	"github.com/openshift/origin/pkg/authorization/util"
 
 	clusterpolicyregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy"
 	clusterpolicyetcd "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy/etcd"
@@ -154,10 +155,12 @@ func OverwriteBootstrapPolicy(optsGetter restoptions.Getter, policyFile, createB
 	}
 	clusterPolicyBindingRegistry := clusterpolicybindingregistry.NewRegistry(clusterPolicyBindingStorage)
 
-	roleStorage := rolestorage.NewVirtualStorage(policyRegistry, policyBindingRegistry, clusterPolicyRegistry, clusterPolicyBindingRegistry, nil, authorizationapi.Resource("role"))
-	roleBindingStorage := rolebindingstorage.NewVirtualStorage(policyRegistry, policyBindingRegistry, clusterPolicyRegistry, clusterPolicyBindingRegistry, nil, authorizationapi.Resource("rolebinding"))
-	clusterRoleStorage := clusterrolestorage.NewClusterRoleStorage(clusterPolicyRegistry, clusterPolicyBindingRegistry, nil)
-	clusterRoleBindingStorage := clusterrolebindingstorage.NewClusterRoleBindingStorage(clusterPolicyRegistry, clusterPolicyBindingRegistry, nil)
+	liveRuleResolver := util.NewReadOnlyRuleResolver(policyRegistry, policyBindingRegistry, clusterPolicyRegistry, clusterPolicyBindingRegistry)
+
+	roleStorage := rolestorage.NewVirtualStorage(policyRegistry, liveRuleResolver, nil)
+	roleBindingStorage := rolebindingstorage.NewVirtualStorage(policyBindingRegistry, liveRuleResolver, nil)
+	clusterRoleStorage := clusterrolestorage.NewClusterRoleStorage(clusterPolicyRegistry, liveRuleResolver, nil)
+	clusterRoleBindingStorage := clusterrolebindingstorage.NewClusterRoleBindingStorage(clusterPolicyBindingRegistry, liveRuleResolver, nil)
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {

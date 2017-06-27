@@ -19,9 +19,6 @@ import (
 	oapi "github.com/openshift/origin/pkg/api"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	authorizationinterfaces "github.com/openshift/origin/pkg/authorization/interfaces"
-	clusterpolicyregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicy"
-	clusterpolicybindingregistry "github.com/openshift/origin/pkg/authorization/registry/clusterpolicybinding"
-	policyregistry "github.com/openshift/origin/pkg/authorization/registry/policy"
 	policybindingregistry "github.com/openshift/origin/pkg/authorization/registry/policybinding"
 	rolebindingregistry "github.com/openshift/origin/pkg/authorization/registry/rolebinding"
 	"github.com/openshift/origin/pkg/authorization/rulevalidation"
@@ -39,31 +36,16 @@ type VirtualStorage struct {
 }
 
 // NewVirtualStorage creates a new REST for policies.
-func NewVirtualStorage(policyRegistry policyregistry.Registry, policyBindingRegistry policybindingregistry.Registry, clusterPolicyRegistry clusterpolicyregistry.Registry, clusterBindingRegistry clusterpolicybindingregistry.Registry, cachedRuleResolver rulevalidation.AuthorizationRuleResolver, resource schema.GroupResource) rolebindingregistry.Storage {
-	ruleResolver := rulevalidation.NewDefaultRuleResolver(
-		policyregistry.ReadOnlyPolicyListerNamespacer{
-			Registry: policyRegistry,
-		},
-		policybindingregistry.ReadOnlyPolicyBindingListerNamespacer{
-			Registry: policyBindingRegistry,
-		},
-		&clusterpolicyregistry.ReadOnlyClusterPolicyClientShim{
-			ReadOnlyClusterPolicy: clusterpolicyregistry.ReadOnlyClusterPolicy{Registry: clusterPolicyRegistry},
-		},
-		&clusterpolicybindingregistry.ReadOnlyClusterPolicyBindingClientShim{
-			ReadOnlyClusterPolicyBinding: clusterpolicybindingregistry.ReadOnlyClusterPolicyBinding{Registry: clusterBindingRegistry},
-		},
-	)
-
+func NewVirtualStorage(policyBindingRegistry policybindingregistry.Registry, liveRuleResolver, cachedRuleResolver rulevalidation.AuthorizationRuleResolver) rolebindingregistry.Storage {
 	return &VirtualStorage{
 		BindingRegistry: policyBindingRegistry,
 
-		RuleResolver:       ruleResolver,
+		RuleResolver:       liveRuleResolver,
 		CachedRuleResolver: cachedRuleResolver,
 
 		CreateStrategy: rolebindingregistry.LocalStrategy,
 		UpdateStrategy: rolebindingregistry.LocalStrategy,
-		Resource:       resource,
+		Resource:       authorizationapi.Resource("rolebinding"),
 	}
 }
 

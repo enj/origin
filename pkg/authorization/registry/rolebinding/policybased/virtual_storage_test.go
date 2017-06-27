@@ -70,16 +70,15 @@ func makeTestStorage() rolebindingregistry.Storage {
 	clusterPolicyRegistry := test.NewClusterPolicyRegistry(testNewClusterPolicies(), nil)
 	policyRegistry := test.NewPolicyRegistry([]authorizationapi.Policy{}, nil)
 
-	return NewVirtualStorage(policyRegistry, bindingRegistry, clusterPolicyRegistry, clusterBindingRegistry, rulevalidation.NewDefaultRuleResolver(policyRegistry, bindingRegistry, clusterPolicyRegistry, clusterBindingRegistry), authorizationapi.Resource("rolebinding"))
+	return NewVirtualStorage(bindingRegistry, rulevalidation.NewDefaultRuleResolver(policyRegistry, bindingRegistry, clusterPolicyRegistry, clusterBindingRegistry), nil)
 }
 
 func makeClusterTestStorage() rolebindingregistry.Storage {
 	clusterBindingRegistry := test.NewClusterPolicyBindingRegistry(testNewClusterBindings(), nil)
 	clusterPolicyRegistry := test.NewClusterPolicyRegistry(testNewClusterPolicies(), nil)
 	bindingRegistry := clusterpolicybindingregistry.NewSimulatedRegistry(clusterBindingRegistry)
-	policyRegistry := test.NewPolicyRegistry([]authorizationapi.Policy{}, nil)
 
-	return NewVirtualStorage(policyRegistry, bindingRegistry, clusterPolicyRegistry, clusterBindingRegistry, rulevalidation.NewDefaultRuleResolver(nil, nil, clusterPolicyRegistry, clusterBindingRegistry), authorizationapi.Resource("clusterrolebinding"))
+	return NewVirtualStorage(bindingRegistry, rulevalidation.NewDefaultRuleResolver(nil, nil, clusterPolicyRegistry, clusterBindingRegistry), nil)
 }
 
 func TestCreateValidationError(t *testing.T) {
@@ -356,7 +355,7 @@ func TestDeleteError(t *testing.T) {
 	bindingRegistry := &test.PolicyBindingRegistry{}
 	bindingRegistry.Err = errors.New("Sample Error")
 
-	storage := NewVirtualStorage(&test.PolicyRegistry{}, bindingRegistry, &test.ClusterPolicyRegistry{}, &test.ClusterPolicyBindingRegistry{}, rulevalidation.NewDefaultRuleResolver(&test.PolicyRegistry{}, bindingRegistry, &test.ClusterPolicyRegistry{}, &test.ClusterPolicyBindingRegistry{}), authorizationapi.Resource("rolebinding"))
+	storage := NewVirtualStorage(bindingRegistry, rulevalidation.NewDefaultRuleResolver(&test.PolicyRegistry{}, bindingRegistry, &test.ClusterPolicyRegistry{}, &test.ClusterPolicyBindingRegistry{}), nil)
 	ctx := apirequest.WithUser(apirequest.WithNamespace(apirequest.NewContext(), "unittest"), &user.DefaultInfo{Name: "system:admin"})
 	_, _, err := storage.Delete(ctx, "foo", nil)
 	if err != bindingRegistry.Err {

@@ -1656,7 +1656,7 @@ func TestClusterPolicyCache(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 300; i++ {
 		clusterRole := &authorizationapi.ClusterRole{ObjectMeta: metav1.ObjectMeta{GenerateName: time.Now().String()}}
 		clusterRole, err = clusterAdminClient.ClusterRoles().Create(clusterRole)
 		if err != nil {
@@ -1700,7 +1700,7 @@ func TestPolicyCache(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 300; i++ {
 		role := &authorizationapi.Role{ObjectMeta: metav1.ObjectMeta{GenerateName: time.Now().String()}}
 		role, err = haroldClient.Roles(namespace).Create(role)
 		if err != nil {
