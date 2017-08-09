@@ -173,11 +173,6 @@ func (c *MasterConfig) withKubeAPI(delegateAPIServer apiserver.DelegationTarget,
 	if err != nil {
 		return nil, err
 	}
-
-	if err := kubeAPIServer.GenericAPIServer.AddPostStartHook("rbac/bootstrap-openshift-roles", rbacrest.GetPostStartHook(bootstrappolicy.Policy())); err != nil {
-		glog.Fatalf("Failed to bootstrap openshift roles: %v", err)
-	}
-
 	// this sets up the openapi endpoints
 	preparedKubeAPIServer := kubeAPIServer.GenericAPIServer.PrepareRun()
 
@@ -260,7 +255,7 @@ func (c *MasterConfig) Run(kubeAPIServerConfig *kubeapiserver.Config, controller
 			return nil
 		})
 	aggregatedAPIServer.GenericAPIServer.AddPostStartHook("template.openshift.io-sharednamespace", c.ensureOpenShiftSharedResourcesNamespace)
-	aggregatedAPIServer.GenericAPIServer.AddPostStartHook("authorization.openshift.io-bootstrapclusterroles", c.ensureComponentAuthorizationRules)
+	aggregatedAPIServer.GenericAPIServer.AddPostStartHook("authorization.openshift.io-bootstrapclusterroles", rbacrest.GetPostStartHook(bootstrappolicy.Policy()))
 
 	go aggregatedAPIServer.GenericAPIServer.PrepareRun().Run(stopCh)
 

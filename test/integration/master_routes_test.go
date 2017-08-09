@@ -102,7 +102,6 @@ var expectedIndex = []string{
 	"/healthz/poststarthook/project.openshift.io-projectauthorizationcache",
 	"/healthz/poststarthook/project.openshift.io-projectcache",
 	"/healthz/poststarthook/quota.openshift.io-clusterquotamapping",
-	"/healthz/poststarthook/rbac/bootstrap-openshift-roles",
 	"/healthz/poststarthook/security.openshift.io-bootstrapscc",
 	"/healthz/poststarthook/start-apiextensions-controllers",
 	"/healthz/poststarthook/start-apiextensions-informers",
