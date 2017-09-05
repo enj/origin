@@ -16,6 +16,7 @@
 #  - COVERAGE_OUTPUT_DIR: locates the directory in which coverage output files will be placed
 #  - COVERAGE_SPEC:       a set of flags for 'go test' that specify the coverage behavior (default '-cover -covermode=atomic')
 #  - GOTEST_FLAGS:        any other flags to be sent to 'go test'
+#  - GOTESTBINARY_FLAGS:  any other flags to be sent to the test binary
 #  - JUNIT_REPORT:        toggles the creation of jUnit XML from the test output and changes this script's output behavior
 #                         to use the 'junitreport' tool for summarizing the tests.
 #  - DLV_DEBUG            toggles running tests using delve debugger
@@ -47,6 +48,7 @@ detect_races="${DETECT_RACES:-true}"
 coverage_output_dir="${COVERAGE_OUTPUT_DIR:-}"
 coverage_spec="${COVERAGE_SPEC:--cover -covermode atomic}"
 gotest_flags="${GOTEST_FLAGS:-}"
+gotestbinary_flags="${GOTESTBINARY_FLAGS:-}"
 junit_report="${JUNIT_REPORT:-}"
 dlv_debug="${DLV_DEBUG:-}"
 
@@ -163,7 +165,7 @@ fi
 
 if [[ -n "${dry_run}" ]]; then
     echo "The following base flags for \`go test\` will be used by $0:"
-    echo "go test ${gotest_flags}"
+    echo "go test ${gotest_flags} -args ${gotestbinary_flags}"
     echo "The following packages will be tested by $0:"
     for package in ${test_packages}; do
         echo "${package}"
@@ -184,7 +186,7 @@ if [[ -n "${junit_report}" ]]; then
     set +o pipefail
 
     go test -i ${gotest_flags} ${test_packages}
-    go test ${gotest_flags} ${test_packages} 2>"${test_error_file}" | tee "${test_output_file}"
+    go test ${gotest_flags} ${test_packages} -args ${gotestbinary_flags} 2>"${test_error_file}" | tee "${test_output_file}"
 
     test_return_code="${PIPESTATUS[0]}"
 
@@ -215,7 +217,7 @@ elif [[ -n "${coverage_output_dir}" ]]; then
         mkdir -p "${coverage_output_dir}/${test_package}"
         local_gotest_flags="${gotest_flags} -coverprofile=${coverage_output_dir}/${test_package}/profile.out"
 
-        go test ${local_gotest_flags} ${test_package}
+        go test ${local_gotest_flags} ${test_package} -args ${gotestbinary_flags}
     done
 
     # assemble all profiles and generate a coverage report
@@ -236,5 +238,5 @@ elif [[ -n "${dlv_debug}" ]]; then
 else
     # we need to generate neither jUnit XML nor coverage reports
     go test -i ${gotest_flags} ${test_packages}
-    go test ${gotest_flags} ${test_packages}
+    go test ${gotest_flags} ${test_packages} -args ${gotestbinary_flags}
 fi

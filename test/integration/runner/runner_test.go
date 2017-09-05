@@ -19,12 +19,21 @@ import (
 )
 
 var timeout = flag.Duration("sub.timeout", 0, "Specify the timeout for each sub test")
+var retries = flag.Int("sub.retries", 1, "Specify the flake retries for each sub test")
+var run = flag.String("sub.run", ".*", "Run only those sub tests matching the regular expression")
 
 func TestIntegration(t *testing.T) {
-	executeTests(t, "..", "github.com/openshift/origin/test/integration", 1)
+	filter, err := regexp.Compile(*run)
+	if err != nil {
+		t.Fatalf("Invalid regex %q for sub.run: %v", *run, err)
+	}
+	if testing.Verbose() {
+		t.Logf("Running integration tests with timeout=%s retries=%d run=%q", (*timeout).String(), *retries, *run)
+	}
+	executeTests(t, "..", "github.com/openshift/origin/test/integration", *retries, filter)
 }
 
-func testsForPackage(t *testing.T, dir, packageName string) []string {
+func testsForPackage(t *testing.T, dir string, filter *regexp.Regexp) []string {
 	c := build.Default
 	p, err := c.ImportDir(dir, 0)
 	if err != nil {
@@ -55,6 +64,9 @@ func testsForPackage(t *testing.T, dir, packageName string) []string {
 					if sexpr.Sel.Name != "T" || sexpr.X.(*ast.Ident).Name != "testing" {
 						continue
 					}
+					if !filter.MatchString(d.Name.Name) {
+						continue
+					}
 					names = append(names, d.Name.Name)
 				default:
 				}
@@ -62,14 +74,17 @@ func testsForPackage(t *testing.T, dir, packageName string) []string {
 			}
 		}
 	}
+	if len(names) == 0 {
+		t.Fatalf("No integration tests found with regex %q for sub.run", *run)
+	}
 	sort.Strings(names)
 	return names
 }
 
-func executeTests(t *testing.T, dir, packageName string, maxRetries int) {
+func executeTests(t *testing.T, dir, packageName string, maxRetries int, filter *regexp.Regexp) {
 	binaryName := path.Base(packageName) + ".test"
 
-	names := testsForPackage(t, dir, packageName)
+	names := testsForPackage(t, dir, filter)
 
 	var binaryPath string
 	if path, err := exec.LookPath(binaryName); err == nil {
