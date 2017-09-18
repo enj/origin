@@ -25,6 +25,7 @@ func NewDefaultServerConfig() *osin.ServerConfig {
 	config.AllowGetAccessRequest = true
 	config.RedirectUriSeparator = ","
 	config.ErrorStatusCode = http.StatusBadRequest
+	config.RequirePKCEForPublicClients = true // TODO determine if we want to do this
 
 	return config
 }

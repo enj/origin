@@ -20,3 +20,6 @@ func OpenShiftOAuthTokenURL(masterAddr string) string {
 func OpenShiftOAuthTokenRequestURL(masterAddr string) string {
 	return masterAddr + path.Join(OpenShiftOAuthAPIPrefix, tokenrequest.RequestTokenEndpoint)
 }
+func OpenShiftOAuthTokenImplicitURL(masterAddr string) string {
+	return masterAddr + path.Join(OpenShiftOAuthAPIPrefix, tokenrequest.ImplicitTokenEndpoint)
+}

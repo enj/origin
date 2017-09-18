@@ -1,20 +1,21 @@
 package tokencmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 
+	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
+
+	"github.com/openshift/origin/pkg/oauth/util"
 )
 
 // CSRFTokenHeader is a marker header that indicates we are not a browser that got tricked into requesting basic auth
@@ -92,8 +93,27 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 		return "", err
 	}
 
+	// TODO get from discovery endpoint?
+	config := &osincli.ClientConfig{
+		ClientId:                 o.ClientID,
+		AuthorizeUrl:             util.OpenShiftOAuthAuthorizeURL(o.ClientConfig.Host),
+		TokenUrl:                 util.OpenShiftOAuthTokenURL(o.ClientConfig.Host),
+		RedirectUrl:              util.OpenShiftOAuthTokenImplicitURL(o.ClientConfig.Host),
+		SendClientSecretInParams: true, // we have no secret, just a client id
+	}
+	if err := osincli.PopulatePKCE(config); err != nil {
+		return "", err
+	}
+
+	client, err := osincli.NewClient(config)
+	if err != nil {
+		return "", err
+	}
+	client.Transport = rt
+	authorizeRequest := client.NewAuthorizeRequest(osincli.CODE)
+
 	// requestURL holds the current URL to make requests to. This can change if the server responds with a redirect
-	requestURL := o.ClientConfig.Host + "/oauth/authorize?" + url.Values{"response_type": []string{"token"}, "client_id": []string{o.ClientID}}.Encode()
+	requestURL := authorizeRequest.GetAuthorizeUrl().String() // TODO does this need state for any reason?
 	// requestHeaders holds additional headers to add to the request. This can be changed by o.Handlers
 	requestHeaders := http.Header{}
 	// requestedURLSet/requestedURLList hold the URLs we have requested, to prevent redirect loops. Gets reset when a challenge is handled.
@@ -159,12 +179,12 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 			redirectURL := resp.Header.Get("Location")
 
 			// OAuth response case (access_token or error parameter)
-			accessToken, err := oauthAuthorizeResult(redirectURL)
+			accessToken, err := oauthAuthorizeResult(client, authorizeRequest, redirectURL)
 			if err != nil {
 				return "", err
 			}
 			if len(accessToken) > 0 {
-				return accessToken, err
+				return accessToken, nil
 			}
 
 			// Non-OAuth response, just follow the URL
@@ -184,32 +204,34 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 	}
 }
 
-func oauthAuthorizeResult(location string) (string, error) {
-	u, err := url.Parse(location)
+func oauthAuthorizeResult(client *osincli.Client, authorizeRequest *osincli.AuthorizeRequest, location string) (string, error) {
+	// Make a request out of the URL since that is what AuthorizeRequest.HandleRequest expects to extra data from
+	req, err := http.NewRequest("GET", location, nil)
 	if err != nil {
 		return "", err
 	}
 
-	if errorCode := u.Query().Get("error"); len(errorCode) > 0 {
-		errorDescription := u.Query().Get("error_description")
-		return "", errors.New(errorCode + " " + errorDescription)
-	}
-
-	// Grab the raw fragment ourselves, since the stdlib URL parsing decodes parts of it
-	fragment := ""
-	if parts := strings.SplitN(location, "#", 2); len(parts) == 2 {
-		fragment = parts[1]
-	}
-	fragmentValues, err := url.ParseQuery(fragment)
+	authorizeData, err := authorizeRequest.HandleRequest(req)
 	if err != nil {
-		return "", err
+		return "", errIfOAuthError(err)
 	}
 
-	if accessToken := fragmentValues.Get("access_token"); len(accessToken) > 0 {
-		return accessToken, nil
+	accessRequest := client.NewAccessRequest(osincli.AUTHORIZATION_CODE, authorizeData)
+	accessData, err := accessRequest.GetToken()
+	if err != nil {
+		return "", errIfOAuthError(err)
 	}
 
-	return "", nil
+	return accessData.AccessToken, nil
+}
+
+func errIfOAuthError(err error) error {
+	if osinErr, ok := err.(*osincli.Error); ok {
+		// We want the whole error message not just the description
+		// TODO better pretty print or should we preserve the old format?
+		return fmt.Errorf("OAuth error: %#v", osinErr)
+	}
+	return nil
 }
 
 func request(rt http.RoundTripper, requestURL string, requestHeaders http.Header) (*http.Response, error) {
