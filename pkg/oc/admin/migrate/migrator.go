@@ -496,7 +496,7 @@ func DefaultRetriable(info *resource.Info, err error) error {
 			return ErrNotRetriable{err}
 		}
 		return ErrRetriable{err}
-	case errors.IsServerTimeout(err):
+	case errors.IsServerTimeout(err), errors.IsTimeout(err):
 		return ErrRetriable{err}
 	}
 	return err
