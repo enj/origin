@@ -1,14 +1,12 @@
 package tokencmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
-
-	"github.com/RangelReale/osincli"
-	"github.com/golang/glog"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,11 +14,29 @@ import (
 	restclient "k8s.io/client-go/rest"
 
 	"github.com/openshift/origin/pkg/oauth/util"
+
+	"github.com/RangelReale/osincli"
+	"github.com/golang/glog"
 )
 
-// CSRFTokenHeader is a marker header that indicates we are not a browser that got tricked into requesting basic auth
-// Corresponds to the header expected by basic-auth challenging authenticators
-const CSRFTokenHeader = "X-CSRF-Token"
+const (
+	// csrfTokenHeader is a marker header that indicates we are not a browser that got tricked into requesting basic auth
+	// Corresponds to the header expected by basic-auth challenging authenticators
+	// Copied from pkg/auth/authenticator/challenger/passwordchallenger/password_auth_handler.go
+	csrfTokenHeader = "X-CSRF-Token"
+
+	// Discovery endpoint for OAuth 2.0 Authorization Server Metadata
+	// See IETF Draft:
+	// https://tools.ietf.org/html/draft-ietf-oauth-discovery-04#section-2
+	// Copied from pkg/cmd/server/origin/nonapiserver.go
+	oauthMetadataEndpoint = "/.well-known/oauth-authorization-server"
+
+	// openShiftCLIClientID is the name of the CLI OAuth client, copied from pkg/oauth/apiserver/auth.go
+	openShiftCLIClientID = "openshift-challenging-client"
+
+	// pkce_s256 is sha256 hash per RFC7636, copied from github.com/RangelReale/osincli/pkce.go
+	pkce_s256 = "S256"
+)
 
 // ChallengeHandler handles responses to WWW-Authenticate challenges.
 type ChallengeHandler interface {
@@ -43,7 +59,7 @@ type ChallengeHandler interface {
 type RequestTokenOptions struct {
 	ClientConfig *restclient.Config
 	Handler      ChallengeHandler
-	ClientID     string
+	OsinConfig   *osincli.ClientConfig
 }
 
 // RequestToken uses the cmd arguments to locate an openshift oauth server and attempts to authenticate
@@ -71,14 +87,50 @@ func NewRequestTokenOptions(clientCfg *restclient.Config, reader io.Reader, defa
 	return &RequestTokenOptions{
 		ClientConfig: clientCfg,
 		Handler:      handler,
-		ClientID:     "openshift-challenging-client",
 	}
+}
+
+// SetDefaultOsinConfig overwrites RequestTokenOptions.OsinConfig with the default
+// CLI OAuth client and PKCE support if the server supports S256
+func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
+	// get the OAuth metadata from the server
+	rt, err := restclient.TransportFor(o.ClientConfig)
+	if err != nil {
+		return err
+	}
+	resp, err := request(rt, o.ClientConfig.Host+oauthMetadataEndpoint, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	metadata := &util.OauthAuthorizationServerMetadata{}
+	if err := json.NewDecoder(resp.Body).Decode(metadata); err != nil {
+		return err
+	}
+
+	// use the metadata to build the osin config
+	config := &osincli.ClientConfig{
+		ClientId:                 openShiftCLIClientID,
+		AuthorizeUrl:             metadata.AuthorizationEndpoint,
+		TokenUrl:                 metadata.TokenEndpoint,
+		RedirectUrl:              util.OpenShiftOAuthTokenImplicitURL(metadata.Issuer),
+		SendClientSecretInParams: true, // we have no secret, just a client id
+	}
+	if sets.NewString(metadata.CodeChallengeMethodsSupported...).Has(pkce_s256) {
+		if err := osincli.PopulatePKCE(config); err != nil {
+			return err
+		}
+	}
+	o.OsinConfig = config
+	return nil
 }
 
 // RequestToken locates an openshift oauth server and attempts to authenticate.
 // It returns the access token if it gets one, or an error if it does not.
 // It should only be invoked once on a given RequestTokenOptions instance.
 // The Handler held by the options is released as part of this call.
+// If RequestTokenOptions.OsinConfig is nil, it will be defaulted using SetDefaultOsinConfig.
+// The caller is responsible for setting up the entire OsinConfig if the value is not nil.
 func (o *RequestTokenOptions) RequestToken() (string, error) {
 	defer func() {
 		// Always release the handler
@@ -93,19 +145,13 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 		return "", err
 	}
 
-	// TODO get from discovery endpoint?
-	config := &osincli.ClientConfig{
-		ClientId:                 o.ClientID,
-		AuthorizeUrl:             util.OpenShiftOAuthAuthorizeURL(o.ClientConfig.Host),
-		TokenUrl:                 util.OpenShiftOAuthTokenURL(o.ClientConfig.Host),
-		RedirectUrl:              util.OpenShiftOAuthTokenImplicitURL(o.ClientConfig.Host),
-		SendClientSecretInParams: true, // we have no secret, just a client id
-	}
-	if err := osincli.PopulatePKCE(config); err != nil {
-		return "", err
+	if o.OsinConfig == nil {
+		if err := o.SetDefaultOsinConfig(); err != nil {
+			return "", err
+		}
 	}
 
-	client, err := osincli.NewClient(config)
+	client, err := osincli.NewClient(o.OsinConfig)
 	if err != nil {
 		return "", err
 	}
@@ -113,7 +159,7 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 	authorizeRequest := client.NewAuthorizeRequest(osincli.CODE)
 
 	// requestURL holds the current URL to make requests to. This can change if the server responds with a redirect
-	requestURL := authorizeRequest.GetAuthorizeUrl().String() // TODO does this need state for any reason?
+	requestURL := authorizeRequest.GetAuthorizeUrl().String()
 	// requestHeaders holds additional headers to add to the request. This can be changed by o.Handlers
 	requestHeaders := http.Header{}
 	// requestedURLSet/requestedURLList hold the URLs we have requested, to prevent redirect loops. Gets reset when a challenge is handled.
@@ -204,6 +250,11 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 	}
 }
 
+// oauthAuthorizeResult performs the OAuth code flow if location has a code parameter.
+// It only returns an error if something "impossible" happens (location is not a valid URL)
+// or a definite OAuth error is encountered during the code flow.  Other errors are assumed to
+// be caused by location not being part of the OAuth flow (it was a redirect that the client
+// needs to follow as part of the challenge flow and not a redirect step in the OAuth flow).
 func oauthAuthorizeResult(client *osincli.Client, authorizeRequest *osincli.AuthorizeRequest, location string) (string, error) {
 	// Make a request out of the URL since that is what AuthorizeRequest.HandleRequest expects to extra data from
 	req, err := http.NewRequest("GET", location, nil)
@@ -227,9 +278,7 @@ func oauthAuthorizeResult(client *osincli.Client, authorizeRequest *osincli.Auth
 
 func errIfOAuthError(err error) error {
 	if osinErr, ok := err.(*osincli.Error); ok {
-		// We want the whole error message not just the description
-		// TODO better pretty print or should we preserve the old format?
-		return fmt.Errorf("OAuth error: %#v", osinErr)
+		return fmt.Errorf("%s %s", osinErr.Id, osinErr.Description)
 	}
 	return nil
 }
@@ -243,7 +292,7 @@ func request(rt http.RoundTripper, requestURL string, requestHeaders http.Header
 	for k, v := range requestHeaders {
 		req.Header[k] = v
 	}
-	req.Header.Set(CSRFTokenHeader, "1")
+	req.Header.Set(csrfTokenHeader, "1")
 
 	// Make the request
 	return rt.RoundTrip(req)
