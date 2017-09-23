@@ -425,6 +425,7 @@ func TestRequestToken(t *testing.T) {
 		opts := &RequestTokenOptions{
 			ClientConfig: &restclient.Config{Host: s.URL},
 			Handler:      tc.Handler,
+			TokenFlow:    true,
 		}
 		token, err := opts.RequestToken()
 		if token != tc.ExpectedToken {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,9 @@ const (
 
 	// pkce_s256 is sha256 hash per RFC7636, copied from github.com/RangelReale/osincli/pkce.go
 	pkce_s256 = "S256"
+
+	// token fakes the missing osin.TOKEN const
+	token osincli.AuthorizeRequestType = "token"
 )
 
 // ChallengeHandler handles responses to WWW-Authenticate challenges.
@@ -60,15 +64,16 @@ type RequestTokenOptions struct {
 	ClientConfig *restclient.Config
 	Handler      ChallengeHandler
 	OsinConfig   *osincli.ClientConfig
+	TokenFlow    bool
 }
 
 // RequestToken uses the cmd arguments to locate an openshift oauth server and attempts to authenticate
 // it returns the access token if it gets one.  An error if it does not
 func RequestToken(clientCfg *restclient.Config, reader io.Reader, defaultUsername string, defaultPassword string) (string, error) {
-	return NewRequestTokenOptions(clientCfg, reader, defaultUsername, defaultPassword).RequestToken()
+	return NewRequestTokenOptions(clientCfg, reader, defaultUsername, defaultPassword, false).RequestToken()
 }
 
-func NewRequestTokenOptions(clientCfg *restclient.Config, reader io.Reader, defaultUsername string, defaultPassword string) *RequestTokenOptions {
+func NewRequestTokenOptions(clientCfg *restclient.Config, reader io.Reader, defaultUsername string, defaultPassword string, tokenFlow bool) *RequestTokenOptions {
 	handlers := []ChallengeHandler{}
 	if GSSAPIEnabled() {
 		handlers = append(handlers, NewNegotiateChallengeHandler(NewGSSAPINegotiator(defaultUsername)))
@@ -87,11 +92,12 @@ func NewRequestTokenOptions(clientCfg *restclient.Config, reader io.Reader, defa
 	return &RequestTokenOptions{
 		ClientConfig: clientCfg,
 		Handler:      handler,
+		TokenFlow:    tokenFlow,
 	}
 }
 
-// SetDefaultOsinConfig overwrites RequestTokenOptions.OsinConfig with the default
-// CLI OAuth client and PKCE support if the server supports S256
+// SetDefaultOsinConfig overwrites RequestTokenOptions.OsinConfig with the default CLI
+// OAuth client and PKCE support if the server supports S256 / a code flow is being used
 func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
 	// get the OAuth metadata from the server
 	rt, err := restclient.TransportFor(o.ClientConfig)
@@ -116,7 +122,7 @@ func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
 		RedirectUrl:              util.OpenShiftOAuthTokenImplicitURL(metadata.Issuer),
 		SendClientSecretInParams: true, // we have no secret, just a client id
 	}
-	if sets.NewString(metadata.CodeChallengeMethodsSupported...).Has(pkce_s256) {
+	if !o.TokenFlow && sets.NewString(metadata.CodeChallengeMethodsSupported...).Has(pkce_s256) {
 		if err := osincli.PopulatePKCE(config); err != nil {
 			return err
 		}
@@ -156,7 +162,19 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 		return "", err
 	}
 	client.Transport = rt
-	authorizeRequest := client.NewAuthorizeRequest(osincli.CODE)
+	authorizeRequest := client.NewAuthorizeRequest(osincli.CODE) // assume code flow to start with
+
+	var oauthTokenFunc func(redirectURL string) (accessToken string, oauthError error)
+	if o.TokenFlow {
+		// access_token in fragment or error parameter
+		authorizeRequest.Type = token // manually override to token flow if necessary
+		oauthTokenFunc = oauthTokenFlow
+	} else {
+		// code or error parameter
+		oauthTokenFunc = func(redirectURL string) (accessToken string, oauthError error) {
+			return oauthCodeFlow(client, authorizeRequest, redirectURL)
+		}
+	}
 
 	// requestURL holds the current URL to make requests to. This can change if the server responds with a redirect
 	requestURL := authorizeRequest.GetAuthorizeUrl().String()
@@ -224,8 +242,8 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 		if resp.StatusCode == http.StatusFound {
 			redirectURL := resp.Header.Get("Location")
 
-			// OAuth response case (access_token or error parameter)
-			accessToken, err := oauthAuthorizeResult(client, authorizeRequest, redirectURL)
+			// OAuth response case
+			accessToken, err := oauthTokenFunc(redirectURL)
 			if err != nil {
 				return "", err
 			}
@@ -250,12 +268,41 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 	}
 }
 
-// oauthAuthorizeResult performs the OAuth code flow if location has a code parameter.
+// oauthTokenFlow attempts to extract an OAuth token from location's fragment's access_token value.
+// It only returns an error if something "impossible" happens (location is not a valid URL) or a definite
+// OAuth error is contained in the location URL.  No error is returned if location does not contain
+// a token; it is assumed that location was not part of the OAuth flow (it was a redirect that the client
+// needs to follow as part of the challenge flow and not a redirect step in the OAuth flow).
+func oauthTokenFlow(location string) (string, error) {
+	u, err := url.Parse(location)
+	if err != nil {
+		return "", err
+	}
+
+	if errorCode := u.Query().Get("error"); len(errorCode) > 0 {
+		errorDescription := u.Query().Get("error_description")
+		return "", createOAuthError(errorCode, errorDescription)
+	}
+
+	// Grab the raw fragment ourselves, since the stdlib URL parsing decodes parts of it
+	fragment := ""
+	if parts := strings.SplitN(location, "#", 2); len(parts) == 2 {
+		fragment = parts[1]
+	}
+	fragmentValues, err := url.ParseQuery(fragment)
+	if err != nil {
+		return "", err
+	}
+
+	return fragmentValues.Get("access_token"), nil
+}
+
+// oauthCodeFlow performs the OAuth code flow if location has a code parameter.
 // It only returns an error if something "impossible" happens (location is not a valid URL)
 // or a definite OAuth error is encountered during the code flow.  Other errors are assumed to
 // be caused by location not being part of the OAuth flow (it was a redirect that the client
 // needs to follow as part of the challenge flow and not a redirect step in the OAuth flow).
-func oauthAuthorizeResult(client *osincli.Client, authorizeRequest *osincli.AuthorizeRequest, location string) (string, error) {
+func oauthCodeFlow(client *osincli.Client, authorizeRequest *osincli.AuthorizeRequest, location string) (string, error) {
 	// Make a request out of the URL since that is what AuthorizeRequest.HandleRequest expects to extra data from
 	req, err := http.NewRequest("GET", location, nil)
 	if err != nil {
@@ -278,9 +325,13 @@ func oauthAuthorizeResult(client *osincli.Client, authorizeRequest *osincli.Auth
 
 func errIfOAuthError(err error) error {
 	if osinErr, ok := err.(*osincli.Error); ok {
-		return fmt.Errorf("%s %s", osinErr.Id, osinErr.Description)
+		return createOAuthError(osinErr.Id, osinErr.Description)
 	}
 	return nil
+}
+
+func createOAuthError(errorCode, errorDescription string) error {
+	return fmt.Errorf("%s %s", errorCode, errorDescription)
 }
 
 func request(rt http.RoundTripper, requestURL string, requestHeaders http.Header) (*http.Response, error) {
