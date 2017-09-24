@@ -19,6 +19,9 @@ func OpenShiftOAuthTokenURL(masterAddr string) string {
 func OpenShiftOAuthTokenRequestURL(masterAddr string) string {
 	return openShiftOAuthURL(masterAddr, tokenrequest.RequestTokenEndpoint)
 }
+func OpenShiftOAuthTokenDisplayURL(masterAddr string) string {
+	return openShiftOAuthURL(masterAddr, tokenrequest.DisplayTokenEndpoint)
+}
 func OpenShiftOAuthTokenImplicitURL(masterAddr string) string {
 	return openShiftOAuthURL(masterAddr, tokenrequest.ImplicitTokenEndpoint)
 }
