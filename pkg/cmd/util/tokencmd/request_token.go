@@ -67,8 +67,8 @@ type RequestTokenOptions struct {
 	TokenFlow    bool
 }
 
-// RequestToken uses the cmd arguments to locate an openshift oauth server and attempts to authenticate
-// it returns the access token if it gets one.  An error if it does not
+// RequestToken uses the cmd arguments to locate an openshift oauth server and attempts to authenticate via an
+// OAuth code flow and challenge handling.  It returns the access token if it gets one or an error if it does not.
 func RequestToken(clientCfg *restclient.Config, reader io.Reader, defaultUsername string, defaultPassword string) (string, error) {
 	return NewRequestTokenOptions(clientCfg, reader, defaultUsername, defaultPassword, false).RequestToken()
 }
@@ -104,7 +104,7 @@ func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
 	if err != nil {
 		return err
 	}
-	resp, err := request(rt, o.ClientConfig.Host+oauthMetadataEndpoint, nil)
+	resp, err := request(rt, strings.TrimRight(o.ClientConfig.Host, "/")+oauthMetadataEndpoint, nil)
 	if err != nil {
 		return err
 	}

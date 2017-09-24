@@ -9,6 +9,10 @@ import (
 	"testing"
 
 	restclient "k8s.io/client-go/rest"
+
+	"github.com/openshift/origin/pkg/oauth/util"
+
+	"github.com/RangelReale/osincli"
 )
 
 type unloadableNegotiator struct {
@@ -425,7 +429,14 @@ func TestRequestToken(t *testing.T) {
 		opts := &RequestTokenOptions{
 			ClientConfig: &restclient.Config{Host: s.URL},
 			Handler:      tc.Handler,
-			TokenFlow:    true,
+			OsinConfig: &osincli.ClientConfig{
+				ClientId:                 openShiftCLIClientID,
+				AuthorizeUrl:             util.OpenShiftOAuthAuthorizeURL(s.URL),
+				TokenUrl:                 util.OpenShiftOAuthTokenURL(s.URL),
+				RedirectUrl:              util.OpenShiftOAuthTokenImplicitURL(s.URL),
+				SendClientSecretInParams: true, // we have no secret, just a client id
+			},
+			TokenFlow: true,
 		}
 		token, err := opts.RequestToken()
 		if token != tc.ExpectedToken {
