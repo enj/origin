@@ -303,7 +303,7 @@ func oauthTokenFlow(location string) (string, error) {
 // be caused by location not being part of the OAuth flow (it was a redirect that the client
 // needs to follow as part of the challenge flow and not a redirect step in the OAuth flow).
 func oauthCodeFlow(client *osincli.Client, authorizeRequest *osincli.AuthorizeRequest, location string) (string, error) {
-	// Make a request out of the URL since that is what AuthorizeRequest.HandleRequest expects to extra data from
+	// Make a request out of the URL since that is what AuthorizeRequest.HandleRequest expects to extract data from
 	req, err := http.NewRequest("GET", location, nil)
 	if err != nil {
 		return "", err
