@@ -116,11 +116,10 @@ func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
 
 	// use the metadata to build the osin config
 	config := &osincli.ClientConfig{
-		ClientId:                 openShiftCLIClientID,
-		AuthorizeUrl:             metadata.AuthorizationEndpoint,
-		TokenUrl:                 metadata.TokenEndpoint,
-		RedirectUrl:              util.OpenShiftOAuthTokenImplicitURL(metadata.Issuer),
-		SendClientSecretInParams: true, // we have no secret, just a client id
+		ClientId:     openShiftCLIClientID,
+		AuthorizeUrl: metadata.AuthorizationEndpoint,
+		TokenUrl:     metadata.TokenEndpoint,
+		RedirectUrl:  util.OpenShiftOAuthTokenImplicitURL(metadata.Issuer),
 	}
 	if !o.TokenFlow && sets.NewString(metadata.CodeChallengeMethodsSupported...).Has(pkce_s256) {
 		if err := osincli.PopulatePKCE(config); err != nil {
