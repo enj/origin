@@ -99,6 +99,10 @@ func NewRequestTokenOptions(clientCfg *restclient.Config, reader io.Reader, defa
 // SetDefaultOsinConfig overwrites RequestTokenOptions.OsinConfig with the default CLI
 // OAuth client and PKCE support if the server supports S256 / a code flow is being used
 func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
+	if o.OsinConfig != nil {
+		return fmt.Errorf("osin config is already set to: %#v", *o.OsinConfig)
+	}
+
 	// get the OAuth metadata from the server
 	rt, err := restclient.TransportFor(o.ClientConfig)
 	if err != nil {
@@ -126,6 +130,7 @@ func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
 			return err
 		}
 	}
+
 	o.OsinConfig = config
 	return nil
 }
