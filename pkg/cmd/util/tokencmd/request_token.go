@@ -331,7 +331,7 @@ func oauthCodeFlow(client *osincli.Client, authorizeRequest *osincli.AuthorizeRe
 		if osinErr, ok := err.(*osincli.Error); ok {
 			return "", createOAuthError(osinErr.Id, osinErr.Description)
 		}
-		return "", nil
+		return "", nil // we ignore all non-OAuth errors
 	}
 
 	return accessData.AccessToken, nil
