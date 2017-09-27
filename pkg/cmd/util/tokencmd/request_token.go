@@ -274,9 +274,9 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 
 // oauthTokenFlow attempts to extract an OAuth token from location's fragment's access_token value.
 // It only returns an error if something "impossible" happens (location is not a valid URL) or a definite
-// OAuth error is contained in the location URL.  No error is returned if location does not contain
-// a token; it is assumed that location was not part of the OAuth flow (it was a redirect that the client
-// needs to follow as part of the challenge flow and not a redirect step in the OAuth flow).
+// OAuth error is contained in the location URL.  No error is returned if location does not contain a token.
+// It is assumed that location was not part of the OAuth flow; it was a redirect that the client needs to follow
+// as part of the challenge flow (an authenticating proxy for example) and not a redirect step in the OAuth flow.
 func oauthTokenFlow(location string) (string, error) {
 	u, err := url.Parse(location)
 	if err != nil {
@@ -303,9 +303,9 @@ func oauthTokenFlow(location string) (string, error) {
 
 // oauthCodeFlow performs the OAuth code flow if location has a code parameter.
 // It only returns an error if something "impossible" happens (location is not a valid URL)
-// or a definite OAuth error is encountered during the code flow.  Other errors are assumed to
-// be caused by location not being part of the OAuth flow (it was a redirect that the client
-// needs to follow as part of the challenge flow and not a redirect step in the OAuth flow).
+// or a definite OAuth error is encountered during the code flow.  Other errors are assumed to be caused
+// by location not being part of the OAuth flow; it was a redirect that the client needs to follow as part
+// of the challenge flow (an authenticating proxy for example) and not a redirect step in the OAuth flow.
 func oauthCodeFlow(client *osincli.Client, authorizeRequest *osincli.AuthorizeRequest, location string) (string, error) {
 	// Make a request out of the URL since that is what AuthorizeRequest.HandleRequest expects to extract data from
 	req, err := http.NewRequest("GET", location, nil)
