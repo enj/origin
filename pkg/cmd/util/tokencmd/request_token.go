@@ -283,9 +283,8 @@ func oauthTokenFlow(location string) (string, error) {
 		return "", err
 	}
 
-	if errorCode := u.Query().Get("error"); len(errorCode) > 0 {
-		errorDescription := u.Query().Get("error_description")
-		return "", createOAuthError(errorCode, errorDescription)
+	if oauthErr := oauthErrFromValues(u.Query()); oauthErr != nil {
+		return "", oauthErr
 	}
 
 	// Grab the raw fragment ourselves, since the stdlib URL parsing decodes parts of it
@@ -313,23 +312,35 @@ func oauthCodeFlow(client *osincli.Client, authorizeRequest *osincli.AuthorizeRe
 		return "", err
 	}
 
+	req.ParseForm()
+	if oauthErr := oauthErrFromValues(req.Form); oauthErr != nil {
+		return "", oauthErr
+	}
+	if len(req.Form.Get("code")) == 0 {
+		return "", nil // no code parameter so this is not part of the OAuth flow
+	}
+
 	authorizeData, err := authorizeRequest.HandleRequest(req)
 	if err != nil {
-		return "", errIfOAuthError(err)
+		return "", nil // we already checked for OAuth errors in req so we know we can ignore this
 	}
 
 	accessRequest := client.NewAccessRequest(osincli.AUTHORIZATION_CODE, authorizeData)
 	accessData, err := accessRequest.GetToken()
 	if err != nil {
-		return "", errIfOAuthError(err)
+		if osinErr, ok := err.(*osincli.Error); ok {
+			return "", createOAuthError(osinErr.Id, osinErr.Description)
+		}
+		return "", nil
 	}
 
 	return accessData.AccessToken, nil
 }
 
-func errIfOAuthError(err error) error {
-	if osinErr, ok := err.(*osincli.Error); ok {
-		return createOAuthError(osinErr.Id, osinErr.Description)
+func oauthErrFromValues(values url.Values) error {
+	if errorCode := values.Get("error"); len(errorCode) > 0 {
+		errorDescription := values.Get("error_description")
+		return createOAuthError(errorCode, errorDescription)
 	}
 	return nil
 }
