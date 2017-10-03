@@ -1,4 +1,4 @@
-package authorizer
+package browsersafeproxy
 
 import (
 	"net/http"

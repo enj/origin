@@ -11,12 +11,13 @@ import (
 	kubeapiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 
 	// Admission control plug-ins used by OpenShift
+	"github.com/openshift/origin/pkg/auth/admission/browsersafeproxy"
 	authorizationrestrictusers "github.com/openshift/origin/pkg/authorization/admission/restrictusers"
 	buildjenkinsbootstrapper "github.com/openshift/origin/pkg/build/admission/jenkinsbootstrapper"
 	buildsecretinjector "github.com/openshift/origin/pkg/build/admission/secretinjector"
 	buildstrategyrestrictions "github.com/openshift/origin/pkg/build/admission/strategyrestrictions"
 	imageadmission "github.com/openshift/origin/pkg/image/admission"
-	imagepolicy "github.com/openshift/origin/pkg/image/admission/imagepolicy"
+	"github.com/openshift/origin/pkg/image/admission/imagepolicy"
 	ingressadmission "github.com/openshift/origin/pkg/ingress/admission"
 	projectlifecycle "github.com/openshift/origin/pkg/project/admission/lifecycle"
 	projectnodeenv "github.com/openshift/origin/pkg/project/admission/nodeenv"
@@ -49,6 +50,7 @@ func init() {
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	kubeapiserver.RegisterAllAdmissionPlugins(plugins)
 	genericapiserver.RegisterAllAdmissionPlugins(plugins)
+	browsersafeproxy.Register(plugins)
 	authorizationrestrictusers.Register(plugins)
 	buildjenkinsbootstrapper.Register(plugins)
 	buildsecretinjector.Register(plugins)
@@ -93,6 +95,7 @@ var (
 		"ResourceQuota",
 		"openshift.io/ClusterResourceQuota",
 		"openshift.io/IngressAdmission",
+		browsersafeproxy.PluginName,
 	)
 
 	// DefaultOffPlugins includes plugins which require explicit configuration to run

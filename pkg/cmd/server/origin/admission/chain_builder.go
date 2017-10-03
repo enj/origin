@@ -10,10 +10,11 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	kclientsetinternal "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	noderestriction "k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
+	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	saadmit "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	storageclassdefaultadmission "k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
 
+	"github.com/openshift/origin/pkg/auth/admission/browsersafeproxy"
 	oadmission "github.com/openshift/origin/pkg/cmd/server/admission"
 	configapi "github.com/openshift/origin/pkg/cmd/server/api"
 	"github.com/openshift/origin/pkg/cmd/util/pluginconfig"
@@ -21,13 +22,13 @@ import (
 	imagepolicy "github.com/openshift/origin/pkg/image/admission/imagepolicy/api"
 	ingressadmission "github.com/openshift/origin/pkg/ingress/admission"
 	overrideapi "github.com/openshift/origin/pkg/quota/admission/clusterresourceoverride/api"
-
 	serviceadmit "github.com/openshift/origin/pkg/service/admission"
 )
 
 var (
 	// openshiftAdmissionControlPlugins gives the in-order default admission chain for openshift resources.
 	openshiftAdmissionControlPlugins = []string{
+		browsersafeproxy.PluginName,
 		"ProjectRequestLimit",
 		"OriginNamespaceLifecycle",
 		"openshift.io/RestrictSubjectBindings",
@@ -80,6 +81,7 @@ var (
 	// When possible, this list is used.  The set of openshift+kube chains must exactly match this set.  In addition,
 	// the order specified in the openshift and kube chains must match the order here.
 	CombinedAdmissionControlPlugins = []string{
+		browsersafeproxy.PluginName,
 		lifecycle.PluginName,
 		"ProjectRequestLimit",
 		"OriginNamespaceLifecycle",
