@@ -278,8 +278,24 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 		return result.Err()
 	}
 
-	// Ignore any resource that does not support GET
-	result.IgnoreErrors(errors.IsMethodNotSupported, errors.IsNotFound)
+	var (
+		// This is fatal in the end
+		ignoredFatalError bool
+		// Ignore all errors so migrate never gives up early
+		alwaysIgnoreErrors resource.ErrMatchFunc = func(err error) bool {
+			switch {
+			// Ignore any resource that does not support GET
+			case errors.IsMethodNotSupported(err), errors.IsNotFound(err):
+			// Record all other errors so we can fail the command
+			default:
+				ignoredFatalError = true
+				fmt.Fprintf(out, "error: could not process resource: %v\n", err)
+			}
+			return true
+		}
+	)
+
+	result.IgnoreErrors(alwaysIgnoreErrors)
 
 	t := migrateTracker{
 		out:       out,
@@ -320,19 +336,29 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 		}
 	}
 
-	if t.resourcesWithErrors.Len() > 0 {
+	// Handle the errors related to specific individual resources that failed
+	// These occur when running the VisitorFunc passed to result.Visit
+	if len(t.resourcesWithErrors) > 0 {
 		fmt.Fprintf(out, "info: to rerun only failing resources, add --include=%s\n", strings.Join(t.resourcesWithErrors.List(), ","))
 	}
-
-	switch {
-	case err != nil:
-		fmt.Fprintf(out, "error: exited without processing all resources: %v\n", err)
-		err = kcmdutil.ErrExit
-	case t.errors > 0:
+	if t.errors > 0 {
 		fmt.Fprintf(out, "error: %d resources failed to migrate\n", t.errors)
-		err = kcmdutil.ErrExit
 	}
-	return err
+
+	// Handle the errors related to resources that failed to be listed and thus result.Visit never called VisitorFunc
+	// The err from result.Visit should never happen since alwaysIgnoreErrors handles all errors
+	if err != nil {
+		fmt.Fprintf(out, "error: exited without processing all resources: %v\n", err)
+	}
+	if ignoredFatalError {
+		fmt.Fprintln(out, "error: could not process all resources")
+	}
+
+	failed := err != nil || t.errors > 0 || ignoredFatalError || len(t.resourcesWithErrors) > 0
+	if failed {
+		return kcmdutil.ErrExit
+	}
+	return nil
 }
 
 // ErrUnchanged may be returned by MigrateActionFunc to indicate that the object
