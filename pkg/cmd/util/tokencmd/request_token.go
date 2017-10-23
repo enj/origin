@@ -302,7 +302,7 @@ func oauthTokenFlow(location string) (string, error) {
 
 // oauthCodeFlow performs the OAuth code flow if location has a code parameter.
 // It returns an error if something "impossible" happens (location is not a valid URL) or a definite
-// OAuth error is contained in the location URL.  If the URL has no code parameter, no error is returned.
+// OAuth error is contained in the location URL.  No error is returned if the URL has no code parameter.
 // It is assumed that location was not part of the OAuth flow; it was a redirect that the client needs
 // to follow as part of the challenge flow (an authenticating proxy for example) and not a redirect step
 // in the OAuth flow.  Once the URL is determined to be part of the code flow, any error in the code flow
