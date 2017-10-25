@@ -140,8 +140,8 @@ func DefaultClusterAdminClientCertInfo(certDir string) ClientCertInfo {
 			KeyFile:  DefaultKeyFilename(certDir, "admin"),
 		},
 		UnqualifiedUser: "admin",
-		User:            "system:admin",
-		Groups:          sets.NewString(bootstrappolicy.ClusterAdminGroup),
+		User:            bootstrappolicy.SystemAdminUsername,
+		Groups:          sets.NewString(bootstrappolicy.ClusterAdminGroup, bootstrappolicy.MastersGroup),
 	}
 }
 
