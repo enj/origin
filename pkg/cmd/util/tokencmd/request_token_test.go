@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -401,7 +404,7 @@ func TestRequestToken(t *testing.T) {
 	for k, tc := range testcases {
 		i := 0
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if i > len(tc.Requests) {
+			if i >= len(tc.Requests) {
 				t.Errorf("%s: %d: more requests received than expected: %#v", k, i, req)
 				return
 			}
@@ -680,12 +683,17 @@ func TestSetDefaultOsinConfig(t *testing.T) {
 func TestRequestTokenCodeFlow(t *testing.T) {
 	type req struct {
 		authorization string
+		path          string
+		method        string
+		query         url.Values
+		body          string
 	}
 	type resp struct {
 		status          int
 		location        string
+		query           url.Values
 		wwwAuthenticate []string
-		challengeDone   bool
+		body            string
 	}
 
 	type requestResponse struct {
@@ -724,82 +732,119 @@ func TestRequestTokenCodeFlow(t *testing.T) {
 		}
 	}
 
-	initialRequest := req{}
-
-	basicChallenge1 := resp{401, "", []string{"Basic realm=foo"}}
-	basicRequest1 := req{"Basic bXl1c2VyOm15cGFzc3dvcmQ="} // base64("myuser:mypassword")
-	basicChallenge2 := resp{401, "", []string{"Basic realm=seriously...foo"}}
-
-	negotiateChallenge1 := resp{401, "", []string{"Negotiate"}}
-	negotiateRequest1 := req{"Negotiate cmVzcG9uc2Ux"}                           // base64("response1")
-	negotiateChallenge2 := resp{401, "", []string{"Negotiate Y2hhbGxlbmdlMg=="}} // base64("challenge2")
-	negotiateRequest2 := req{"Negotiate cmVzcG9uc2Uy"}                           // base64("response2")
-
-	doubleChallenge := resp{401, "", []string{"Negotiate", "Basic realm=foo"}}
-
-	successfulToken := "12345"
-	successfulLocation := fmt.Sprintf("/#access_token=%s", successfulToken)
-	success := resp{302, successfulLocation, nil}
-	successWithNegotiate := resp{302, successfulLocation, []string{"Negotiate Y2hhbGxlbmdlMg=="}}
-
-	testcases := map[string]struct {
-		Handler       ChallengeHandler
-		Requests      []requestResponse
-		ExpectedToken string
-		ExpectedError string
-	}{
-		// Defaulting basic handler
-		"defaulted basic handler, no challenge, success": {
-			Handler: &BasicChallengeHandler{Username: "myuser", Password: "mypassword"},
-			Requests: []requestResponse{
-				{initialRequest, success},
-			},
-			ExpectedToken: successfulToken,
+	initialRequest := req{path: "/oauth/authorize", method: "GET",
+		query: url.Values{
+			"client_id":     []string{"openshift-challenging-client"},
+			"redirect_uri":  []string{"http://127.0.0.1:41933/oauth/token/implicit"},
+			"response_type": []string{"code"},
 		},
 	}
 
-	for k, tc := range testcases {
+	basicChallenge1 := resp{status: 401, wwwAuthenticate: []string{"Basic realm=foo"}}
+	basicRequest1 := req{path: "/oauth/authorize", authorization: "Basic bXl1c2VyOm15cGFzc3dvcmQ=", method: "GET",
+		query: url.Values{
+			"client_id":     []string{"openshift-challenging-client"},
+			"redirect_uri":  []string{"http://127.0.0.1:41933/oauth/token/implicit"},
+			"response_type": []string{"code"},
+		},
+	} // base64("myuser:mypassword")
+
+	//basicChallenge2 := resp{401, "", []string{"Basic realm=seriously...foo"}}
+	//
+	//negotiateChallenge1 := resp{401, "", []string{"Negotiate"}}
+	//negotiateRequest1 := req{"Negotiate cmVzcG9uc2Ux"}                           // base64("response1")
+	//negotiateChallenge2 := resp{401, "", []string{"Negotiate Y2hhbGxlbmdlMg=="}} // base64("challenge2")
+	//negotiateRequest2 := req{"Negotiate cmVzcG9uc2Uy"}                           // base64("response2")
+	//
+	//doubleChallenge := resp{401, "", []string{"Negotiate", "Basic realm=foo"}}
+
+	successfulToken := "12345"
+	//successfulLocation := fmt.Sprintf("/#access_token=%s", successfulToken)
+
+	response1 := resp{status: 302, location: "/redir1"}
+	response2 := resp{status: 302, location: "/redir2"}
+	response3 := resp{status: 302, location: "/redir3"}
+	response4 := resp{status: 302, location: "/valuedoesnotmatter", query: url.Values{
+		"code": []string{"fancycode"},
+	}}
+	response5 := resp{status: 200, body: `{"token_type": "code", "access_token": "12345"}`}
+
+	request1 := req{path: "/redir1", method: "GET"}
+	request2 := req{path: "/redir2", method: "GET"}
+	request3 := req{path: "/redir3", method: "GET"}
+	request4 := req{path: "/oauth/token", method: "POST", body: `code=fancycode&grant_type=authorization_code&redirect_uri=http%3A%2F%2F127.0.0.1%3A34645%2Foauth%2Ftoken%2Fimplicit`,
+		authorization: "Basic b3BlbnNoaWZ0LWNoYWxsZW5naW5nLWNsaWVudDo=", // base64 openshift-challenging-client:
+	}
+
+	//success := resp{status: 302, location: successfulLocation}
+	//successWithNegotiate := resp{302, successfulLocation, []string{"Negotiate Y2hhbGxlbmdlMg=="}}
+
+	for k, tc := range map[string]struct {
+		handler       ChallengeHandler
+		requests      []requestResponse
+		expectedToken string
+		expectedError string
+	}{
+		// Defaulting basic handler
+		"defaulted basic handler, no challenge, success": {
+			handler: &BasicChallengeHandler{Username: "myuser", Password: "mypassword"},
+			requests: []requestResponse{
+				{expectedRequest: initialRequest, serverResponse: basicChallenge1},
+				{expectedRequest: basicRequest1, serverResponse: response1},
+				{expectedRequest: request1, serverResponse: response2},
+				{expectedRequest: request2, serverResponse: response3},
+				{expectedRequest: request3, serverResponse: response4},
+				{expectedRequest: request4, serverResponse: response5},
+			},
+			expectedToken: successfulToken,
+		},
+	} {
 		i := 0
-		startedCodeFlow := false
-		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if i > len(tc.Requests) {
+		var s *httptest.Server
+		s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if i >= len(tc.requests) {
 				t.Errorf("%s: %d: more requests received than expected: %#v", k, i, req)
 				return
 			}
-			rr := tc.Requests[i]
+			rr := tc.requests[i]
 			i++
-			if !startedCodeFlow {
-				if req.Method != "GET" {
-					t.Errorf("%s: %d: Expected GET, got %s", k, i, req.Method)
-					return
-				}
-				if req.URL.Path != "/oauth/authorize" {
-					t.Errorf("%s: %d: Expected /oauth/authorize, got %s", k, i, req.URL.Path)
-					return
-				}
-				if e, a := rr.expectedRequest.authorization, req.Header.Get("Authorization"); e != a {
-					t.Errorf("%s: %d: expected 'Authorization: %s', got 'Authorization: %s'", k, i, e, a)
-					return
-				}
-				if len(rr.serverResponse.location) > 0 {
-					w.Header().Add("Location", rr.serverResponse.location)
-				}
-				for _, v := range rr.serverResponse.wwwAuthenticate {
-					w.Header().Add("WWW-Authenticate", v)
-				}
-				w.WriteHeader(rr.serverResponse.status)
-				if rr.serverResponse.challengeDone {
-					startedCodeFlow = true
-				}
-			} else {
-				// TODO
+			if e, a := rr.expectedRequest.method, req.Method; e != a {
+				t.Errorf("%s: %d: Expected method %s, got %s", k, i, e, a)
+				return
 			}
+			if e, a := rr.expectedRequest.path, req.URL.Path; e != a {
+				t.Errorf("%s: %d: Expected path %s, got %s", k, i, e, a)
+				return
+			}
+			if e, a := getQuery(rr.expectedRequest.query), req.URL.Query().Encode(); e != a {
+				t.Logf("%s: %d: Expected query %s, got %s", k, i, e, a)
+				//return
+			}
+			if e, a := rr.expectedRequest.body, getBody(req.Body); e != a {
+				t.Logf("%s: %d: Expected body %s, got %s", k, i, e, a)
+				//return
+			}
+			if e, a := rr.expectedRequest.authorization, req.Header.Get("Authorization"); e != a { // TODO check all headers
+				t.Errorf("%s: %d: expected 'Authorization: %s', got 'Authorization: %s'", k, i, e, a)
+				return
+			}
+			if location, query := rr.serverResponse.location, getQuery(rr.serverResponse.query); len(location) > 0 {
+				if len(query) > 0 {
+					query = "?" + query
+				}
+				w.Header().Add("Location", s.URL+location+query)
+			}
+			for _, v := range rr.serverResponse.wwwAuthenticate {
+				w.Header().Add("WWW-Authenticate", v)
+			}
+			w.WriteHeader(rr.serverResponse.status)
+			w.Write([]byte(rr.serverResponse.body))
 		}))
 		defer s.Close()
 
 		opts := &RequestTokenOptions{
 			ClientConfig: &restclient.Config{Host: s.URL},
-			Handler:      tc.Handler,
+			Handler:      tc.handler,
 			OsinConfig: &osincli.ClientConfig{
 				ClientId:     openShiftCLIClientID,
 				AuthorizeUrl: util.OpenShiftOAuthAuthorizeURL(s.URL),
@@ -809,19 +854,41 @@ func TestRequestTokenCodeFlow(t *testing.T) {
 			TokenFlow: false,
 		}
 		token, err := opts.RequestToken()
-		if token != tc.ExpectedToken {
-			t.Errorf("%s: expected token '%s', got '%s'", k, tc.ExpectedToken, token)
+		if e, a := tc.expectedToken, token; e != a {
+			t.Errorf("%s: expected token %q, got %q", k, e, a)
 		}
-		errStr := ""
-		if err != nil {
-			errStr = err.Error()
+		if e, a := tc.expectedError, getErrorStr(err); e != a {
+			t.Errorf("%s: expected error '%s', got '%s'", k, e, a)
 		}
-		if errStr != tc.ExpectedError {
-			t.Errorf("%s: expected error '%s', got '%s'", k, tc.ExpectedError, errStr)
+		if e, a := len(tc.requests), i; e != a {
+			t.Errorf("%s: expected %d requests, saw %d", k, e, a)
 		}
-		if i != len(tc.Requests) {
-			t.Errorf("%s: expected %d requests, saw %d", k, len(tc.Requests), i)
-		}
-		verifyReleased(k, tc.Handler)
+		verifyReleased(k, tc.handler)
 	}
+}
+
+func getQuery(values url.Values) string {
+	if values == nil {
+		return ""
+	}
+	return values.Encode()
+}
+
+func getBody(closer io.ReadCloser) string {
+	if closer == nil {
+		return ""
+	}
+	defer closer.Close()
+	data, err := ioutil.ReadAll(closer)
+	if err != nil {
+		panic(err)
+	}
+	return string(data)
+}
+
+func getErrorStr(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

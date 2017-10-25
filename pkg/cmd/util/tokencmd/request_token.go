@@ -241,6 +241,8 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 			if err := o.Handler.CompleteChallenge(requestURL, resp.Header); err != nil {
 				return "", err
 			}
+			// We have finished handling challenges so we should no longer send challenge headers
+			requestHeaders = http.Header{}
 		}
 
 		if resp.StatusCode == http.StatusFound {
