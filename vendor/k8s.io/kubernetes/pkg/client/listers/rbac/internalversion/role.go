@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -78,12 +79,14 @@ func (s roleNamespaceLister) List(selector labels.Selector) (ret []*rbac.Role, e
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.Role))
 	})
+	glog.Error("MO Role list", len(ret), err)
 	return ret, err
 }
 
 // Get retrieves the Role from the indexer for a given namespace and name.
 func (s roleNamespaceLister) Get(name string) (*rbac.Role, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	glog.Error("MO Role get ", s.namespace, name, exists, err)
 	if err != nil {
 		return nil, err
 	}

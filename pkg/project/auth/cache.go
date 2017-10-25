@@ -19,6 +19,7 @@ import (
 	rbacinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/rbac/internalversion"
 	rbaclisters "k8s.io/kubernetes/pkg/client/listers/rbac/internalversion"
 
+	"github.com/golang/glog"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 )
@@ -392,7 +393,10 @@ func (ac *AuthorizationCache) synchronize() {
 	// if none of our internal reflectors changed, then we can skip reviewing the cache
 	skip, currentState := ac.skip.SkipSynchronize(ac.lastState, ac.lastSyncResourceVersioner, ac.roleLastSyncResourceVersioner)
 	if skip {
+		glog.Error("MO skipped", currentState)
 		return
+	} else {
+		glog.Error("MO NOT skipped", currentState)
 	}
 
 	// by default, we update our current caches and do an incremental change

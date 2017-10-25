@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -49,12 +50,14 @@ func (s *clusterRoleLister) List(selector labels.Selector) (ret []*rbac.ClusterR
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.ClusterRole))
 	})
+	glog.Error("MO ClusterRole list", len(ret), err)
 	return ret, err
 }
 
 // Get retrieves the ClusterRole from the index for a given name.
 func (s *clusterRoleLister) Get(name string) (*rbac.ClusterRole, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
+	glog.Error("MO ClusterRole get ", name, exists, err)
 	if err != nil {
 		return nil, err
 	}
