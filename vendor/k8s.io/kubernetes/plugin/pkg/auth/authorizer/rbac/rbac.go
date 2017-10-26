@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/client/listers/rbac"
 	rbaclisters "k8s.io/kubernetes/pkg/client/listers/rbac/internalversion"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
@@ -70,6 +71,10 @@ func (v *authorizingVisitor) visit(rule *rbac.PolicyRule, err error) bool {
 }
 
 func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (bool, string, error) {
+	glog.Errorf("MO AUTH %#v %#v", requestAttributes.GetUser(), requestAttributes)
+	if !requestAttributes.IsResourceRequest() {
+		glog.Error("MO AUTH2 ", internalversion.PrintCallers())
+	}
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
 	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
