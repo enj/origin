@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/client/listers/rbac"
 )
 
 // ClusterRoleBindingLister helps list ClusterRoleBindings.
@@ -50,14 +51,14 @@ func (s *clusterRoleBindingLister) List(selector labels.Selector) (ret []*rbac.C
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.ClusterRoleBinding))
 	})
-	glog.Error("MO ClusterRoleBinding list", len(ret), err)
+	glog.Error("MO ClusterRoleBinding list", len(ret), err, internalversion.PrintCallers())
 	return ret, err
 }
 
 // Get retrieves the ClusterRoleBinding from the index for a given name.
 func (s *clusterRoleBindingLister) Get(name string) (*rbac.ClusterRoleBinding, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
-	glog.Error("MO ClusterRoleBinding get ", name, exists, err)
+	glog.Error("MO ClusterRoleBinding get ", name, exists, err, internalversion.PrintCallers())
 	if err != nil {
 		return nil, err
 	}

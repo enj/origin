@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/client/listers/rbac"
 )
 
 // RoleBindingLister helps list RoleBindings.
@@ -79,14 +80,14 @@ func (s roleBindingNamespaceLister) List(selector labels.Selector) (ret []*rbac.
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.RoleBinding))
 	})
-	glog.Error("MO RoleBinding list", len(ret), err)
+	glog.Error("MO RoleBinding list", len(ret), err, internalversion.PrintCallers())
 	return ret, err
 }
 
 // Get retrieves the RoleBinding from the indexer for a given namespace and name.
 func (s roleBindingNamespaceLister) Get(name string) (*rbac.RoleBinding, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	glog.Error("MO RoleBinding get ", s.namespace, name, exists, err)
+	glog.Error("MO RoleBinding get ", s.namespace, name, exists, err, internalversion.PrintCallers())
 	if err != nil {
 		return nil, err
 	}
