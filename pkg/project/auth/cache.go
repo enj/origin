@@ -362,13 +362,13 @@ func (ac *AuthorizationCache) invalidateCache() bool {
 		return invalidateCache
 	}
 
-	temporaryVersions := sets.NewString()
+	clusterRoleVersions := sets.NewString()
 	for _, clusterRole := range clusterRoleList {
-		temporaryVersions.Insert(clusterRole.ResourceVersion)
+		clusterRoleVersions.Insert(clusterRole.ResourceVersion)
 	}
-	if (len(ac.clusterRoleResourceVersions) != len(temporaryVersions)) || !ac.clusterRoleResourceVersions.HasAll(temporaryVersions.List()...) {
+	if (len(ac.clusterRoleResourceVersions) != len(clusterRoleVersions)) || !ac.clusterRoleResourceVersions.HasAll(clusterRoleVersions.List()...) {
 		invalidateCache = true
-		ac.clusterRoleResourceVersions = temporaryVersions
+		ac.clusterRoleResourceVersions = clusterRoleVersions
 	}
 
 	clusterRoleBindingList, err := ac.clusterRoleBindingLister.List(labels.Everything())
@@ -377,13 +377,13 @@ func (ac *AuthorizationCache) invalidateCache() bool {
 		return invalidateCache
 	}
 
-	temporaryVersions.Delete(temporaryVersions.List()...)
+	clusterRoleBindingVersions := sets.NewString()
 	for _, clusterRoleBinding := range clusterRoleBindingList {
-		temporaryVersions.Insert(clusterRoleBinding.ResourceVersion)
+		clusterRoleBindingVersions.Insert(clusterRoleBinding.ResourceVersion)
 	}
-	if (len(ac.clusterBindingResourceVersions) != len(temporaryVersions)) || !ac.clusterBindingResourceVersions.HasAll(temporaryVersions.List()...) {
+	if (len(ac.clusterBindingResourceVersions) != len(clusterRoleBindingVersions)) || !ac.clusterBindingResourceVersions.HasAll(clusterRoleBindingVersions.List()...) {
 		invalidateCache = true
-		ac.clusterBindingResourceVersions = temporaryVersions
+		ac.clusterBindingResourceVersions = clusterRoleBindingVersions
 	}
 	return invalidateCache
 }
