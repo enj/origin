@@ -33,6 +33,8 @@ type OAuthTokenValidator interface {
 	Validate(token *oauth.OAuthAccessToken) error
 }
 
+var _ OAuthTokenValidator = OAuthTokenValidators(nil)
+
 type OAuthTokenValidators []OAuthTokenValidator
 
 func (v OAuthTokenValidators) Validate(token *oauth.OAuthAccessToken) error {
