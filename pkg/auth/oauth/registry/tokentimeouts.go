@@ -86,7 +86,7 @@ func NewOAuthTokenTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface,
 	}
 	// safetyMargin is set to one tenth of flushTimeout
 	safetyMargin := flushTimeout / 10
-	ttu := &oauthTokenTimeoutValidator{
+	timeoutValidator := &oauthTokenTimeoutValidator{
 		oauthClient:  oauthClient,
 		tokens:       tokens,
 		tokenChannel: make(chan tokenData),
@@ -97,7 +97,7 @@ func NewOAuthTokenTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface,
 		flushTimeout:   timeoutAsDuration(flushTimeout),
 		safetyMargin:   timeoutAsDuration(safetyMargin),
 	}
-	return ttu, ttu.start
+	return timeoutValidator, timeoutValidator.run
 }
 
 // Validate is called with a token when it is seen by an authenticator
@@ -179,7 +179,7 @@ func (a *oauthTokenTimeoutValidator) flush(flushHorizon time.Time) {
 
 	for item := a.tree.Min(); item != nil; item = a.tree.Min() {
 		tdr := item.(*tokenDataRef)
-		if !tdr.timeout.Before(flushHorizon) {
+		if tdr.timeout.After(flushHorizon) {
 			// out of items within the flush Horizon
 			break
 		}
@@ -203,7 +203,7 @@ func (a *oauthTokenTimeoutValidator) flush(flushHorizon time.Time) {
 	glog.V(5).Infof("Flushed %d tokens out of %d in bucket", flushedTokens, totalTokens)
 }
 
-func (a *oauthTokenTimeoutValidator) start(stopCh <-chan struct{}) {
+func (a *oauthTokenTimeoutValidator) run(stopCh <-chan struct{}) {
 	glog.V(5).Infof("Started Token Timeout Flush Handling thread!")
 
 	nextTimer := time.NewTimer(a.flushTimeout)
