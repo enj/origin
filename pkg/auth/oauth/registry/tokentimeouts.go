@@ -46,8 +46,8 @@ func (a *tokenDataRef) Less(than btree.Item) bool {
 type oauthTokenTimeoutValidator struct {
 	oauthClient    OAuthClientGetter
 	tokens         OAuthAccessTokenPatcher
-	tokenChannel   chan tokenData
-	data           map[string]tokenData
+	tokenChannel   chan *tokenData
+	data           map[string]*tokenData
 	tree           *btree.BTree
 	defaultTimeout time.Duration
 	flushTimeout   time.Duration
@@ -98,8 +98,8 @@ func NewOAuthTokenTimeoutValidator(tokens OAuthAccessTokenPatcher, oauthClient O
 	timeoutValidator := &oauthTokenTimeoutValidator{
 		oauthClient:  oauthClient,
 		tokens:       tokens,
-		tokenChannel: make(chan tokenData),
-		data:         make(map[string]tokenData),
+		tokenChannel: make(chan *tokenData),
+		data:         make(map[string]*tokenData),
 		// FIXME: what is the right degree for the btree
 		tree:           btree.New(32),
 		defaultTimeout: timeoutAsDuration(defaultTimeout),
@@ -118,7 +118,7 @@ func (a *oauthTokenTimeoutValidator) Validate(token *oauth.OAuthAccessToken) err
 	}
 
 	now := time.Now()
-	td := tokenData{
+	td := &tokenData{
 		token: token,
 		seen:  now,
 	}
@@ -138,7 +138,7 @@ func timeoutAsDuration(timeout int32) time.Duration {
 	return time.Duration(timeout) * time.Second
 }
 
-func (a *oauthTokenTimeoutValidator) updateTokenSeen(td tokenData) {
+func (a *oauthTokenTimeoutValidator) updateTokenSeen(td *tokenData) {
 	a.tokenChannel <- td
 }
 
@@ -172,12 +172,12 @@ func (a *oauthTokenTimeoutValidator) clientTimeout(name string) time.Duration {
 	return timeoutAsDuration(*oauthClient.AccessTokenTimeoutSeconds)
 }
 
-func (a *oauthTokenTimeoutValidator) insert(td tokenData) {
+func (a *oauthTokenTimeoutValidator) insert(td *tokenData) {
 	a.data[td.token.Name] = td
-	a.tree.ReplaceOrInsert(&tokenDataRef{td.token.Name, td.timeout()})
+	a.tree.ReplaceOrInsert(&tokenDataRef{name: td.token.Name, timeout: td.timeout()})
 }
 
-func (a *oauthTokenTimeoutValidator) remove(td tokenData, tdr *tokenDataRef) {
+func (a *oauthTokenTimeoutValidator) remove(td *tokenData, tdr *tokenDataRef) {
 	a.tree.Delete(tdr)
 	delete(a.data, td.token.Name)
 }
@@ -185,7 +185,7 @@ func (a *oauthTokenTimeoutValidator) remove(td tokenData, tdr *tokenDataRef) {
 func (a *oauthTokenTimeoutValidator) flush(flushHorizon time.Time) {
 	flushedTokens := 0
 	totalTokens := len(a.data)
-	var failedPatches []tokenData
+	var failedPatches []*tokenData
 
 	glog.V(5).Infof("Flushing tokens timing out before %s", flushHorizon)
 
