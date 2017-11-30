@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
@@ -12,11 +13,13 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	kapi "k8s.io/kubernetes/pkg/api"
 
 	authapi "github.com/openshift/origin/pkg/auth/api"
 	"github.com/openshift/origin/pkg/auth/userregistry/identitymapper"
 	"github.com/openshift/origin/pkg/cmd/server/etcd"
+	"github.com/openshift/origin/pkg/cmd/util/tokencmd"
 	userapi "github.com/openshift/origin/pkg/user/apis/user"
 	userclient "github.com/openshift/origin/pkg/user/generated/internalclientset/typed/user/internalversion"
 	testutil "github.com/openshift/origin/test/util"
@@ -24,7 +27,7 @@ import (
 )
 
 func makeIdentityInfo(providerName, providerUserName string, extra map[string]string) authapi.UserIdentityInfo {
-	info := authapi.NewDefaultUserIdentityInfo("idp", "bob")
+	info := authapi.NewDefaultUserIdentityInfo(providerName, providerUserName)
 	if extra != nil {
 		info.Extra = extra
 	}
@@ -183,7 +186,7 @@ func TestUserInitialization(t *testing.T) {
 			CreateUser:     makeUser("mappeduser"),
 			CreateIdentity: makeIdentityWithUserReference("idp", "bob", "mappeduser", "invalidUID"),
 
-			ExpectedErr:        kerrs.NewNotFound(userapi.Resource("useridentitymapping"), "idp:bob"),
+			ExpectedUserName:   "bob",
 			ExpectedIdentities: []string{"idp:bob"},
 		},
 		"generate with existing mapped identity without user backreference": {
@@ -267,7 +270,8 @@ func TestUserInitialization(t *testing.T) {
 			CreateUser:     makeUser("mappeduser"),
 			CreateIdentity: makeIdentityWithUserReference("idp", "bob", "mappeduser", "invalidUID"),
 
-			ExpectedErr: kerrs.NewNotFound(userapi.Resource("useridentitymapping"), "idp:bob"),
+			ExpectedUserName:   "bob",
+			ExpectedIdentities: []string{"idp:bob"},
 		},
 		"add with existing mapped identity without user backreference": {
 			Identity: makeIdentityInfo("idp", "bob", nil),
@@ -357,7 +361,8 @@ func TestUserInitialization(t *testing.T) {
 			CreateUser:     makeUser("mappeduser"),
 			CreateIdentity: makeIdentityWithUserReference("idp", "bob", "mappeduser", "invalidUID"),
 
-			ExpectedErr: kerrs.NewNotFound(userapi.Resource("useridentitymapping"), "idp:bob"),
+			ExpectedUserName:   "bob",
+			ExpectedIdentities: []string{"idp:bob"},
 		},
 		"claim with existing mapped identity without user backreference": {
 			Identity: makeIdentityInfo("idp", "bob", nil),
@@ -476,4 +481,156 @@ func TestUserInitialization(t *testing.T) {
 		}
 		wg.Wait()
 	}
+}
+
+func TestIdentityReentrant(t *testing.T) {
+	masterConfig, clusterAdminKubeConfig, err := testserver.StartTestMasterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testserver.CleanupMasterEtcd(t, masterConfig)
+
+	clusterAdminClientConfig, err := testutil.GetClusterAdminClientConfig(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clusterAdminUserClientAPI := userclient.NewForConfigOrDie(clusterAdminClientConfig)
+	clusterAdminUserClient := clusterAdminUserClientAPI.Users()
+	clusterAdminIdentityClient := clusterAdminUserClientAPI.Identities()
+
+	userWatch, err := clusterAdminUserClient.Watch(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer userWatch.Stop()
+
+	identityWatch, err := clusterAdminIdentityClient.Watch(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer identityWatch.Stop()
+
+	// delete a user which has an identity
+	{
+		haroldUserName := "harold"
+		haroldIdentityName := "anypassword:harold"
+
+		// cause the creation of a user and identity
+		if _, err := tokencmd.RequestToken(clusterAdminClientConfig, nil, haroldUserName, "password"); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait to see those objects
+		oldHaroldUser := waitForUserEvent(haroldUserName, "", watch.Added, userWatch, t)
+		oldHaroldIdentity := waitForIdentityEvent(haroldIdentityName, "", watch.Added, identityWatch, t)
+
+		// Delete the user to make the identity UID no longer match
+		if err := clusterAdminUserClient.Delete(haroldUserName, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait for the delete
+		_ = waitForUserEvent(haroldUserName, oldHaroldUser.UID, watch.Deleted, userWatch, t)
+
+		// try to login again, which should cause the deletion of the stale identity followed by the creation of the user and the new identity
+		if _, err := tokencmd.RequestToken(clusterAdminClientConfig, nil, haroldUserName, "password"); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait to see those events
+		_ = waitForIdentityEvent(haroldIdentityName, oldHaroldIdentity.UID, watch.Deleted, identityWatch, t)
+		newHaroldUser := waitForUserEvent(haroldUserName, "", watch.Added, userWatch, t)
+		newHaroldIdentity := waitForIdentityEvent(haroldIdentityName, "", watch.Added, identityWatch, t)
+
+		// check that the new identity matches the UID of the new user, which is different from the UID of the old user
+		if newHaroldUser.UID != newHaroldIdentity.User.UID {
+			t.Errorf("new user %#v and identity %#v do not have matching UID", newHaroldUser, newHaroldIdentity)
+		}
+		if oldHaroldUser.UID == newHaroldUser.UID {
+			t.Errorf("old %#v and new %#v user should not have matching UID", oldHaroldUser, newHaroldUser)
+		}
+	}
+
+	// delete a user which has an identity, then recreate the same user so the identity does not match
+	{
+		bobUserName := "bob"
+		bobIdentityName := "anypassword:bob"
+
+		// cause the creation of a user and identity
+		if _, err := tokencmd.RequestToken(clusterAdminClientConfig, nil, bobUserName, "password"); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait to see those objects
+		oldBobUser := waitForUserEvent(bobUserName, "", watch.Added, userWatch, t)
+		oldBobIdentity := waitForIdentityEvent(bobIdentityName, "", watch.Added, identityWatch, t)
+
+		// Delete the user to make the identity UID no longer match
+		if err := clusterAdminUserClient.Delete(bobUserName, nil); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait for the delete
+		_ = waitForUserEvent(bobUserName, oldBobUser.UID, watch.Deleted, userWatch, t)
+
+		// explicitly recreate the user so it will have a different UID
+		createBobUser := oldBobUser.DeepCopy()
+		createBobUser.ResourceVersion = ""
+		if _, err := clusterAdminUserClient.Create(createBobUser); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait for the create
+		newBobUser := waitForUserEvent(bobUserName, "", watch.Added, userWatch, t)
+
+		// check the UID of the new user is different from the UID of the old user
+		if oldBobUser.UID == newBobUser.UID {
+			t.Errorf("old %#v and new %#v user should not have matching UID", oldBobUser, newBobUser)
+		}
+
+		// try to login again, which should cause the deletion of the stale identity followed by the creation of the new identity
+		if _, err := tokencmd.RequestToken(clusterAdminClientConfig, nil, bobUserName, "password"); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait to see those events
+		_ = waitForIdentityEvent(bobIdentityName, oldBobIdentity.UID, watch.Deleted, identityWatch, t)
+		newBobIdentity := waitForIdentityEvent(bobIdentityName, "", watch.Added, identityWatch, t)
+
+		// check that the new identity matches the UID of the new user
+		if newBobUser.UID != newBobIdentity.User.UID {
+			t.Errorf("new user %#v and identity %#v do not have matching UID", newBobUser, newBobIdentity)
+		}
+	}
+}
+
+func waitForUserEvent(name string, uid types.UID, eventType watch.EventType, w watch.Interface, t *testing.T) *userapi.User {
+	select {
+	case event := <-w.ResultChan():
+		user := event.Object.(*userapi.User)
+		if event.Type != eventType || user.Name != name || (eventType != watch.Added && user.UID != uid) {
+			t.Fatalf("got wrong user event %#v + %#v, want name=%s uid=%s type=%s", event, user, name, uid, eventType)
+		}
+		return user
+
+	case <-time.After(30 * time.Second):
+		t.Fatalf("user event timeout: name=%s uid=%s type=%s", name, uid, eventType)
+	}
+	return nil
+}
+
+func waitForIdentityEvent(name string, uid types.UID, eventType watch.EventType, w watch.Interface, t *testing.T) *userapi.Identity {
+	select {
+	case event := <-w.ResultChan():
+		identity := event.Object.(*userapi.Identity)
+		if event.Type != eventType || identity.Name != name || (eventType != watch.Added && identity.UID != uid) {
+			t.Fatalf("got wrong identity event %#v + %#v, want name=%s uid=%s type=%s", event, identity, name, uid, eventType)
+		}
+		return identity
+
+	case <-time.After(30 * time.Second):
+		t.Fatalf("identity event timeout: name=%s uid=%s type=%s", name, uid, eventType)
+	}
+	return nil
 }

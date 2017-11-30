@@ -176,33 +176,61 @@ func TestProvision(t *testing.T) {
 			},
 			ExpectedError: true,
 		},
-		"existing identity, missing user reference": {
+		"existing identity, missing user reference, delete stale identity and recreate": {
 			ProviderName:     "idp",
 			ProviderUserName: "bob",
 
-			ExistingIdentity:           makeIdentity("bobIdentityUID", "idp", "bob", "bobUserUID", "bob"),
-			ExistingUser:               nil,
-			NewIdentityGetterResponses: []interface{}{},
+			ExistingIdentity: makeIdentity("bobIdentityUID", "idp", "bob", "bobUserUID", "bob"),
+			ExistingUser:     nil,
+			NewIdentityGetterResponses: []interface{}{
+				makeUser("bobUserUID", "bob", "idp:bob"), // respond with a new user that matches identity
+			},
 
 			ExpectedActions: []test.Action{
+				// we get the identity and user
 				{Name: "GetIdentity", Object: "idp:bob"},
 				{Name: "GetUser", Object: "bob"},
+
+				// but the user does not exist so we delete the stale identity
+				{Name: "DeleteIdentity", Object: "idp:bob"},
+
+				// we try to get the identity again, but it no longer exists since we deleted it
+				{Name: "GetIdentity", Object: "idp:bob"},
+
+				// so we create a new identity and NewIdentityGetterResponses "creates" the new user via UserForNewIdentity
+				{Name: "CreateIdentity", Object: makeIdentity("", "idp", "bob", "bobUserUID", "bob")},
 			},
-			ExpectedError: true,
+
+			// no error even though the user did not exist initially
+			ExpectedUserName: "bob",
 		},
-		"existing identity, invalid user UID reference": {
+		"existing identity, invalid user UID reference, delete stale identity and recreate": {
 			ProviderName:     "idp",
 			ProviderUserName: "bob",
 
-			ExistingIdentity:           makeIdentity("bobIdentityUID", "idp", "bob", "bobUserUIDInvalid", "bob"),
-			ExistingUser:               makeUser("bobUserUID", "bob", "idp:bob"),
-			NewIdentityGetterResponses: []interface{}{},
+			ExistingIdentity: makeIdentity("bobIdentityUID", "idp", "bob", "bobUserUIDInvalid", "bob"),
+			ExistingUser:     makeUser("bobUserUID", "bob", "idp:bob"),
+			NewIdentityGetterResponses: []interface{}{
+				makeUser("bobUserUID", "bob", "idp:bob"), // respond with ExistingUser data
+			},
 
 			ExpectedActions: []test.Action{
+				// we get the identity and user
 				{Name: "GetIdentity", Object: "idp:bob"},
 				{Name: "GetUser", Object: "bob"},
+
+				// but the user UID does not match so we delete the stale identity
+				{Name: "DeleteIdentity", Object: "idp:bob"},
+
+				// we try to get the identity again, but it no longer exists since we deleted it
+				{Name: "GetIdentity", Object: "idp:bob"},
+
+				// so we create a new identity with the correct userUID
+				{Name: "CreateIdentity", Object: makeIdentity("", "idp", "bob", "bobUserUID", "bob")},
 			},
-			ExpectedError: true,
+
+			// no error even though the user UID did not match initially
+			ExpectedUserName: "bob",
 		},
 		"existing identity, user reference without identity backreference": {
 			ProviderName:     "idp",
@@ -234,6 +262,7 @@ func TestProvision(t *testing.T) {
 		},
 	}
 
+testLoop:
 	for k, tc := range testcases {
 		actions := []test.Action{}
 		identityRegistry := &test.IdentityRegistry{
@@ -276,12 +305,12 @@ func TestProvision(t *testing.T) {
 
 		for i, action := range actions {
 			if len(tc.ExpectedActions) <= i {
-				t.Fatalf("%s: expected %d actions, got extras: %#v", k, len(tc.ExpectedActions), actions[i:])
-				continue
+				t.Errorf("%s: expected %d actions, got extras: %#v", k, len(tc.ExpectedActions), actions[i:])
+				continue testLoop
 			}
 			expectedAction := tc.ExpectedActions[i]
 			if !reflect.DeepEqual(expectedAction, action) {
-				t.Fatalf("%s: expected\n\t%s %#v\nGot\n\t%s %#v", k, expectedAction.Name, expectedAction.Object, action.Name, action.Object)
+				t.Errorf("%s: expected\n\t%s %#v\nGot\n\t%s %#v", k, expectedAction.Name, expectedAction.Object, action.Name, action.Object)
 				continue
 			}
 		}

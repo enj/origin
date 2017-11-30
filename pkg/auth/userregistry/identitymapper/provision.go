@@ -1,7 +1,8 @@
 package identitymapper
 
 import (
-	"github.com/golang/glog"
+	"fmt"
+
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -12,6 +13,8 @@ import (
 	authapi "github.com/openshift/origin/pkg/auth/api"
 	userapi "github.com/openshift/origin/pkg/user/apis/user"
 	userclient "github.com/openshift/origin/pkg/user/generated/internalclientset/typed/user/internalversion"
+
+	"github.com/golang/glog"
 )
 
 // UserForNewIdentityGetter is responsible for creating or locating the persisted User for the given Identity.
@@ -19,6 +22,20 @@ import (
 type UserForNewIdentityGetter interface {
 	// UserForNewIdentity returns a persisted User object for the given Identity, creating it if needed
 	UserForNewIdentity(ctx apirequest.Context, preferredUserName string, identity *userapi.Identity) (*userapi.User, error)
+}
+
+type errInvalidIdentity struct {
+	identity *userapi.Identity
+	user     *userapi.User
+}
+
+func (e errInvalidIdentity) Error() string {
+	return fmt.Sprintf("stale identity %v does not match user %v", e.identity, e.user)
+}
+
+func isErrInvalidIdentity(err error) bool {
+	_, ok := err.(errInvalidIdentity)
+	return ok
 }
 
 var _ = authapi.UserIdentityMapper(&provisioningIdentityMapper{})
@@ -69,7 +86,20 @@ func (p *provisioningIdentityMapper) userForWithRetries(info authapi.UserIdentit
 		return nil, err
 	}
 
-	return p.getMapping(ctx, identity)
+	user, err := p.getMapping(ctx, identity)
+
+	// The identity is out of sync with the user, delete the identity and try again
+	if isErrInvalidIdentity(err) && allowedRetries > 0 {
+		// Ignore not found errors on delete because it probably means that the same identity was
+		// deleted by another instance of this identity provider (e.g. double-clicked login button)
+		glog.Infof("stale identity data found, attempting to delete: %v", err)
+		if err := p.identity.Delete(info.GetIdentityName(), nil); err != nil && !kerrs.IsNotFound(err) {
+			return nil, err
+		}
+		return p.userForWithRetries(info, allowedRetries-1)
+	}
+
+	return user, err
 }
 
 // createIdentityAndMapping creates an identity with a valid user reference for the given identity info
@@ -111,12 +141,18 @@ func (p *provisioningIdentityMapper) getMapping(ctx apirequest.Context, identity
 		return nil, kerrs.NewNotFound(userapi.Resource("useridentitymapping"), identity.Name)
 	}
 	u, err := p.user.Get(identity.User.Name, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		// the identity references a user that does not exist so we
+		// signal to userForWithRetries that it needs to clean up this stale identity
+		return nil, errInvalidIdentity{identity: identity}
+	}
 	if err != nil {
 		return nil, err
 	}
 	if u.UID != identity.User.UID {
-		glog.Errorf("identity.user.uid (%s) and user.uid (%s) do not match for identity %s", identity.User.UID, u.UID, identity.Name)
-		return nil, kerrs.NewNotFound(userapi.Resource("useridentitymapping"), identity.Name)
+		// the identity references a user that exists but has a different UID so we
+		// signal to userForWithRetries that it needs to clean up this stale identity
+		return nil, errInvalidIdentity{identity: identity, user: u}
 	}
 	if !sets.NewString(u.Identities...).Has(identity.Name) {
 		glog.Errorf("user.identities (%#v) does not include identity (%s)", u, identity.Name)

@@ -69,7 +69,7 @@ func TestOAuthServiceAccountClient(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	clusterAdminOAuthClient := oauthclient.NewForConfigOrDie(clusterAdminClientConfig).Oauth()
-	clusterAdminUserClient := userclient.NewForConfigOrDie(clusterAdminClientConfig)
+	clusterAdminUserClient := userclient.NewForConfigOrDie(clusterAdminClientConfig).Users()
 
 	projectName := "hammer-project"
 	if _, _, err := testserver.CreateNewProject(clusterAdminClientConfig, projectName, "harold"); err != nil {
@@ -387,10 +387,10 @@ func TestOAuthServiceAccountClient(t *testing.T) {
 			Scope:        scope.Join([]string{"user:info", "role:edit:" + projectName}),
 			SendClientSecretInParams: true,
 		}
-		t.Log("Testing grant flow is reentrant")
+		t.Log("Testing grant flow is reentrant if user does not exist")
 		// First time, the approval steps are needed
 		// Second time, the approval steps are skipped
-		// Then we delete and recreate the user to make the client authorization UID no longer match
+		// Then we delete the user to make the client authorization UID no longer match (a new user will automatically be provisioned)
 		// Third time, the approval steps are needed
 		// Fourth time, the approval steps are skipped
 		runOAuthFlow(t, clusterAdminClientConfig, projectName, oauthClientConfig, nil, authorizationCodes, authorizationErrors, true, true, []string{
@@ -416,8 +416,8 @@ func TestOAuthServiceAccountClient(t *testing.T) {
 
 		// Delete the user to make the client authorization UID no longer match
 		// runOAuthFlow will cause the creation of the same user with a different UID during its challenge phase
-		if err := deleteUser(clusterAdminUserClient, "harold"); err != nil {
-			t.Fatalf("Failed to delete and recreate harold user: %v", err)
+		if err := clusterAdminUserClient.Delete("harold", nil); err != nil {
+			t.Fatalf("Failed to delete harold user: %v", err)
 		}
 
 		runOAuthFlow(t, clusterAdminClientConfig, projectName, oauthClientConfig, nil, authorizationCodes, authorizationErrors, true, true, []string{
@@ -442,19 +442,6 @@ func TestOAuthServiceAccountClient(t *testing.T) {
 		})
 		clusterAdminOAuthClient.OAuthClientAuthorizations().Delete("harold:"+oauthClientConfig.ClientId, nil)
 	}
-}
-
-func deleteUser(clusterAdminUserClient userclient.UserInterface, name string) error {
-	oldUser, err := clusterAdminUserClient.Users().Get(name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	for _, identity := range oldUser.Identities {
-		if err := clusterAdminUserClient.Identities().Delete(identity, nil); err != nil {
-			return err
-		}
-	}
-	return clusterAdminUserClient.Users().Delete(name, nil)
 }
 
 func drain(ch chan string) {

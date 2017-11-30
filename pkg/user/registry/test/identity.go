@@ -66,6 +66,15 @@ func (r *IdentityRegistry) Update(u *userapi.Identity) (*userapi.Identity, error
 	return r.UpdateIdentity, r.UpdateErr
 }
 
+func (r *IdentityRegistry) Delete(name string, options *metav1.DeleteOptions) error {
+	*r.Actions = append(*r.Actions, Action{"DeleteIdentity", name})
+	if _, ok := r.GetIdentities[name]; ok {
+		delete(r.GetIdentities, name)
+		return nil
+	}
+	return kerrs.NewNotFound(userapi.Resource("identity"), name)
+}
+
 func (r *IdentityRegistry) List(options metav1.ListOptions) (*userapi.IdentityList, error) {
 	*r.Actions = append(*r.Actions, Action{"ListIdentities", options})
 	if r.ListIdentity == nil && r.ListErr == nil {
