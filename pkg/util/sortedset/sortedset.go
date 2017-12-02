@@ -1,0 +1,182 @@
+package sortedset
+
+import "github.com/google/btree"
+
+// SetItem represents a single object in a SortedSet.
+type SetItem interface {
+	// Key returns the unique identifier for this item.
+	Key() string
+	// Rank is used to sort items.
+	// Items with the same rank are sorted lexicographically based on Key.
+	// If sorting only by Key is desired, implementors should embed NoRank and override Key.
+	Rank() int64
+}
+
+// SortedSet stores SetItems based on Key (uniqueness) and Rank (sorting).
+type SortedSet struct {
+	sorted *btree.BTree
+	set    map[string]*treeItem
+}
+
+// SetString implements SetItem using a string.
+// It has two main uses:
+// 1. If all items in a SortedSet are SetStrings, the set becomes a store of unique strings sorted lexicographically.
+// 2. It serves as a Key item that can be passed into methods that ignore Rank such as SortedSet.Remove.
+type SetString string
+
+func (s SetString) Key() string {
+	return string(s)
+}
+
+func (s SetString) Rank() int64 {
+	return 0
+}
+
+// NoRank is embedded in custom structs so that SortedSet will only sort by Key.
+type NoRank struct{}
+
+func (*NoRank) Key() string {
+	panic("implementors should embed NoRank and implement Key to sort items lexicographically")
+}
+
+func (*NoRank) Rank() int64 {
+	return 0
+}
+
+func New() *SortedSet {
+	return &SortedSet{
+		sorted: btree.New(32),
+		set:    make(map[string]*treeItem),
+	}
+}
+
+// Add inserts the item into the set.
+// If an item with the same Key existed in the set, it is removed and returned.
+func (s *SortedSet) Add(item SetItem) SetItem {
+	old := s.Remove(item)
+
+	key := item.Key()
+	value := &treeItem{item: item}
+
+	s.sorted.ReplaceOrInsert(value) // should always return nil because we call remove first
+	s.set[key] = value
+
+	return old
+}
+
+// Remove deletes the item from the set based on Key (Rank is ignored).
+// The removed item is returned if it existed in the set.
+func (s *SortedSet) Remove(item SetItem) SetItem {
+	key := item.Key()
+	value, ok := s.set[key]
+	if !ok {
+		return nil
+	}
+
+	s.sorted.Delete(value) // should always return the same data as value (non-nil)
+	delete(s.set, key)
+
+	return value.item
+}
+
+func (s *SortedSet) Min() SetItem {
+	if min := s.sorted.Min(); min != nil {
+		return min.(*treeItem).item
+	}
+	return nil
+}
+
+func (s *SortedSet) Max() SetItem {
+	if max := s.sorted.Max(); max != nil {
+		return max.(*treeItem).item
+	}
+	return nil
+}
+
+func (s *SortedSet) Len() int {
+	return len(s.set)
+}
+
+func (s *SortedSet) Get(item SetItem) SetItem {
+	if value, ok := s.set[item.Key()]; ok {
+		return value.item
+	}
+	return nil
+}
+
+func (s *SortedSet) Has(item SetItem) bool {
+	_, ok := s.set[item.Key()]
+	return ok
+}
+
+// List returns all items in the set in sorted order.
+// If remove is set to true, the returned items are removed from the set.
+func (s *SortedSet) List(remove bool) []SetItem {
+	return s.ascend(
+		func(item SetItem) bool {
+			return true
+		},
+		remove,
+	)
+}
+
+// LessThan returns all items less than the given rank.
+// If remove is set to true, the returned items are removed from the set.
+func (s *SortedSet) LessThan(rank int64, remove bool) []SetItem {
+	return s.ascend(
+		func(item SetItem) bool {
+			return item.Rank() < rank
+		},
+		remove,
+	)
+}
+
+// setItemIterator allows callers of ascend to iterate in-order over the set.
+// When this function returns false, iteration will stop.
+type setItemIterator func(item SetItem) bool
+
+func (s *SortedSet) ascend(iterator setItemIterator, remove bool) []SetItem {
+	var items []SetItem
+	s.sorted.Ascend(func(i btree.Item) bool {
+		item := i.(*treeItem).item
+		if !iterator(item) {
+			return false
+		}
+		items = append(items, item)
+		return true
+	})
+	// remove after Ascend since it is probably not safe to delete while iterating
+	if remove {
+		for _, item := range items {
+			s.Remove(item)
+		}
+	}
+	return items
+}
+
+var _ btree.Item = &treeItem{}
+
+type treeItem struct {
+	item SetItem
+}
+
+func (i *treeItem) Less(than btree.Item) bool {
+	other := than.(*treeItem).item
+
+	selfKey := i.item.Key()
+	otherKey := other.Key()
+
+	// !a.Less(b) && !b.Less(a) means a == b
+	if selfKey == otherKey {
+		return false
+	}
+
+	selfRank := i.item.Rank()
+	otherRank := other.Rank()
+
+	if selfRank == otherRank {
+		return selfKey < otherKey
+	}
+
+	return selfRank < otherRank
+}
