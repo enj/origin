@@ -17,6 +17,20 @@ type SortedSet struct {
 	set    map[string]*treeItem
 }
 
+// SetString implements SetItem using a string.
+// It has two main uses:
+// 1. If all items in a SortedSet are SetStrings, the set becomes a store of unique strings sorted lexicographically.
+// 2. It serves as a Key item that can be passed into methods that ignore Rank such as SortedSet.Remove.
+type SetString string
+
+func (s SetString) Key() string {
+	return string(s)
+}
+
+func (s SetString) Rank() int64 {
+	return 0
+}
+
 func New() *SortedSet {
 	return &SortedSet{
 		sorted: btree.New(32),
