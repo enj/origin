@@ -65,6 +65,11 @@ func (s *SortedSet) Len() int {
 	return len(s.set)
 }
 
+func (s *SortedSet) Has(item SetItem) bool {
+	_, ok := s.set[item.Key()]
+	return ok
+}
+
 // LessThan returns all items less than the given rank.
 // If remove is set to true, the returned items are removed from the set.
 func (s *SortedSet) LessThan(rank int64, remove bool) []SetItem {
