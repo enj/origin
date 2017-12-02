@@ -65,6 +65,13 @@ func (s *SortedSet) Len() int {
 	return len(s.set)
 }
 
+func (s *SortedSet) Get(item SetItem) SetItem {
+	if value, ok := s.set[item.Key()]; ok {
+		return value.item
+	}
+	return nil
+}
+
 func (s *SortedSet) Has(item SetItem) bool {
 	_, ok := s.set[item.Key()]
 	return ok
