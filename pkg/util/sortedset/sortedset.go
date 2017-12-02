@@ -8,6 +8,7 @@ type SetItem interface {
 	Key() string
 	// Rank is used to sort items.
 	// Items with the same rank are sorted lexicographically based on Key.
+	// If sorting only by Key is desired, Rank should return 0 for all items in the SortedSet.
 	Rank() int64
 }
 
