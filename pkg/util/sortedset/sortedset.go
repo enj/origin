@@ -8,7 +8,7 @@ type SetItem interface {
 	Key() string
 	// Rank is used to sort items.
 	// Items with the same rank are sorted lexicographically based on Key.
-	// If sorting only by Key is desired, Rank should return 0 for all items in the SortedSet.
+	// If sorting only by Key is desired, implementors should embed NoRank and override Key.
 	Rank() int64
 }
 
@@ -29,6 +29,17 @@ func (s SetString) Key() string {
 }
 
 func (s SetString) Rank() int64 {
+	return 0
+}
+
+// NoRank is embedded in custom structs so that SortedSet will only sort by Key.
+type NoRank struct{}
+
+func (*NoRank) Key() string {
+	panic("implementors should embed NoRank and implement Key to sort items lexicographically")
+}
+
+func (*NoRank) Rank() int64 {
 	return 0
 }
 
