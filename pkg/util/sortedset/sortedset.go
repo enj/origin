@@ -103,13 +103,37 @@ func (s *SortedSet) Has(item SetItem) bool {
 	return ok
 }
 
+// List returns all items in the set in sorted order.
+// If remove is set to true, the returned items are removed from the set.
+func (s *SortedSet) List(remove bool) []SetItem {
+	return s.ascend(
+		func(item SetItem) bool {
+			return true
+		},
+		remove,
+	)
+}
+
 // LessThan returns all items less than the given rank.
 // If remove is set to true, the returned items are removed from the set.
 func (s *SortedSet) LessThan(rank int64, remove bool) []SetItem {
+	return s.ascend(
+		func(item SetItem) bool {
+			return item.Rank() < rank
+		},
+		remove,
+	)
+}
+
+// setItemIterator allows callers of ascend to iterate in-order over the set.
+// When this function returns false, iteration will stop.
+type setItemIterator func(item SetItem) bool
+
+func (s *SortedSet) ascend(iterator setItemIterator, remove bool) []SetItem {
 	var items []SetItem
 	s.sorted.Ascend(func(i btree.Item) bool {
 		item := i.(*treeItem).item
-		if item.Rank() >= rank {
+		if !iterator(item) {
 			return false
 		}
 		items = append(items, item)
