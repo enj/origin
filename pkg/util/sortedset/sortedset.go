@@ -80,11 +80,17 @@ func (s *SortedSet) Remove(item SetItem) SetItem {
 }
 
 func (s *SortedSet) Min() SetItem {
-	return s.sorted.Min().(*treeItem).item
+	if min := s.sorted.Min(); min != nil {
+		return min.(*treeItem).item
+	}
+	return nil
 }
 
 func (s *SortedSet) Max() SetItem {
-	return s.sorted.Max().(*treeItem).item
+	if max := s.sorted.Max(); max != nil {
+		return max.(*treeItem).item
+	}
+	return nil
 }
 
 func (s *SortedSet) Len() int {
