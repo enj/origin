@@ -8,6 +8,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/openshift/origin/pkg/oauth/apis/oauth"
@@ -43,6 +44,36 @@ func timeoutAsDuration(timeout int32) time.Duration {
 	return time.Duration(timeout) * time.Second
 }
 
+type tickerClock interface {
+	clock.Clock
+	NewTicker(d time.Duration) tickerInterface
+}
+
+type tickerInterface interface {
+	C() <-chan time.Time
+	Stop()
+}
+
+var _ tickerInterface = &tickerImp{}
+
+type tickerImp struct {
+	*time.Ticker
+}
+
+func (t *tickerImp) C() <-chan time.Time {
+	return t.Ticker.C
+}
+
+var _ tickerClock = tickerClockImp{}
+
+type tickerClockImp struct {
+	clock.RealClock
+}
+
+func (tickerClockImp) NewTicker(d time.Duration) tickerInterface {
+	return &tickerImp{Ticker: time.NewTicker(d)}
+}
+
 type TimeoutValidator struct {
 	oauthClients   oauthclientlister.OAuthClientLister
 	tokens         oauthclient.OAuthAccessTokenInterface
@@ -50,6 +81,7 @@ type TimeoutValidator struct {
 	data           *rankedset.RankedSet
 	defaultTimeout time.Duration
 	tickerInterval time.Duration
+	clock          tickerClock
 }
 
 func NewTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface, oauthClients oauthclientlister.OAuthClientLister, defaultTimeout int32, minValidTimeout int32) *TimeoutValidator {
@@ -60,6 +92,7 @@ func NewTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface, oauthClie
 		data:           rankedset.New(),
 		defaultTimeout: timeoutAsDuration(defaultTimeout),
 		tickerInterval: timeoutAsDuration(minValidTimeout / 3), // we tick at least 3 times within each timeout period
+		clock:          tickerClockImp{},
 	}
 	glog.V(5).Infof("Token Timeout Validator primed with defaultTimeout=%s tickerInterval=%s", a.defaultTimeout, a.tickerInterval)
 	return a
@@ -75,7 +108,7 @@ func (a *TimeoutValidator) Validate(token *oauth.OAuthAccessToken, _ *user.User)
 
 	td := &tokenData{
 		token: token,
-		seen:  time.Now(),
+		seen:  a.clock.Now(),
 	}
 	if td.timeout().Before(td.seen) {
 		return errTimedout
@@ -186,14 +219,14 @@ func (a *TimeoutValidator) flush(flushHorizon time.Time) {
 func (a *TimeoutValidator) nextTick() time.Time {
 	// Add a small safety Margin so flushes tend to
 	// overlap a little rather than have gaps
-	return time.Now().Add(a.tickerInterval + 10*time.Second)
+	return a.clock.Now().Add(a.tickerInterval + 10*time.Second)
 }
 
 func (a *TimeoutValidator) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	glog.V(5).Infof("Started Token Timeout Flush Handling thread!")
 
-	ticker := time.NewTicker(a.tickerInterval)
+	ticker := a.clock.NewTicker(a.tickerInterval)
 	// make sure to kill the ticker when we exit
 	defer ticker.Stop()
 
@@ -214,7 +247,7 @@ func (a *TimeoutValidator) Run(stopCh <-chan struct{}) {
 				a.flush(nextTick)
 			}
 
-		case <-ticker.C:
+		case <-ticker.C():
 			nextTick = a.nextTick()
 			a.flush(nextTick)
 		}

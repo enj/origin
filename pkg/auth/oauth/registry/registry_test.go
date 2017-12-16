@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	clienttesting "k8s.io/client-go/testing"
@@ -494,7 +495,28 @@ func (f fakeOAuthClientLister) List(selector labels.Selector) ([]*oapi.OAuthClie
 	return list, nil
 }
 
-func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oauthclient.OAuthAccessTokenInterface, present bool) {
+type fakeClock struct {
+	*clock.FakeClock
+}
+
+func (c *fakeClock) NewTicker(d time.Duration) tickerInterface {
+	return fakeTicker(c.FakeClock.Tick(d))
+}
+
+func (c *fakeClock) Sleep(d time.Duration) {
+	c.FakeClock.Sleep(d)
+	time.Sleep(time.Second) // TODO this is a real sleep to let the other bits sync, remove with something better
+}
+
+type fakeTicker <-chan time.Time
+
+func (t fakeTicker) C() <-chan time.Time {
+	return (<-chan time.Time)(t)
+}
+
+func (t fakeTicker) Stop() {}
+
+func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oauthclient.OAuthAccessTokenInterface, current clock.Clock, present bool) {
 	userInfo, found, err := authf.AuthenticateToken(name)
 	if present {
 		if !found {
@@ -508,9 +530,12 @@ func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oau
 		}
 	} else {
 		if found {
-			token, _ := tokens.Get(name, metav1.GetOptions{})
+			token, tokenErr := tokens.Get(name, metav1.GetOptions{})
+			if tokenErr != nil {
+				t.Fatal(tokenErr)
+			}
 			t.Errorf("Found token (created=%s, timeout=%di, now=%s), but it should be gone!",
-				token.CreationTimestamp, token.InactivityTimeoutSeconds, time.Now())
+				token.CreationTimestamp, token.InactivityTimeoutSeconds, current.Now())
 		}
 		if err != errTimedout {
 			t.Errorf("Unexpected error checking absence of token %s: %v", name, err)
@@ -524,6 +549,8 @@ func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oau
 func TestAuthenticateTokenTimeout(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
+	testClock := &fakeClock{FakeClock: clock.NewFakeClock(time.Now())}
 
 	defaultTimeout := int32(30) // 30 seconds
 	clientTimeout := int32(15)  // 15 seconds so flush -> 5 seconds
@@ -541,7 +568,7 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "slowClient"},
 	}
 	testToken := oapi.OAuthAccessToken{
-		ObjectMeta:               metav1.ObjectMeta{Name: "testToken", CreationTimestamp: metav1.Time{Time: time.Now()}},
+		ObjectMeta:               metav1.ObjectMeta{Name: "testToken", CreationTimestamp: metav1.Time{Time: testClock.Now()}},
 		ClientName:               "testClient",
 		ExpiresIn:                600, // 10 minutes
 		UserName:                 "foo",
@@ -549,7 +576,7 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 		InactivityTimeoutSeconds: clientTimeout,
 	}
 	quickToken := oapi.OAuthAccessToken{
-		ObjectMeta:               metav1.ObjectMeta{Name: "quickToken", CreationTimestamp: metav1.Time{Time: time.Now()}},
+		ObjectMeta:               metav1.ObjectMeta{Name: "quickToken", CreationTimestamp: metav1.Time{Time: testClock.Now()}},
 		ClientName:               "quickClient",
 		ExpiresIn:                600, // 10 minutes
 		UserName:                 "foo",
@@ -557,7 +584,7 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 		InactivityTimeoutSeconds: minTimeout,
 	}
 	slowToken := oapi.OAuthAccessToken{
-		ObjectMeta:               metav1.ObjectMeta{Name: "slowToken", CreationTimestamp: metav1.Time{Time: time.Now()}},
+		ObjectMeta:               metav1.ObjectMeta{Name: "slowToken", CreationTimestamp: metav1.Time{Time: testClock.Now()}},
 		ClientName:               "slowClient",
 		ExpiresIn:                600, // 10 minutes
 		UserName:                 "foo",
@@ -565,7 +592,7 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 		InactivityTimeoutSeconds: defaultTimeout,
 	}
 	emergToken := oapi.OAuthAccessToken{
-		ObjectMeta:               metav1.ObjectMeta{Name: "emergToken", CreationTimestamp: metav1.Time{Time: time.Now()}},
+		ObjectMeta:               metav1.ObjectMeta{Name: "emergToken", CreationTimestamp: metav1.Time{Time: testClock.Now()}},
 		ClientName:               "quickClient",
 		ExpiresIn:                600, // 10 minutes
 		UserName:                 "foo",
@@ -581,33 +608,34 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 		clients: oauthClients,
 	}
 	timeouts := NewTimeoutValidator(accessTokenGetter, lister, defaultTimeout, minTimeout)
+	timeouts.clock = testClock
 	tokenAuthenticator := NewTokenAuthenticator(accessTokenGetter, userRegistry, identitymapper.NoopGroupMapper{}, timeouts)
 
 	go timeouts.Run(stopCh)
 
 	// wait to see that the other thread has updated the timeouts
-	time.Sleep(1 * time.Second)
+	testClock.Sleep(1 * time.Second)
 
 	// TIME: 1 seconds have passed here
 
 	// first time should succeed for all
-	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, true)
-	checkToken(t, "quickToken", tokenAuthenticator, accessTokenGetter, true)
-	checkToken(t, "slowToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, testClock, true)
+	checkToken(t, "quickToken", tokenAuthenticator, accessTokenGetter, testClock, true)
+	checkToken(t, "slowToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 	// this should cause an emergency flush, if not the next auth will fail,
 	// as the token will be timed out
-	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 
 	// wait 5 seconds
-	time.Sleep(5 * time.Second)
+	testClock.Sleep(5 * time.Second)
 
 	// TIME: 6th second
 
 	// See if emergency flush happened
-	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 
 	// wait for timeout (minTimeout + 1 - the previously waited 6 seconds)
-	time.Sleep(time.Duration(minTimeout-5) * time.Second)
+	testClock.Sleep(time.Duration(minTimeout-5) * time.Second)
 
 	// TIME: 11th second
 
@@ -625,21 +653,24 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 		}
 	}
 
+	// TODO fix
+	testClock.Sleep(time.Second)
+
 	// this should fail
-	checkToken(t, "quickToken", tokenAuthenticator, accessTokenGetter, false)
+	checkToken(t, "quickToken", tokenAuthenticator, accessTokenGetter, testClock, false)
 	// while this should get updated
-	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 
 	// wait for timeout
-	time.Sleep(time.Duration(clientTimeout+1) * time.Second)
+	testClock.Sleep(time.Duration(clientTimeout+1) * time.Second)
 
 	// TIME: 27th second
 
 	// this should get updated
-	checkToken(t, "slowToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "slowToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 
 	// while this should not fail
-	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 	// and should be updated to last at least till the 31st second
 	token, err := accessTokenGetter.Get("testToken", metav1.GetOptions{})
 	if err != nil {
@@ -663,10 +694,14 @@ func TestAuthenticateTokenTimeout(t *testing.T) {
 	}
 
 	// and wait until test token should time out, and has been flushed for sure
-	time.Sleep(time.Duration(minTimeout) * time.Second)
+	testClock.Sleep(time.Duration(minTimeout) * time.Second)
 
 	// while this should not fail
-	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, true)
+	checkToken(t, "testToken", tokenAuthenticator, accessTokenGetter, testClock, true)
+
+	// TODO fix
+	testClock.Sleep(time.Second)
+
 	// and should be updated to have a ZERO timeout
 	token, err = accessTokenGetter.Get("testToken", metav1.GetOptions{})
 	if err != nil {
