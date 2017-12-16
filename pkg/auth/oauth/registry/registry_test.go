@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -547,6 +548,14 @@ func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oau
 }
 
 func TestAuthenticateTokenTimeout(t *testing.T) {
+	for i := 0; i < 30000; i++ {
+		idx := strconv.Itoa(i)
+		t.Run(idx, doTestAuthenticateTokenTimeout)
+	}
+}
+
+func doTestAuthenticateTokenTimeout(t *testing.T) {
+	t.Parallel()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
