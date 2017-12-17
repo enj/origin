@@ -81,7 +81,8 @@ type TimeoutValidator struct {
 	data           *rankedset.RankedSet
 	defaultTimeout time.Duration
 	tickerInterval time.Duration
-	clock          tickerClock
+	flushHandler   func(flushHorizon time.Time) // allows us to decorate this func during unit tests
+	clock          tickerClock                  // allows us to control time during unit tests
 }
 
 func NewTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface, oauthClients oauthclientlister.OAuthClientLister, defaultTimeout int32, minValidTimeout int32) *TimeoutValidator {
@@ -94,6 +95,7 @@ func NewTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface, oauthClie
 		tickerInterval: timeoutAsDuration(minValidTimeout / 3), // we tick at least 3 times within each timeout period
 		clock:          tickerClockImp{},
 	}
+	a.flushHandler = a.flush
 	glog.V(5).Infof("Token Timeout Validator primed with defaultTimeout=%s tickerInterval=%s", a.defaultTimeout, a.tickerInterval)
 	return a
 }
@@ -237,6 +239,7 @@ func (a *TimeoutValidator) Run(stopCh <-chan struct{}) {
 		case <-stopCh:
 			// if channel closes terminate
 			return
+
 		case td := <-a.tokenChannel:
 			a.data.Insert(td)
 			// if this token is going to time out before the timer, flush now
@@ -244,12 +247,12 @@ func (a *TimeoutValidator) Run(stopCh <-chan struct{}) {
 			if tokenTimeout.Before(nextTick) {
 				glog.V(5).Infof("Timeout for user=%q client=%q scopes=%v falls before next ticker (%s < %s), forcing flush!",
 					td.token.UserName, td.token.ClientName, td.token.Scopes, tokenTimeout, nextTick)
-				a.flush(nextTick)
+				a.flushHandler(nextTick)
 			}
 
 		case <-ticker.C():
 			nextTick = a.nextTick()
-			a.flush(nextTick)
+			a.flushHandler(nextTick)
 		}
 	}
 }
