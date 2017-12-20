@@ -225,7 +225,6 @@ func (a *TimeoutValidator) nextTick() time.Time {
 }
 
 func (a *TimeoutValidator) Run(stopCh <-chan struct{}) {
-	<-stopCh
 	defer runtime.HandleCrash()
 	glog.V(5).Infof("Started Token Timeout Flush Handling thread!")
 

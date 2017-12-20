@@ -541,12 +541,11 @@ func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oau
 
 func waitForFlush(t *testing.T, c chan struct{}) {
 	t.Helper()
-	goruntime.Gosched()
 	select {
 	case <-c:
-	case <-time.After(5 * time.Second):
-		goruntime.Gosched()
+	case <-time.After(3 * time.Second):
 	}
+	// whether we flushed or not, let the go runtime schedule the timeout routine so it is ready
 	goruntime.Gosched()
 }
 
@@ -623,21 +622,18 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	timeouts := NewTimeoutValidator(accessTokenGetter, lister, defaultTimeout, minTimeout)
 	timeouts.clock = testClock
 	originalFlush := timeouts.flushHandler
-	timeoutsSync := make(chan struct{}, 100)
+	timeoutsSync := make(chan struct{}, 100) // use a buffered channel to make sure our custom flushHandler never blocks
 	timeouts.flushHandler = func(flushHorizon time.Time) {
 		originalFlush(flushHorizon)
-		go func() {
-			timeoutsSync <- struct{}{} // signal that flush is complete so we never race against it
-		}()
+		timeoutsSync <- struct{}{} // signal that flush is complete so we never race against it
 	}
 
+	// add some padding to all sleep invocations to make sure we are not failing on any boundary values
 	buffer := 500 * time.Millisecond
 
 	tokenAuthenticator := NewTokenAuthenticator(accessTokenGetter, userRegistry, identitymapper.NoopGroupMapper{}, timeouts)
 
 	go timeouts.Run(stopCh)
-	stopCh <- struct{}{}
-	goruntime.Gosched()
 
 	// TIME: 0 seconds have passed here
 
