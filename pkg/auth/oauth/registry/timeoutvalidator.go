@@ -81,8 +81,11 @@ type TimeoutValidator struct {
 	data           *rankedset.RankedSet
 	defaultTimeout time.Duration
 	tickerInterval time.Duration
-	flushHandler   func(flushHorizon time.Time) // allows us to decorate this func during unit tests
-	clock          tickerClock                  // allows us to control time during unit tests
+
+	// fields that are used to have a deterministic order of events in unit tests
+	flushHandler    func(flushHorizon time.Time) // allows us to decorate this func during unit tests
+	putTokenHandler func(td *tokenData)          // allows us to decorate this func during unit tests
+	clock           tickerClock                  // allows us to control time during unit tests
 }
 
 func NewTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface, oauthClients oauthclientlister.OAuthClientLister, defaultTimeout int32, minValidTimeout int32) *TimeoutValidator {
@@ -96,6 +99,7 @@ func NewTimeoutValidator(tokens oauthclient.OAuthAccessTokenInterface, oauthClie
 		clock:          tickerClockImp{},
 	}
 	a.flushHandler = a.flush
+	a.putTokenHandler = a.putToken
 	glog.V(5).Infof("Token Timeout Validator primed with defaultTimeout=%s tickerInterval=%s", a.defaultTimeout, a.tickerInterval)
 	return a
 }
@@ -123,7 +127,7 @@ func (a *TimeoutValidator) Validate(token *oauth.OAuthAccessToken, _ *user.User)
 	// After a positive timeout check we need to update the timeout and
 	// schedule an update so that we can either set or update the Timeout
 	// we do that launching a micro goroutine to avoid blocking
-	go a.putToken(td)
+	go a.putTokenHandler(td)
 
 	return nil
 }
