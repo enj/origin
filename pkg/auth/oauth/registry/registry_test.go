@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	goruntime "runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -540,11 +541,13 @@ func checkToken(t *testing.T, name string, authf authenticator.Token, tokens oau
 
 func waitForFlush(t *testing.T, c chan struct{}) {
 	t.Helper()
+	goruntime.Gosched()
 	select {
 	case <-c:
 	case <-time.After(5 * time.Second):
-		t.Fatal("failed to flush")
+		goruntime.Gosched()
 	}
+	goruntime.Gosched()
 }
 
 func TestAuthenticateTokenTimeout(t *testing.T) {
@@ -559,7 +562,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	testClock := &fakeClock{FakeClock: clock.NewFakeClock(time.Now())}
+	testClock := &fakeClock{FakeClock: clock.NewFakeClock(time.Time{})}
 
 	defaultTimeout := int32(30) // 30 seconds
 	clientTimeout := int32(15)  // 15 seconds
@@ -620,15 +623,21 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	timeouts := NewTimeoutValidator(accessTokenGetter, lister, defaultTimeout, minTimeout)
 	timeouts.clock = testClock
 	originalFlush := timeouts.flushHandler
-	timeoutsSync := make(chan struct{})
+	timeoutsSync := make(chan struct{}, 100)
 	timeouts.flushHandler = func(flushHorizon time.Time) {
 		originalFlush(flushHorizon)
-		timeoutsSync <- struct{}{} // signal that flush is complete so we never race against it
+		go func() {
+			timeoutsSync <- struct{}{} // signal that flush is complete so we never race against it
+		}()
 	}
+
+	buffer := 500 * time.Millisecond
 
 	tokenAuthenticator := NewTokenAuthenticator(accessTokenGetter, userRegistry, identitymapper.NoopGroupMapper{}, timeouts)
 
 	go timeouts.Run(stopCh)
+	stopCh <- struct{}{}
+	goruntime.Gosched()
 
 	// TIME: 0 seconds have passed here
 
@@ -642,7 +651,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	waitForFlush(t, timeoutsSync) // from emergency flush
 
 	// wait 6 seconds
-	testClock.Sleep(6 * time.Second)
+	testClock.Sleep(5*time.Second + buffer)
 
 	// a tick happens every 3 seconds
 	waitForFlush(t, timeoutsSync)
@@ -654,7 +663,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 
 	// wait for timeout (minTimeout + 1 - the previously waited 6 seconds)
-	testClock.Sleep(time.Duration(minTimeout-5) * time.Second)
+	testClock.Sleep(time.Duration(minTimeout-5)*time.Second + buffer)
 	waitForFlush(t, timeoutsSync)
 	waitForFlush(t, timeoutsSync)
 
@@ -681,7 +690,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	waitForFlush(t, timeoutsSync)
 
 	// wait for timeout
-	testClock.Sleep(time.Duration(clientTimeout+1) * time.Second)
+	testClock.Sleep(time.Duration(clientTimeout+1)*time.Second + buffer)
 
 	// 16 seconds equals 5 more flushes
 	waitForFlush(t, timeoutsSync)
@@ -719,7 +728,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	}
 
 	// and wait until test token should time out, and has been flushed for sure
-	testClock.Sleep(time.Duration(minTimeout) * time.Second)
+	testClock.Sleep(time.Duration(minTimeout)*time.Second + buffer)
 	waitForFlush(t, timeoutsSync)
 
 	// while this should not fail
