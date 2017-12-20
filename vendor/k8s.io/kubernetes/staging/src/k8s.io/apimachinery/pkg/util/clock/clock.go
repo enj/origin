@@ -174,7 +174,7 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 		w := &f.waiters[i]
 		if !w.targetTime.After(t) {
 
-			if w.skipIfBlocked && false {
+			if w.skipIfBlocked {
 				select {
 				case w.destChan <- t:
 					w.fired = true

@@ -543,7 +543,8 @@ func waitForFlush(t *testing.T, c chan struct{}) {
 	t.Helper()
 	select {
 	case <-c:
-	case <-time.After(3 * time.Second):
+	case <-time.After(30 * time.Second):
+		t.Log("failed to flush")
 	}
 	// whether we flushed or not, let the go runtime schedule the timeout routine so it is ready
 	goruntime.Gosched()
@@ -688,8 +689,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	// wait for timeout
 	testClock.Sleep(time.Duration(clientTimeout+1)*time.Second + buffer)
 
-	// 16 seconds equals 5 more flushes
-	waitForFlush(t, timeoutsSync)
+	// 16 seconds equals 5 more flushes, but the fake clock will only tick once during this time
 	waitForFlush(t, timeoutsSync)
 
 	// TIME: 27th second
