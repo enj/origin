@@ -643,7 +643,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	}
 
 	// add some padding to all sleep invocations to make sure we are not failing on any boundary values
-	buffer := 500 * time.Millisecond
+	buffer := time.Nanosecond
 
 	tokenAuthenticator := NewTokenAuthenticator(accessTokenGetter, userRegistry, identitymapper.NoopGroupMapper{}, timeouts)
 
