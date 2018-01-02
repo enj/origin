@@ -658,6 +658,8 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	checkToken(t, "quickToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 	wait(t, putTokenSync)
 
+	wait(t, timeoutsSync) // from emergency flush because quickToken has a short enough timeout
+
 	checkToken(t, "slowToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 	wait(t, putTokenSync)
 
@@ -666,13 +668,12 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 	wait(t, putTokenSync)
 
-	wait(t, timeoutsSync) // from emergency flush
+	wait(t, timeoutsSync) // from emergency flush because emergToken has a super short timeout
 
 	// wait 6 seconds
 	testClock.Sleep(5*time.Second + buffer)
 
 	// a tick happens every 3 seconds
-	wait(t, timeoutsSync)
 	wait(t, timeoutsSync)
 
 	// TIME: 6th second
@@ -681,9 +682,10 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	checkToken(t, "emergToken", tokenAuthenticator, accessTokenGetter, testClock, true)
 	wait(t, putTokenSync)
 
+	wait(t, timeoutsSync) // from emergency flush because emergToken has a super short timeout
+
 	// wait for timeout (minTimeout + 1 - the previously waited 6 seconds)
 	testClock.Sleep(time.Duration(minTimeout-5)*time.Second + buffer)
-	wait(t, timeoutsSync)
 	wait(t, timeoutsSync)
 
 	// TIME: 11th second
