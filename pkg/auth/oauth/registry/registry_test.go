@@ -627,7 +627,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	// decorate flush
 	// The fake clock 1. and 2. require that we issue a wait(t, timeoutsSync) after each testClock.Sleep that causes a tick
 	originalFlush := timeouts.flushHandler
-	timeoutsSync := make(chan struct{}, 100) // use a buffered channel to make sure our custom flushHandler never blocks
+	timeoutsSync := make(chan struct{})
 	timeouts.flushHandler = func(flushHorizon time.Time) {
 		originalFlush(flushHorizon)
 		timeoutsSync <- struct{}{} // signal that flush is complete so we never race against it
@@ -636,7 +636,7 @@ func doTestAuthenticateTokenTimeout(t *testing.T) {
 	// decorate putToken
 	// We must issue a wait(t, putTokenSync) after each call to checkToken that should be successful
 	originalPutToken := timeouts.putTokenHandler
-	putTokenSync := make(chan struct{}, 100) // use a buffered channel to make sure our custom putTokenHandler never blocks
+	putTokenSync := make(chan struct{})
 	timeouts.putTokenHandler = func(td *tokenData) {
 		originalPutToken(td)
 		putTokenSync <- struct{}{} // signal that putToken is complete so we never race against it
