@@ -12,6 +12,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+
+	"github.com/golang/glog"
 )
 
 // Bucket represents a token bucket that fills at a predetermined rate.
@@ -167,6 +170,7 @@ const infinityDuration time.Duration = 0x7fffffffffffffff
 // tokens to the bucket once this method commits us to taking them.
 func (tb *Bucket) Take(count int64) time.Duration {
 	d, _ := tb.take(tb.clock.Now(), count, infinityDuration)
+	glog.Errorf("%v", tb.avail)
 	return d
 }
 

@@ -19,6 +19,7 @@ package resource
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,7 @@ type Selector struct {
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
 func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
+	glog.Errorf("%#v", client)
 	return &Selector{
 		Client:               client,
 		Mapping:              mapping,

@@ -60,6 +60,11 @@ func NoRateLimit(r *rest.Request) {
 	r.
 		Throttle(alwaysRateLimiter). // make requests as fast as we can
 		BackOff(noBackoff)           // only back off when the server sends retry-after headers, and not when requests fail
+	glog.Errorf("MO1 %#v", r)
+}
+
+func FOOBAR(r *rest.Request) {
+	glog.Errorf("MO2 %#v", r)
 }
 
 // timeStampNow returns the current time in the same format as glog
@@ -261,6 +266,8 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 
 	if o.NoRateLimit {
 		o.Builder = o.Builder.TransformRequests(NoRateLimit)
+	} else {
+		o.Builder = o.Builder.TransformRequests(FOOBAR)
 	}
 
 	return nil
@@ -326,8 +333,10 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 
 		resourcesWithErrors: sets.NewString(),
 	}
+	glog.Errorf("%#v", result)
 
 	err := result.Visit(func(info *resource.Info, err error) error {
+		glog.Errorf("%#v", info.Client)
 		if err == nil && o.FilterFn != nil {
 			var ok bool
 			if ok, err = o.FilterFn(info); err == nil && !ok {
