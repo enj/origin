@@ -656,6 +656,17 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{err: utilerrors.NewAggregate(b.errs)}
 	}
 
+	if len(b.requestTransforms) != 0 {
+		clientMapper := b.mapper.ClientMapper
+		b.mapper.ClientMapper = ClientMapperFunc(func(mapping *meta.RESTMapping) (RESTClient, error) {
+			client, err := clientMapper.ClientForMapping(mapping)
+			if err != nil {
+				return nil, err
+			}
+			return NewClientWithOptions(client, b.requestTransforms...), nil
+		})
+	}
+
 	if b.selectAll {
 		selector := labels.Everything().String()
 		b.labelSelector = &selector
@@ -722,7 +733,6 @@ func (b *Builder) visitBySelector() *Result {
 			result.err = err
 			return result
 		}
-		client = NewClientWithOptions(client, b.requestTransforms...)
 		selectorNamespace := b.namespace
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
@@ -772,7 +782,6 @@ func (b *Builder) visitByResource() *Result {
 			result.err = err
 			return result
 		}
-		client = NewClientWithOptions(client, b.requestTransforms...)
 		clients[s] = client
 	}
 
