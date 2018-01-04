@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -49,6 +51,17 @@ func AlwaysRequiresMigration(_ *resource.Info) (Reporter, error) {
 	return ReporterBool(true), nil
 }
 
+var (
+	alwaysRateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+	noBackoff         = &rest.NoBackoff{}
+)
+
+func NoRateLimit(r *rest.Request) {
+	r.
+		Throttle(alwaysRateLimiter). // make requests as fast as we can
+		BackOff(noBackoff)           // only back off when the server sends retry-after headers, and not when requests fail
+}
+
 // timeStampNow returns the current time in the same format as glog
 func timeStampNow() string {
 	return time.Now().Format("0102 15:04:05.000000")
@@ -68,6 +81,7 @@ type ResourceOptions struct {
 	Include       []string
 	Filenames     []string
 	Confirm       bool
+	NoRateLimit   bool
 	Output        string
 	FromKey       string
 	ToKey         string
@@ -87,6 +101,7 @@ func (o *ResourceOptions) Bind(c *cobra.Command) {
 	c.Flags().StringSliceVar(&o.Include, "include", o.Include, "Resource types to migrate. Passing --filename will override this flag.")
 	c.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", true, "Migrate objects in all namespaces. Defaults to true.")
 	c.Flags().BoolVar(&o.Confirm, "confirm", false, "If true, all requested objects will be migrated. Defaults to false.")
+	c.Flags().BoolVar(&o.NoRateLimit, "no-rate-limit", false, "If true, client side rate limiting will be disabled.")
 
 	c.Flags().StringVar(&o.FromKey, "from-key", o.FromKey, "If specified, only migrate items with a key (namespace/name or name) greater than or equal to this value")
 	c.Flags().StringVar(&o.ToKey, "to-key", o.ToKey, "If specified, only migrate items with a key (namespace/name or name) less than this value")
@@ -238,11 +253,16 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 	}
 
 	if !allNamespaces {
-		o.Builder.NamespaceParam(namespace)
+		o.Builder = o.Builder.NamespaceParam(namespace)
 	}
 	if len(o.Filenames) == 0 {
-		o.Builder.ResourceTypes(o.Include...)
+		o.Builder = o.Builder.ResourceTypes(o.Include...)
 	}
+
+	if o.NoRateLimit {
+		o.Builder = o.Builder.TransformRequests(NoRateLimit)
+	}
+
 	return nil
 }
 
@@ -291,8 +311,8 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	out := o.Out
 
 	result := o.Builder.Do()
-	if result.Err() != nil {
-		return result.Err()
+	if err := result.Err(); err != nil {
+		return err
 	}
 
 	// Ignore any resource that does not support GET
