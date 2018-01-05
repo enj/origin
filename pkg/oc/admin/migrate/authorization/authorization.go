@@ -54,6 +54,7 @@ func NewCmdMigrateAuthorization(name, fullName string, f *clientcmd.Factory, in 
 			Out:           out,
 			ErrOut:        errout,
 			AllNamespaces: true,
+			Confirm:       true, // force our save function to always run (it is read only)
 			Include: []string{
 				"clusterroles.authorization.openshift.io",
 				"roles.authorization.openshift.io",
@@ -73,8 +74,6 @@ func NewCmdMigrateAuthorization(name, fullName string, f *clientcmd.Factory, in 
 		},
 		Deprecated: fmt.Sprintf("will not work against 3.7 servers"),
 	}
-	options.ResourceOptions.Bind(cmd)
-
 	return cmd
 }
 
@@ -121,18 +120,8 @@ func (o MigrateAuthorizationOptions) Validate() error {
 }
 
 func (o MigrateAuthorizationOptions) Run() error {
-	return o.ResourceOptions.Visitor().Visit(o.isAuthorizationInfo)
-}
-
-func (o *MigrateAuthorizationOptions) isAuthorizationInfo(info *resource.Info) (migrate.Reporter, error) {
-	switch info.Object.(type) {
-	case *authorizationapi.ClusterRole,
-		*authorizationapi.Role,
-		*authorizationapi.ClusterRoleBinding,
-		*authorizationapi.RoleBinding:
-		return migrate.ReporterBool(true), nil // we lie and say this object has changed so our save function will run
-	}
-	panic("impossible info for migrate authorization isAuthorizationInfo")
+	// we lie and say this object has changed so our save function will run
+	return o.ResourceOptions.Visitor().Visit(migrate.AlwaysRequiresMigration)
 }
 
 // checkParity confirms that Openshift authorization objects are in sync with Kubernetes RBAC

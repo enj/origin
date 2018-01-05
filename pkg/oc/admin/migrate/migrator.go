@@ -54,9 +54,6 @@ func timeStampNow() string {
 	return time.Now().Format("0102 15:04:05.000000")
 }
 
-// NotChanged is a Reporter returned by operations that are guaranteed to be read-only
-var NotChanged = ReporterBool(false)
-
 // ResourceOptions assists in performing migrations on any object that
 // can be retrieved via the API.
 type ResourceOptions struct {
@@ -102,7 +99,12 @@ func (o *ResourceOptions) Bind(c *cobra.Command) {
 }
 
 func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error {
-	o.Output = kcmdutil.GetFlagString(c, "output")
+	// oc adm migrate authorization does not support printing and takes no parameters, so we ignore the error here
+	var flagErr error
+	o.Output, flagErr = c.Flags().GetString("output")
+	if flagErr != nil {
+		glog.V(4).Infof("Error getting output flag: %v", flagErr)
+	}
 	switch {
 	case len(o.Output) > 0:
 		printer, err := f.PrinterForOptions(kcmdutil.ExtractCmdPrintOptions(c, false))
