@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/flowcontrol"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -105,6 +106,11 @@ func (o *MigrateAuthorizationOptions) Complete(name string, f *clientcmd.Factory
 	// this is safe because only a cluster admin will have the ability to read these objects
 	configShallowCopy := *config
 	configShallowCopy.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+
+	// This command is only compatible with a 3.6 server, which only supported RBAC v1beta1
+	// Thus we must force that GV otherwise the client will default to v1
+	gv := v1beta1.SchemeGroupVersion
+	configShallowCopy.GroupVersion = &gv
 
 	rbac, err := rbacinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
