@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"k8s.io/api/rbac/v1beta1"
+	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/flowcontrol"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -145,7 +146,8 @@ func (o *MigrateAuthorizationOptions) checkParity(info *resource.Info, _ migrate
 	case *authorizationapi.RoleBinding:
 		err = o.checkRoleBinding(t)
 	default:
-		panic("impossible info for migrate authorization checkParity")
+		// this should never happen unless o.Include or the server is broken
+		return fmt.Errorf("impossible type %T for checkParity info=%#v object=%#v", t, info, t)
 	}
 
 	// We encountered no error, so this object is in sync.
@@ -175,6 +177,17 @@ func (o *MigrateAuthorizationOptions) checkParity(info *resource.Info, _ migrate
 	return err
 }
 
+// handleRBACGetError signals for a retry on NotFound (handles deletion and sync lag)
+// and ServerTimeout (handles heavy load against the server).
+func handleRBACGetError(err error) migrate.TemporaryError {
+	switch {
+	case kerrs.IsNotFound(err), kerrs.IsServerTimeout(err):
+		return migrate.ErrRetriable{err}
+	default:
+		return migrate.ErrNotRetriable{err}
+	}
+}
+
 func (o *MigrateAuthorizationOptions) checkClusterRole(originClusterRole *authorizationapi.ClusterRole) migrate.TemporaryError {
 	// convert the origin role to a rbac role
 	convertedClusterRole, err := util.ConvertToRBACClusterRole(originClusterRole)
@@ -186,8 +199,8 @@ func (o *MigrateAuthorizationOptions) checkClusterRole(originClusterRole *author
 	// try to get the equivalent rbac role from the api
 	rbacClusterRole, err := o.rbac.ClusterRoles().Get(originClusterRole.Name, v1.GetOptions{})
 	if err != nil {
-		// it is possible that the controller has not synced this yet, so we retry here
-		return migrate.ErrRetriable{err}
+		// it is possible that the controller has not synced this yet
+		return handleRBACGetError(err)
 	}
 
 	// if they are not equal, something has gone wrong and the two objects are not in sync
@@ -210,8 +223,8 @@ func (o *MigrateAuthorizationOptions) checkRole(originRole *authorizationapi.Rol
 	// try to get the equivalent rbac role from the api
 	rbacRole, err := o.rbac.Roles(originRole.Namespace).Get(originRole.Name, v1.GetOptions{})
 	if err != nil {
-		// it is possible that the controller has not synced this yet, so we retry here
-		return migrate.ErrRetriable{err}
+		// it is possible that the controller has not synced this yet
+		return handleRBACGetError(err)
 	}
 
 	// if they are not equal, something has gone wrong and the two objects are not in sync
@@ -234,8 +247,8 @@ func (o *MigrateAuthorizationOptions) checkClusterRoleBinding(originRoleBinding 
 	// try to get the equivalent rbac role binding from the api
 	rbacRoleBinding, err := o.rbac.ClusterRoleBindings().Get(originRoleBinding.Name, v1.GetOptions{})
 	if err != nil {
-		// it is possible that the controller has not synced this yet, so we retry here
-		return migrate.ErrRetriable{err}
+		// it is possible that the controller has not synced this yet
+		return handleRBACGetError(err)
 	}
 
 	// if they are not equal, something has gone wrong and the two objects are not in sync
@@ -258,8 +271,8 @@ func (o *MigrateAuthorizationOptions) checkRoleBinding(originRoleBinding *author
 	// try to get the equivalent rbac role binding from the api
 	rbacRoleBinding, err := o.rbac.RoleBindings(originRoleBinding.Namespace).Get(originRoleBinding.Name, v1.GetOptions{})
 	if err != nil {
-		// it is possible that the controller has not synced this yet, so we retry here
-		return migrate.ErrRetriable{err}
+		// it is possible that the controller has not synced this yet
+		return handleRBACGetError(err)
 	}
 
 	// if they are not equal, something has gone wrong and the two objects are not in sync
