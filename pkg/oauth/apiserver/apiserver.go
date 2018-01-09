@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -25,6 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type notFoundOAuthClientGetter struct{}
+
+func (notFoundOAuthClientGetter) Get(name string, _ metav1.GetOptions) (*oauthapi.OAuthClient, error) {
+	return nil, errors.NewNotFound(oauthapi.Resource("oauthclients"), name)
+}
 
 type ExtraConfig struct {
 	CoreAPIServerClientConfig *restclient.Config
@@ -103,11 +110,6 @@ func (c *completedConfig) V1RESTStorage() (map[string]rest.Storage, error) {
 }
 
 func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
-	clientStorage, err := clientetcd.NewREST(c.GenericConfig.RESTOptionsGetter)
-	if err != nil {
-		return nil, fmt.Errorf("error building REST storage: %v", err)
-	}
-
 	// If OAuth is disabled, set the strategy to Deny
 	saAccountGrantMethod := oauthapi.GrantHandlerDeny
 	if len(c.ExtraConfig.ServiceAccountMethod) > 0 {
@@ -149,6 +151,19 @@ func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
 		return nil, fmt.Errorf("error building REST storage: %v", err)
 	}
 	clientAuthorizationStorage, err := clientauthetcd.NewREST(c.GenericConfig.RESTOptionsGetter, combinedOAuthClientGetter)
+	if err != nil {
+		return nil, fmt.Errorf("error building REST storage: %v", err)
+	}
+
+	saOAuthClientGetter := saoauth.NewServiceAccountOAuthClientGetter(
+		coreClient,
+		coreClient,
+		coreV1Client.Events(""),
+		routeClient.Route(),
+		notFoundOAuthClientGetter{}, // prevent any REST recursion
+		saAccountGrantMethod,
+	)
+	clientStorage, err := clientetcd.NewREST(c.GenericConfig.RESTOptionsGetter, saOAuthClientGetter)
 	if err != nil {
 		return nil, fmt.Errorf("error building REST storage: %v", err)
 	}
