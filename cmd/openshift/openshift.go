@@ -23,7 +23,7 @@ import (
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
-	defer serviceability.BehaviorOnPanic(os.Getenv("OPENSHIFT_ON_PANIC"))()
+	defer serviceability.BehaviorOnPanicWithRateLimitedErrors(os.Getenv("OPENSHIFT_ON_PANIC"))()
 	defer serviceability.Profile(os.Getenv("OPENSHIFT_PROFILE")).Stop()
 
 	rand.Seed(time.Now().UTC().UnixNano())
