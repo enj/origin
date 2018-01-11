@@ -36,6 +36,7 @@ func (r *rateLimitedErrorHandler) handleErr(err error) {
 		for _, fn := range r.handlers {
 			fn(err)
 		}
+		glog.Error("MOWASHERE " + key.stack)
 	}
 }
 

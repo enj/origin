@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/logs"
 
 	"github.com/openshift/origin/pkg/cmd/openshift"
@@ -30,6 +32,14 @@ func main() {
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
+
+	go func() {
+		for {
+			now := time.Now()
+			utilruntime.HandleError(fmt.Errorf("MOWASHERE %d:%d", now.Hour(), now.Second()))
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
 
 	basename := filepath.Base(os.Args[0])
 	command := openshift.CommandFor(basename)
