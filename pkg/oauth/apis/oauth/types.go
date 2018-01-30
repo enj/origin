@@ -46,6 +46,21 @@ type OAuthAccessToken struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+type OAuthAccessTokenRequest struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	// UserName is the user name associated with this token
+	UserName string
+
+	// Token is the user name associated with this token
+	Token string
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type OAuthAuthorizeToken struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta

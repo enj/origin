@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -17,13 +19,12 @@ import (
 	oauthapi "github.com/openshift/origin/pkg/oauth/apis/oauth"
 	oauthclient "github.com/openshift/origin/pkg/oauth/generated/internalclientset/typed/oauth/internalversion"
 	accesstokenetcd "github.com/openshift/origin/pkg/oauth/registry/oauthaccesstoken/etcd"
+	accesstokenrequestetcd "github.com/openshift/origin/pkg/oauth/registry/oauthaccesstokenrequest/etcd"
 	authorizetokenetcd "github.com/openshift/origin/pkg/oauth/registry/oauthauthorizetoken/etcd"
 	clientetcd "github.com/openshift/origin/pkg/oauth/registry/oauthclient/etcd"
 	clientauthetcd "github.com/openshift/origin/pkg/oauth/registry/oauthclientauthorization/etcd"
 	routeclient "github.com/openshift/origin/pkg/route/generated/internalclientset"
 	saoauth "github.com/openshift/origin/pkg/serviceaccounts/oauthclient"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ExtraConfig struct {
@@ -158,5 +159,12 @@ func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
 	v1Storage["oAuthAccessTokens"] = accessTokenStorage
 	v1Storage["oAuthClients"] = clientStorage
 	v1Storage["oAuthClientAuthorizations"] = clientAuthorizationStorage
+
+	roundTripper := c.ExtraConfig.CoreAPIServerClientConfig.Transport
+	if wrapTransport := c.ExtraConfig.CoreAPIServerClientConfig.WrapTransport; wrapTransport != nil {
+		roundTripper = wrapTransport(roundTripper)
+	}
+	v1Storage["oAuthAccessTokenRequests"] = accesstokenrequestetcd.NewREST(roundTripper, c.ExtraConfig.CoreAPIServerClientConfig.Host)
+
 	return v1Storage, nil
 }

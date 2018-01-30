@@ -21,6 +21,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/request/union"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
+	"k8s.io/apiserver/pkg/authentication/user"
 	kuser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/util/retry"
@@ -611,7 +612,18 @@ func (c *OAuthServerConfig) getPasswordAuthenticator(identityProvider configapi.
 }
 
 func (c *OAuthServerConfig) getAuthenticationRequestHandler() (authenticator.Request, error) {
-	var authRequestHandlers []authenticator.Request
+	authRequestHandlers := []authenticator.Request{
+		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+			u := req.Header.Get("MO_USER_HEADER")
+			if len(u) == 0 {
+				return nil, false, nil
+			}
+			return &user.DefaultInfo{
+				Name:   u,
+				Groups: []string{user.AllAuthenticated, user.AllAuthenticated + ":oauth"},
+			}, true, nil
+		}),
+	}
 
 	if c.ExtraOAuthConfig.SessionAuth != nil {
 		authRequestHandlers = append(authRequestHandlers, c.ExtraOAuthConfig.SessionAuth)
