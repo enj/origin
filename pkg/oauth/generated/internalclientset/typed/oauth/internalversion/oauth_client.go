@@ -8,6 +8,7 @@ import (
 type OauthInterface interface {
 	RESTClient() rest.Interface
 	OAuthAccessTokensGetter
+	OAuthAccessTokenRequestsGetter
 	OAuthAuthorizeTokensGetter
 	OAuthClientsGetter
 	OAuthClientAuthorizationsGetter
@@ -20,6 +21,10 @@ type OauthClient struct {
 
 func (c *OauthClient) OAuthAccessTokens() OAuthAccessTokenInterface {
 	return newOAuthAccessTokens(c)
+}
+
+func (c *OauthClient) OAuthAccessTokenRequests() OAuthAccessTokenRequestInterface {
+	return newOAuthAccessTokenRequests(c)
 }
 
 func (c *OauthClient) OAuthAuthorizeTokens() OAuthAuthorizeTokenInterface {

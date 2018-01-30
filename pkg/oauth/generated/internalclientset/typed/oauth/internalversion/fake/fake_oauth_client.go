@@ -14,6 +14,10 @@ func (c *FakeOauth) OAuthAccessTokens() internalversion.OAuthAccessTokenInterfac
 	return &FakeOAuthAccessTokens{c}
 }
 
+func (c *FakeOauth) OAuthAccessTokenRequests() internalversion.OAuthAccessTokenRequestInterface {
+	return &FakeOAuthAccessTokenRequests{c}
+}
+
 func (c *FakeOauth) OAuthAuthorizeTokens() internalversion.OAuthAuthorizeTokenInterface {
 	return &FakeOAuthAuthorizeTokens{c}
 }

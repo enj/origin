@@ -38,6 +38,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=oauth.openshift.io, Version=internalVersion
 	case oauth.SchemeGroupVersion.WithResource("oauthaccesstokens"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Oauth().InternalVersion().OAuthAccessTokens().Informer()}, nil
+	case oauth.SchemeGroupVersion.WithResource("oauthaccesstokenrequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Oauth().InternalVersion().OAuthAccessTokenRequests().Informer()}, nil
 	case oauth.SchemeGroupVersion.WithResource("oauthauthorizetokens"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Oauth().InternalVersion().OAuthAuthorizeTokens().Informer()}, nil
 	case oauth.SchemeGroupVersion.WithResource("oauthclients"):

@@ -7516,6 +7516,51 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 			Dependencies: []string{
 				"github.com/openshift/api/oauth/v1.OAuthAccessToken", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 		},
+		"github.com/openshift/api/oauth/v1.OAuthAccessTokenRequest": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "OAuthAccessTokenRequest describes an OAuth access token",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"userName": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UserName is the user name associated with this token",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"authorizeToken": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Token contains the token that authorized this token",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+		},
 		"github.com/openshift/api/oauth/v1.OAuthAuthorizeToken": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{

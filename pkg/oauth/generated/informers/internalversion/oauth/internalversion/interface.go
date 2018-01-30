@@ -10,6 +10,8 @@ import (
 type Interface interface {
 	// OAuthAccessTokens returns a OAuthAccessTokenInformer.
 	OAuthAccessTokens() OAuthAccessTokenInformer
+	// OAuthAccessTokenRequests returns a OAuthAccessTokenRequestInformer.
+	OAuthAccessTokenRequests() OAuthAccessTokenRequestInformer
 	// OAuthAuthorizeTokens returns a OAuthAuthorizeTokenInformer.
 	OAuthAuthorizeTokens() OAuthAuthorizeTokenInformer
 	// OAuthClients returns a OAuthClientInformer.
@@ -32,6 +34,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // OAuthAccessTokens returns a OAuthAccessTokenInformer.
 func (v *version) OAuthAccessTokens() OAuthAccessTokenInformer {
 	return &oAuthAccessTokenInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// OAuthAccessTokenRequests returns a OAuthAccessTokenRequestInformer.
+func (v *version) OAuthAccessTokenRequests() OAuthAccessTokenRequestInformer {
+	return &oAuthAccessTokenRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // OAuthAuthorizeTokens returns a OAuthAuthorizeTokenInformer.

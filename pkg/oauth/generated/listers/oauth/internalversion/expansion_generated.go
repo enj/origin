@@ -6,6 +6,10 @@ package internalversion
 // OAuthAccessTokenLister.
 type OAuthAccessTokenListerExpansion interface{}
 
+// OAuthAccessTokenRequestListerExpansion allows custom methods to be added to
+// OAuthAccessTokenRequestLister.
+type OAuthAccessTokenRequestListerExpansion interface{}
+
 // OAuthAuthorizeTokenListerExpansion allows custom methods to be added to
 // OAuthAuthorizeTokenLister.
 type OAuthAuthorizeTokenListerExpansion interface{}
