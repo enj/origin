@@ -113,7 +113,7 @@ func (r *REST) Create(ctx request.Context, name string, obj runtime.Object, crea
 
 	return &oauthapi.OAuthAccessTokenRequest{
 		Token: accessData.AccessToken,
-	}
+	}, nil
 }
 
 func requestHelper(rt http.RoundTripper, requestURL string, requestHeaders http.Header) (*http.Response, error) {

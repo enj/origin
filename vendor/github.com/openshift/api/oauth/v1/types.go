@@ -48,6 +48,23 @@ type OAuthAccessToken struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// OAuthAccessTokenRequest describes an OAuth access token
+type OAuthAccessTokenRequest struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// UserName is the user name associated with this token
+	UserName string `json:"userName,omitempty" protobuf:"bytes,6,opt,name=userName"`
+
+	// Token contains the token that authorized this token
+	Token string `json:"authorizeToken,omitempty" protobuf:"bytes,8,opt,name=token"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // OAuthAuthorizeToken describes an OAuth authorization token
 type OAuthAuthorizeToken struct {
 	metav1.TypeMeta `json:",inline"`
