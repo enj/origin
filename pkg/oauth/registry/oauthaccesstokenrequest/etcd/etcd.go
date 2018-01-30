@@ -20,7 +20,10 @@ type REST struct {
 	masterPublicURL string
 }
 
-var _ rest.NamedCreater = &REST{}
+var (
+	_ rest.Creater = &REST{}
+	_ rest.Storage = &REST{}
+)
 
 var broken = errors.NewInternalError(es("broken"))
 
@@ -50,7 +53,7 @@ func (r *REST) New() runtime.Object {
 	return &oauthapi.OAuthAccessTokenRequest{}
 }
 
-func (r *REST) Create(ctx request.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx request.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	config := &osincli.ClientConfig{
 		ClientId:                 "openshift-challenging-client", // TODO
 		ClientSecret:             "",                             // TODO
@@ -58,6 +61,7 @@ func (r *REST) Create(ctx request.Context, name string, obj runtime.Object, crea
 		SendClientSecretInParams: true,
 		AuthorizeUrl:             oauthutil.OpenShiftOAuthAuthorizeURL(r.masterPublicURL),
 		TokenUrl:                 oauthutil.OpenShiftOAuthTokenURL(r.masterPublicURL),
+		RedirectUrl:              oauthutil.OpenShiftOAuthTokenImplicitURL(r.masterPublicURL),
 		Scope:                    "user:info", // TODO
 	}
 	if err := osincli.PopulatePKCE(config); err != nil {

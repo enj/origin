@@ -620,6 +620,7 @@ func (c *OAuthServerConfig) getAuthenticationRequestHandler() (authenticator.Req
 			}
 			return &user.DefaultInfo{
 				Name:   u,
+				UID:    "nonempty", // TODO == user from request has empty UID and thus cannot perform a grant flow
 				Groups: []string{user.AllAuthenticated, user.AllAuthenticated + ":oauth"},
 			}, true, nil
 		}),
