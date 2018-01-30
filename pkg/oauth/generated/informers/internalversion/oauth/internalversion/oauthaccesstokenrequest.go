@@ -9,8 +9,6 @@ import (
 	internalinterfaces "github.com/openshift/origin/pkg/oauth/generated/informers/internalversion/internalinterfaces"
 	internalclientset "github.com/openshift/origin/pkg/oauth/generated/internalclientset"
 	internalversion "github.com/openshift/origin/pkg/oauth/generated/listers/oauth/internalversion"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -39,13 +37,8 @@ func NewOAuthAccessTokenRequestInformer(client internalclientset.Interface, resy
 func NewFilteredOAuthAccessTokenRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: nil,
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				if tweakListOptions != nil {
-					tweakListOptions(&options)
-				}
-				return client.Oauth().OAuthAccessTokenRequests().Watch(options)
-			},
+			ListFunc:  nil,
+			WatchFunc: nil,
 		},
 		&oauth.OAuthAccessTokenRequest{},
 		resyncPeriod,
