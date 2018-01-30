@@ -160,9 +160,9 @@ func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
 	v1Storage["oAuthClients"] = clientStorage
 	v1Storage["oAuthClientAuthorizations"] = clientAuthorizationStorage
 
-	roundTripper := c.ExtraConfig.CoreAPIServerClientConfig.Transport
-	if wrapTransport := c.ExtraConfig.CoreAPIServerClientConfig.WrapTransport; wrapTransport != nil {
-		roundTripper = wrapTransport(roundTripper)
+	roundTripper, err := restclient.TransportFor(c.ExtraConfig.CoreAPIServerClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error building REST storage: %v", err)
 	}
 	v1Storage["oAuthAccessTokenRequests"] = accesstokenrequestetcd.NewREST(roundTripper, c.ExtraConfig.CoreAPIServerClientConfig.Host)
 

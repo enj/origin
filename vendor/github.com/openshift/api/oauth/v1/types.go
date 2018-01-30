@@ -46,6 +46,7 @@ type OAuthAccessToken struct {
 
 // +genclient
 // +genclient:nonNamespaced
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // OAuthAccessTokenRequest describes an OAuth access token
