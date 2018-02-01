@@ -76,7 +76,7 @@ func NewCommandCreateServerCert(commandName string, fullName string, out io.Writ
 	flags.StringVar(&options.KeyFile, "key", "", "The key file. Choose a name that indicates what the service is.")
 
 	flags.StringSliceVar(&options.Hostnames, "hostnames", options.Hostnames, "Every hostname or IP you want server certs to be valid for. Comma delimited list")
-	flags.BoolVar(&options.Overwrite, "overwrite", true, "Overwrite existing cert files if found.  If false, any existing file will be left as-is.")
+	flags.BoolVar(&options.Overwrite, "overwrite", false, "Overwrite existing cert files if found.  If false, any existing file will be left as-is.")
 
 	flags.IntVar(&options.ExpireDays, "expire-days", options.ExpireDays, "Validity of the certificate in days (defaults to 2 years). WARNING: extending this above default value is highly discouraged.")
 

@@ -52,7 +52,7 @@ func NewCommandCreateSignerCert(commandName string, fullName string, out io.Writ
 	options := &CreateSignerCertOptions{
 		ExpireDays: crypto.DefaultCACertificateLifetimeInDays,
 		Output:     out,
-		Overwrite:  true,
+		Overwrite:  false,
 	}
 
 	cmd := &cobra.Command{
