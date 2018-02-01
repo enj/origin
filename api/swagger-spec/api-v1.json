@@ -25109,6 +25109,8 @@
      "allowHostPorts",
      "allowHostPID",
      "allowHostIPC",
+     "defaultAllowPrivilegeEscalation",
+     "allowPrivilegeEscalation",
      "readOnlyRootFilesystem",
      "users",
      "groups"
@@ -25189,6 +25191,12 @@
      "allowHostIPC": {
       "type": "boolean",
       "description": "AllowHostIPC determines if the policy allows host ipc in the containers."
+     },
+     "defaultAllowPrivilegeEscalation": {
+      "type": "boolean"
+     },
+     "allowPrivilegeEscalation": {
+      "type": "boolean"
      },
      "seLinuxContext": {
       "$ref": "v1.SELinuxContextStrategyOptions",

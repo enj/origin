@@ -9433,6 +9433,20 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 								Format:      "",
 							},
 						},
+						"defaultAllowPrivilegeEscalation": {
+							SchemaProps: spec.SchemaProps{
+								Description: "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
+						"allowPrivilegeEscalation": {
+							SchemaProps: spec.SchemaProps{
+								Description: "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"seLinuxContext": {
 							SchemaProps: spec.SchemaProps{
 								Description: "SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.",

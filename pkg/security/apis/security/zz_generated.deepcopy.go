@@ -444,6 +444,15 @@ func (in *SecurityContextConstraints) DeepCopyInto(out *SecurityContextConstrain
 		*out = make([]AllowedFlexVolume, len(*in))
 		copy(*out, *in)
 	}
+	if in.DefaultAllowPrivilegeEscalation != nil {
+		in, out := &in.DefaultAllowPrivilegeEscalation, &out.DefaultAllowPrivilegeEscalation
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	in.SELinuxContext.DeepCopyInto(&out.SELinuxContext)
 	in.RunAsUser.DeepCopyInto(&out.RunAsUser)
 	in.SupplementalGroups.DeepCopyInto(&out.SupplementalGroups)
