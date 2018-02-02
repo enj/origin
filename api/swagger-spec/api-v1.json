@@ -25109,8 +25109,6 @@
      "allowHostPorts",
      "allowHostPID",
      "allowHostIPC",
-     "defaultAllowPrivilegeEscalation",
-     "allowPrivilegeEscalation",
      "readOnlyRootFilesystem",
      "users",
      "groups"
