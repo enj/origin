@@ -211,7 +211,6 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 		sc.SetAllowPrivilegeEscalation(&s.scc.AllowPrivilegeEscalation)
 	}
 
-
 	return sc.ContainerSecurityContext(), nil
 }
 
@@ -348,7 +347,6 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	if !s.scc.AllowPrivilegeEscalation && allowEscalation != nil && *allowEscalation {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("allowPrivilegeEscalation"), *allowEscalation, "Allowing privilege escalation for containers is not allowed"))
 	}
-
 
 	return allErrs
 }
