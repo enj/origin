@@ -532,6 +532,10 @@ func originFuzzer(t *testing.T, seed int64) *fuzz.Fuzzer {
 				securityapi.FSTypeRBD,
 				securityapi.FSTypeSecret}
 			scc.Volumes = []securityapi.FSType{volumeTypes[c.Rand.Intn(len(volumeTypes))]}
+
+			// match to the defaulting logic that is used to be backward compatible
+			scc.AllowPrivilegeEscalation = true
+			scc.DefaultAllowPrivilegeEscalation = nil
 		},
 	)
 	return f
