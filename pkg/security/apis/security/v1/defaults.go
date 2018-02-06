@@ -11,7 +11,6 @@ import (
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	RegisterDefaults(scheme)
 	scheme.AddTypeDefaultingFunc(&v1.SecurityContextConstraints{}, func(obj interface{}) { SetDefaults_SCC(obj.(*v1.SecurityContextConstraints)) })
-	scheme.AddTypeDefaultingFunc(&v1.SecurityContextConstraintsList{}, func(obj interface{}) { SetDefaults_SCCList(obj.(*v1.SecurityContextConstraintsList)) })
 	return nil
 }
 
@@ -83,12 +82,6 @@ func SetDefaults_SCC(scc *v1.SecurityContextConstraints) {
 		scc.AllowPrivilegeEscalation = &t
 	}
 
-}
-
-func SetDefaults_SCCList(sccs *v1.SecurityContextConstraintsList) {
-	for _, scc := range sccs.Items {
-		SetDefaults_SCC(&scc)
-	}
 }
 
 func StringSetToFSType(set sets.String) []v1.FSType {

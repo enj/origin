@@ -537,14 +537,6 @@ func originFuzzer(t *testing.T, seed int64) *fuzz.Fuzzer {
 			scc.AllowPrivilegeEscalation = true
 			scc.DefaultAllowPrivilegeEscalation = nil
 		},
-		func(sccs *securityapi.SecurityContextConstraintsList, c fuzz.Continue) {
-			c.FuzzNoCustom(sccs) // fuzz self without calling this function again
-
-			for _, scc := range sccs.Items {
-				scc.AllowPrivilegeEscalation = true
-				scc.DefaultAllowPrivilegeEscalation = nil
-			}
-		},
 	)
 	return f
 }
