@@ -70,11 +70,11 @@ type SecurityContextConstraints struct {
 	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
 	// process can gain more privileges than its parent process.
 	// +optional
-	DefaultAllowPrivilegeEscalation *bool `json:"defaultAllowPrivilegeEscalation,omitempty" protobuf:"bytes,22,rep,name=defaultAllowPrivilegeEscalation"`
+	DefaultAllowPrivilegeEscalation *bool `json:"defaultAllowPrivilegeEscalation,omitempty" protobuf:"varint,22,rep,name=defaultAllowPrivilegeEscalation"`
 	// AllowPrivilegeEscalation determines if a pod can request to allow
 	// privilege escalation. If unspecified, defaults to true.
 	// +optional
-	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"bytes,23,rep,name=allowPrivilegeEscalation"`
+	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,23,rep,name=allowPrivilegeEscalation"`
 	// SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.
 	SELinuxContext SELinuxContextStrategyOptions `json:"seLinuxContext,omitempty" protobuf:"bytes,13,opt,name=seLinuxContext"`
 	// RunAsUser is the strategy that will dictate what RunAsUser is used in the SecurityContext.
