@@ -266,7 +266,7 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 	}
 
 	// we need at least one worker
-	if o.Parallel == 0 {
+	if !c.Flags().Changed("parallel") {
 		o.Parallel = 1
 	}
 
@@ -282,6 +282,9 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 func (o *ResourceOptions) Validate() error {
 	if len(o.Filenames) == 0 && len(o.Include) == 0 {
 		return fmt.Errorf("you must specify at least one resource or resource type to migrate with --include or --filenames")
+	}
+	if o.Parallel < 1 {
+		return fmt.Errorf("invalid value %d for --parallel, must be at least 1", o.Parallel)
 	}
 	return nil
 }
