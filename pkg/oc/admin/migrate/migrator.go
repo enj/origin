@@ -513,6 +513,7 @@ func (t *migrateTracker) run() {
 		}
 		if r.retry {
 			t.report("retry:", r.data.info, r.data.err)
+			continue // retry attempts do not have results to process
 		}
 
 		switch r.result {
