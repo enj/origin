@@ -168,6 +168,8 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 		},
 	}
 	options.ResourceOptions.Bind(cmd)
+	// opt-in to allow parallel execution since we know this command is goroutine safe
+	cmd.Flags().IntVar(&options.Parallel, "parallel", 1, "Number of workers to use during storage migration.")
 
 	return cmd
 }
