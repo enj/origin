@@ -131,9 +131,9 @@ func validateSCCCapsAgainstDrops(requiredDrops []kapi.Capability, capsToCheck []
 }
 
 // validateSCCDefaultAllowPrivilegeEscalation validates the DefaultAllowPrivilegeEscalation field against the AllowPrivilegeEscalation field of a SecurityContextConstraints.
-func validateSCCDefaultAllowPrivilegeEscalation(fldPath *field.Path, defaultAllowPrivilegeEscalation *bool, allowPrivilegeEscalation bool) field.ErrorList {
+func validateSCCDefaultAllowPrivilegeEscalation(fldPath *field.Path, defaultAllowPrivilegeEscalation *bool, allowPrivilegeEscalation *bool) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if defaultAllowPrivilegeEscalation != nil && *defaultAllowPrivilegeEscalation && !allowPrivilegeEscalation {
+	if defaultAllowPrivilegeEscalation != nil && allowPrivilegeEscalation != nil && *defaultAllowPrivilegeEscalation && *allowPrivilegeEscalation {
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultAllowPrivilegeEscalation, "Cannot set DefaultAllowPrivilegeEscalation to true without also setting AllowPrivilegeEscalation to true"))
 	}
 

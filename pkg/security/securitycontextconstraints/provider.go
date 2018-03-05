@@ -207,8 +207,8 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	}
 
 	// if the SCC sets AllowPrivilegeEscalation to false set that as the default
-	if !s.scc.AllowPrivilegeEscalation && sc.AllowPrivilegeEscalation() == nil {
-		sc.SetAllowPrivilegeEscalation(&s.scc.AllowPrivilegeEscalation)
+	if s.scc.AllowPrivilegeEscalation != nil && !*s.scc.AllowPrivilegeEscalation && sc.AllowPrivilegeEscalation() == nil {
+		sc.SetAllowPrivilegeEscalation(s.scc.AllowPrivilegeEscalation)
 	}
 
 	return sc.ContainerSecurityContext(), nil
@@ -340,12 +340,14 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	}
 
 	allowEscalation := sc.AllowPrivilegeEscalation()
-	if !s.scc.AllowPrivilegeEscalation && allowEscalation == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("allowPrivilegeEscalation"), allowEscalation, "Allowing privilege escalation for containers is not allowed"))
-	}
+	if s.scc.AllowPrivilegeEscalation != nil && !*s.scc.AllowPrivilegeEscalation {
+		if allowEscalation == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("allowPrivilegeEscalation"), allowEscalation, "Allowing privilege escalation for containers is not allowed"))
+		}
 
-	if !s.scc.AllowPrivilegeEscalation && allowEscalation != nil && *allowEscalation {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("allowPrivilegeEscalation"), *allowEscalation, "Allowing privilege escalation for containers is not allowed"))
+		if allowEscalation != nil && *allowEscalation {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("allowPrivilegeEscalation"), *allowEscalation, "Allowing privilege escalation for containers is not allowed"))
+		}
 	}
 
 	return allErrs
