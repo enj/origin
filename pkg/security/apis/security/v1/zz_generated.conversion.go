@@ -8,7 +8,6 @@ import (
 	v1 "github.com/openshift/api/security/v1"
 	security "github.com/openshift/origin/pkg/security/apis/security"
 	api_core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -456,9 +455,7 @@ func autoConvert_v1_SecurityContextConstraints_To_security_SecurityContextConstr
 	out.AllowHostPID = in.AllowHostPID
 	out.AllowHostIPC = in.AllowHostIPC
 	out.DefaultAllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.DefaultAllowPrivilegeEscalation))
-	if err := meta_v1.Convert_Pointer_bool_To_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
-		return err
-	}
+	out.AllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.AllowPrivilegeEscalation))
 	if err := Convert_v1_SELinuxContextStrategyOptions_To_security_SELinuxContextStrategyOptions(&in.SELinuxContext, &out.SELinuxContext, s); err != nil {
 		return err
 	}
@@ -492,9 +489,7 @@ func autoConvert_security_SecurityContextConstraints_To_v1_SecurityContextConstr
 	out.AllowHostPID = in.AllowHostPID
 	out.AllowHostIPC = in.AllowHostIPC
 	out.DefaultAllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.DefaultAllowPrivilegeEscalation))
-	if err := meta_v1.Convert_bool_To_Pointer_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
-		return err
-	}
+	out.AllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.AllowPrivilegeEscalation))
 	if err := Convert_security_SELinuxContextStrategyOptions_To_v1_SELinuxContextStrategyOptions(&in.SELinuxContext, &out.SELinuxContext, s); err != nil {
 		return err
 	}

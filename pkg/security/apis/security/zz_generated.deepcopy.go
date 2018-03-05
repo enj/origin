@@ -453,6 +453,15 @@ func (in *SecurityContextConstraints) DeepCopyInto(out *SecurityContextConstrain
 			**out = **in
 		}
 	}
+	if in.AllowPrivilegeEscalation != nil {
+		in, out := &in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	in.SELinuxContext.DeepCopyInto(&out.SELinuxContext)
 	in.RunAsUser.DeepCopyInto(&out.RunAsUser)
 	in.SupplementalGroups.DeepCopyInto(&out.SupplementalGroups)
