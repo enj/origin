@@ -1004,7 +1004,8 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 
 	// create a SCC that does not allow privilege escalation
 	scc := defaultSCC()
-	scc.AllowPrivilegeEscalation = false
+	dpe := false
+	scc.AllowPrivilegeEscalation = &dpe
 
 	provider, err := NewSimpleProvider(scc, "namespace", NewSimpleStrategyFactory())
 	if err != nil {
@@ -1022,7 +1023,7 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// now add allowPrivilegeEscalation to the SecurityContextConstraints
-	scc.AllowPrivilegeEscalation = true
+	scc.AllowPrivilegeEscalation = &pe
 	errs = provider.ValidateContainerSecurityContext(pod, &pod.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
@@ -1033,15 +1034,16 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 // DefaultAllowPrivilegeEscalation is false we cannot set a container's
 // securityContext to allowPrivilegeEscalation but when it is true we can.
 func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
+	yes := true
+	no := false
+
 	pod := defaultPod()
-	pe := true
-	pod.Containers[0].SecurityContext.AllowPrivilegeEscalation = &pe
+	pod.Containers[0].SecurityContext.AllowPrivilegeEscalation = &yes
 
 	// create a SCC that does not allow privilege escalation
 	scc := defaultSCC()
-	dpe := false
-	scc.DefaultAllowPrivilegeEscalation = &dpe
-	scc.AllowPrivilegeEscalation = false
+	scc.DefaultAllowPrivilegeEscalation = &no
+	scc.AllowPrivilegeEscalation = &no
 
 	provider, err := NewSimpleProvider(scc, "namespace", NewSimpleStrategyFactory())
 	if err != nil {
@@ -1059,9 +1061,8 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// now add DefaultAllowPrivilegeEscalation to the SecurityContextConstraints
-	dpe = true
-	scc.DefaultAllowPrivilegeEscalation = &dpe
-	scc.AllowPrivilegeEscalation = false
+	scc.DefaultAllowPrivilegeEscalation = &yes
+	scc.AllowPrivilegeEscalation = &no
 
 	// expect a denial for this SCC because we did not allowPrivilege Escalation via the SecurityContextConstraints
 	// and test the error message to ensure it's related to allowPrivilegeEscalation
@@ -1075,14 +1076,14 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// Now set AllowPrivilegeEscalation
-	scc.AllowPrivilegeEscalation = true
+	scc.AllowPrivilegeEscalation = &yes
 	errs = provider.ValidateContainerSecurityContext(pod, &pod.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
 	}
 
 	// Now set the scc spec to false and reset AllowPrivilegeEscalation
-	scc.AllowPrivilegeEscalation = false
+	scc.AllowPrivilegeEscalation = &no
 	pod.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 	errs = provider.ValidateContainerSecurityContext(pod, &pod.Containers[0], field.NewPath(""))
 	if len(errs) != 1 {
@@ -1094,7 +1095,7 @@ func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
 	}
 
 	// Now unset both AllowPrivilegeEscalation
-	scc.AllowPrivilegeEscalation = true
+	scc.AllowPrivilegeEscalation = &yes
 	pod.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 	errs = provider.ValidateContainerSecurityContext(pod, &pod.Containers[0], field.NewPath(""))
 	if len(errs) != 0 {

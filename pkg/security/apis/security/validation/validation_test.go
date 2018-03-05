@@ -257,7 +257,7 @@ func TestValidateSecurityContextConstraints(t *testing.T) {
 
 	validDefaultAllowPrivilegeEscalation := validSCC()
 	validDefaultAllowPrivilegeEscalation.DefaultAllowPrivilegeEscalation = &yes
-	validDefaultAllowPrivilegeEscalation.AllowPrivilegeEscalation = true
+	validDefaultAllowPrivilegeEscalation.AllowPrivilegeEscalation = &yes
 
 	successCases := map[string]struct {
 		scc *securityapi.SecurityContextConstraints
