@@ -21,24 +21,31 @@ type accessRestrictionAuthorizer struct {
 func (a *accessRestrictionAuthorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	accessRestrictions, err := a.accessRestrictionLister.List(labels.Everything())
 	if err != nil {
-		// TODO safe?
+		// fail closed (but this should never happen)
 		return authorizer.DecisionDeny, "cannot determine access restrictions", err
 	}
 
+	// check all access restrictions and only short circuit on affirmative deny
 	for _, accessRestriction := range accessRestrictions {
 		// does this access restriction match the given request attributes
 		if matches(accessRestriction, requestAttributes) {
 			// it does match, meaning we need to check if it denies the request
 			if !allowed(accessRestriction, requestAttributes.GetUser()) {
+				// deny the request because it is not allowed by the current access restriction
 				return authorizer.DecisionDeny, "denied by access restriction", nil // TODO better reason?
 			}
 		}
 	}
 
+	// no access restriction matched or denied this request, so we state that we have no opinion
+	// the reason must be blank, otherwise we would spam all RBAC denies with it (which is generally not useful)
 	return authorizer.DecisionNoOpinion, "", nil
 }
 
 func matches(accessRestriction *authorization.AccessRestriction, requestAttributes authorizer.Attributes) bool {
+	if len(accessRestriction.Spec.MatchAttributes) == 0 {
+		return true // fail closed
+	}
 	return rbac.RulesAllow(requestAttributes, accessRestriction.Spec.MatchAttributes...)
 }
 
@@ -68,9 +75,9 @@ func subjectsMatch(subjects []authorization.SubjectMatcher, user user.Info) bool
 
 func subjectMatches(subject authorization.SubjectMatcher, user user.Info) bool {
 	switch {
-	case len(subject.Names) != 0 && len(subject.Groups) == 0:
-		return has(subject.Names, user.GetName())
-	case len(subject.Groups) != 0 && len(subject.Names) == 0:
+	case len(subject.Users) != 0 && len(subject.Groups) == 0:
+		return has(subject.Users, user.GetName())
+	case len(subject.Groups) != 0 && len(subject.Users) == 0:
 		return hasAny(subject.Groups, user.GetGroups())
 	}
 	return false // fail closed

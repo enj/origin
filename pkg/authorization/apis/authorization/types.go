@@ -650,7 +650,7 @@ type AccessRestrictionSpec struct {
 
 // TODO all fields
 type SubjectMatcher struct {
-	Names  []string
+	Users  []string
 	Groups []string
 }
 

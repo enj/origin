@@ -671,7 +671,7 @@ type AccessRestriction struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object's metadata.
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec TODO
 	Spec AccessRestrictionSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
@@ -680,14 +680,14 @@ type AccessRestriction struct {
 // TOOD all fields
 type AccessRestrictionSpec struct {
 	MatchAttributes []rbacv1.PolicyRule `json:"matchAttributes" protobuf:"bytes,1,opt,name=matchAttributes"`
-	AllowedSubjects []SubjectMatcher    `json:"allowedSubjects" protobuf:"bytes,2,opt,name=allowedSubjects"`
-	DeniedSubjects  []SubjectMatcher    `json:"deniedSubjects" protobuf:"bytes,3,opt,name=deniedSubjects"`
+	AllowedSubjects []SubjectMatcher    `json:"allowedSubjects,omitempty" protobuf:"bytes,2,opt,name=allowedSubjects"`
+	DeniedSubjects  []SubjectMatcher    `json:"deniedSubjects,omitempty" protobuf:"bytes,3,opt,name=deniedSubjects"`
 }
 
 // TODO all fields
 type SubjectMatcher struct {
-	Names  []string `json:"names" protobuf:"bytes,1,opt,name=names"`
-	Groups []string `json:"groups" protobuf:"bytes,2,opt,name=groups"`
+	Users  []string `json:"users,omitempty" protobuf:"bytes,1,opt,name=users"`
+	Groups []string `json:"groups,omitempty" protobuf:"bytes,2,opt,name=groups"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
