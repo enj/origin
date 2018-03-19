@@ -1180,7 +1180,7 @@ func Convert_authorization_SubjectAccessReviewResponse_To_v1_SubjectAccessReview
 }
 
 func autoConvert_v1_SubjectMatcher_To_authorization_SubjectMatcher(in *v1.SubjectMatcher, out *authorization.SubjectMatcher, s conversion.Scope) error {
-	out.Names = *(*[]string)(unsafe.Pointer(&in.Names))
+	out.Users = *(*[]string)(unsafe.Pointer(&in.Users))
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
 	return nil
 }
@@ -1191,7 +1191,7 @@ func Convert_v1_SubjectMatcher_To_authorization_SubjectMatcher(in *v1.SubjectMat
 }
 
 func autoConvert_authorization_SubjectMatcher_To_v1_SubjectMatcher(in *authorization.SubjectMatcher, out *v1.SubjectMatcher, s conversion.Scope) error {
-	out.Names = *(*[]string)(unsafe.Pointer(&in.Names))
+	out.Users = *(*[]string)(unsafe.Pointer(&in.Users))
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
 	return nil
 }

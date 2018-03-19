@@ -2130,8 +2130,8 @@ func (m *SubjectMatcher) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Names) > 0 {
-		for _, s := range m.Names {
+	if len(m.Users) > 0 {
+		for _, s := range m.Users {
 			dAtA[i] = 0xa
 			i++
 			l = len(s)
@@ -3006,8 +3006,8 @@ func (m *SubjectAccessReviewResponse) Size() (n int) {
 func (m *SubjectMatcher) Size() (n int) {
 	var l int
 	_ = l
-	if len(m.Names) > 0 {
-		for _, s := range m.Names {
+	if len(m.Users) > 0 {
+		for _, s := range m.Users {
 			l = len(s)
 			n += 1 + l + sovGenerated(uint64(l))
 		}
@@ -3574,7 +3574,7 @@ func (this *SubjectMatcher) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&SubjectMatcher{`,
-		`Names:` + fmt.Sprintf("%v", this.Names) + `,`,
+		`Names:` + fmt.Sprintf("%v", this.Users) + `,`,
 		`Groups:` + fmt.Sprintf("%v", this.Groups) + `,`,
 		`}`,
 	}, "")
@@ -9123,7 +9123,7 @@ func (m *SubjectMatcher) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Names = append(m.Names, string(dAtA[iNdEx:postIndex]))
+			m.Users = append(m.Users, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
