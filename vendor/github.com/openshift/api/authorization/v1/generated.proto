@@ -15,6 +15,33 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
+// AccessRestriction TODO
+message AccessRestriction {
+  // Standard object's metadata.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec TODO
+  optional AccessRestrictionSpec spec = 2;
+}
+
+// AccessRestrictionList is a collection of AccessRestrictions
+message AccessRestrictionList {
+  // Standard object's metadata.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is a list of AccessRestriction objects.
+  repeated AccessRestriction items = 2;
+}
+
+// TOOD all fields
+message AccessRestrictionSpec {
+  repeated k8s.io.api.rbac.v1.PolicyRule matchAttributes = 1;
+
+  repeated SubjectMatcher allowedSubjects = 2;
+
+  repeated SubjectMatcher deniedSubjects = 3;
+}
+
 // Action describes a request to the API server
 message Action {
   // Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces
@@ -521,6 +548,13 @@ message SubjectAccessReviewResponse {
   // It is entirely possible to get an error and be able to continue determine authorization status in spite of it.  This is
   // most common when a bound role is missing, but enough roles are still present and bound to reason about the request.
   optional string evaluationError = 4;
+}
+
+// TODO all fields
+message SubjectMatcher {
+  repeated string names = 1;
+
+  repeated string groups = 2;
 }
 
 // SubjectRulesReview is a resource you can create to determine which actions another user can perform in a namespace
