@@ -625,3 +625,43 @@ type ServiceAccountReference struct {
 	// which the ServiceAccountReference is embedded is used.
 	Namespace string
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AccessRestriction TODO
+type AccessRestriction struct {
+	metav1.TypeMeta
+
+	// Standard object's metadata.
+	metav1.ObjectMeta
+
+	// Spec TODO
+	Spec AccessRestrictionSpec
+}
+
+// TOOD all fields
+type AccessRestrictionSpec struct {
+	MatchAttributes []rbac.PolicyRule
+	AllowedSubjects []SubjectMatcher
+	DeniedSubjects  []SubjectMatcher
+}
+
+// TODO all fields
+type SubjectMatcher struct {
+	Names  []string
+	Groups []string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AccessRestrictionList is a collection of AccessRestrictions
+type AccessRestrictionList struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	metav1.ListMeta
+
+	// Items is a list of AccessRestrictions
+	Items []AccessRestriction
+}

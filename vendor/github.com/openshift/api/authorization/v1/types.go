@@ -661,3 +661,44 @@ type ServiceAccountReference struct {
 	// which the ServiceAccountReference is embedded is used.
 	Namespace string `json:"namespace" protobuf:"bytes,2,opt,name=namespace"`
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AccessRestriction TODO
+type AccessRestriction struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec TODO
+	Spec AccessRestrictionSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// TOOD all fields
+type AccessRestrictionSpec struct {
+	MatchAttributes []rbacv1.PolicyRule `json:"matchAttributes" protobuf:"bytes,1,opt,name=matchAttributes"`
+	AllowedSubjects []SubjectMatcher    `json:"allowedSubjects" protobuf:"bytes,2,opt,name=allowedSubjects"`
+	DeniedSubjects  []SubjectMatcher    `json:"deniedSubjects" protobuf:"bytes,3,opt,name=deniedSubjects"`
+}
+
+// TODO all fields
+type SubjectMatcher struct {
+	Names  []string `json:"names" protobuf:"bytes,1,opt,name=names"`
+	Groups []string `json:"groups" protobuf:"bytes,2,opt,name=groups"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AccessRestrictionList is a collection of AccessRestrictions
+type AccessRestrictionList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is a list of AccessRestriction objects.
+	Items []AccessRestriction `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
