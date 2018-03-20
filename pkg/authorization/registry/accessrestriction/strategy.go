@@ -9,6 +9,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
+	"github.com/openshift/origin/pkg/authorization/apis/authorization/validation"
 )
 
 type strategy struct {
@@ -40,22 +41,17 @@ func (strategy) PrepareForCreate(ctx apirequest.Context, obj runtime.Object) {
 	_ = obj.(*authorizationapi.AccessRestriction)
 }
 
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (strategy) PrepareForUpdate(ctx apirequest.Context, obj, old runtime.Object) {
 	_ = obj.(*authorizationapi.AccessRestriction)
 	_ = old.(*authorizationapi.AccessRestriction)
 }
 
-// Canonicalize normalizes the object after validation.
-func (strategy) Canonicalize(obj runtime.Object) {
-}
+func (strategy) Canonicalize(obj runtime.Object) {}
 
 func (strategy) Validate(ctx apirequest.Context, obj runtime.Object) field.ErrorList {
-	return nil // TODO
-	// return validation.ValidateRoleBindingRestriction(obj.(*authorizationapi.RoleBindingRestriction))
+	return validation.ValidateAccessRestriction(obj.(*authorizationapi.AccessRestriction))
 }
 
 func (strategy) ValidateUpdate(ctx apirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return nil // TODO
-	// return validation.ValidateRoleBindingRestrictionUpdate(obj.(*authorizationapi.RoleBindingRestriction), old.(*authorizationapi.RoleBindingRestriction))
+	return validation.ValidateAccessRestrictionUpdate(obj.(*authorizationapi.AccessRestriction), old.(*authorizationapi.AccessRestriction))
 }

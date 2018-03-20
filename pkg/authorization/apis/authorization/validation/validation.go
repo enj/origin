@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 	uservalidation "github.com/openshift/origin/pkg/user/apis/user/validation"
@@ -525,5 +526,69 @@ func ValidateRoleBindingRestrictionServiceAccount(sa *authorizationapi.ServiceAc
 			field.Required(fld.Child("serviceaccounts"), invalidMsg))
 	}
 
+	return allErrs
+}
+
+func ValidateAccessRestriction(obj *authorizationapi.AccessRestriction) field.ErrorList {
+	allErrs := validation.ValidateObjectMeta(&obj.ObjectMeta, false, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateAccessRestrictionSpec(&obj.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func ValidateAccessRestrictionSpec(spec *authorizationapi.AccessRestrictionSpec, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(spec.MatchAttributes) == 0 {
+		allErrs = append(allErrs, field.Required(fld.Child("matchAttributes"), ""))
+	}
+
+	for i, rule := range spec.MatchAttributes {
+		allErrs = append(allErrs, rbacvalidation.ValidatePolicyRule(rule, false, fld.Child("matchAttributes").Index(i))...)
+	}
+
+	if len(spec.AllowedSubjects) == 0 && len(spec.DeniedSubjects) == 0 {
+		allErrs = append(allErrs, field.Invalid(fld, spec, "either allowedSubjects or deniedSubjects must be specified"))
+	}
+
+	if len(spec.AllowedSubjects) != 0 && len(spec.DeniedSubjects) != 0 {
+		allErrs = append(allErrs, field.Invalid(fld, spec, "both allowedSubjects and deniedSubjects cannot be specified"))
+	}
+
+	for i, subjectMatcher := range spec.AllowedSubjects {
+		allErrs = append(allErrs, ValidateSubjectMatcher(subjectMatcher, fld.Child("allowedSubjects").Index(i))...)
+	}
+
+	for i, subjectMatcher := range spec.DeniedSubjects {
+		allErrs = append(allErrs, ValidateSubjectMatcher(subjectMatcher, fld.Child("deniedSubjects").Index(i))...)
+	}
+
+	return allErrs
+}
+
+func ValidateSubjectMatcher(subjectMatcher authorizationapi.SubjectMatcher, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if subjectMatcher.UserRestriction == nil && subjectMatcher.GroupRestriction == nil {
+		allErrs = append(allErrs, field.Invalid(fld, subjectMatcher, "either userRestriction or groupRestriction must be specified"))
+	}
+
+	if subjectMatcher.UserRestriction != nil && subjectMatcher.GroupRestriction != nil {
+		allErrs = append(allErrs, field.Invalid(fld, subjectMatcher, "both userRestriction and groupRestriction cannot be specified"))
+	}
+
+	if subjectMatcher.UserRestriction != nil {
+		allErrs = append(allErrs, ValidateRoleBindingRestrictionUser(subjectMatcher.UserRestriction, fld.Child("userRestriction"))...)
+	}
+
+	if subjectMatcher.GroupRestriction != nil {
+		allErrs = append(allErrs, ValidateRoleBindingRestrictionGroup(subjectMatcher.GroupRestriction, fld.Child("groupRestriction"))...)
+	}
+
+	return allErrs
+}
+
+func ValidateAccessRestrictionUpdate(obj, old *authorizationapi.AccessRestriction) field.ErrorList {
+	allErrs := ValidateAccessRestriction(obj)
+	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	return allErrs
 }
