@@ -1124,7 +1124,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 							},
 						},
 					},
-					Required: []string{"metadata", "spec"},
+					Required: []string{"spec"},
 				},
 			},
 			Dependencies: []string{
@@ -1217,7 +1217,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 							},
 						},
 					},
-					Required: []string{"matchAttributes", "allowedSubjects", "deniedSubjects"},
+					Required: []string{"matchAttributes"},
 				},
 			},
 			Dependencies: []string{
@@ -3164,37 +3164,21 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Properties: map[string]spec.Schema{
-						"names": {
+						"userRestriction": {
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
+								Ref: ref("github.com/openshift/api/authorization/v1.UserRestriction"),
 							},
 						},
-						"groups": {
+						"groupRestriction": {
 							SchemaProps: spec.SchemaProps{
-								Type: []string{"array"},
-								Items: &spec.SchemaOrArray{
-									Schema: &spec.Schema{
-										SchemaProps: spec.SchemaProps{
-											Type:   []string{"string"},
-											Format: "",
-										},
-									},
-								},
+								Ref: ref("github.com/openshift/api/authorization/v1.GroupRestriction"),
 							},
 						},
 					},
-					Required: []string{"names", "groups"},
 				},
 			},
-			Dependencies: []string{},
+			Dependencies: []string{
+				"github.com/openshift/api/authorization/v1.GroupRestriction", "github.com/openshift/api/authorization/v1.UserRestriction"},
 		},
 		"github.com/openshift/api/authorization/v1.SubjectRulesReview": {
 			Schema: spec.Schema{

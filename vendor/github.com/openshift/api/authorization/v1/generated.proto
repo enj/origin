@@ -552,9 +552,9 @@ message SubjectAccessReviewResponse {
 
 // TODO all fields
 message SubjectMatcher {
-  repeated string names = 1;
+  optional UserRestriction userRestriction = 1;
 
-  repeated string groups = 2;
+  optional GroupRestriction groupRestriction = 2;
 }
 
 // SubjectRulesReview is a resource you can create to determine which actions another user can perform in a namespace
