@@ -650,8 +650,8 @@ type AccessRestrictionSpec struct {
 
 // TODO all fields
 type SubjectMatcher struct {
-	Users  []string
-	Groups []string
+	UserRestriction  *UserRestriction
+	GroupRestriction *GroupRestriction
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

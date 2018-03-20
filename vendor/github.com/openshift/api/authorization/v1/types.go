@@ -686,8 +686,8 @@ type AccessRestrictionSpec struct {
 
 // TODO all fields
 type SubjectMatcher struct {
-	Users  []string `json:"users,omitempty" protobuf:"bytes,1,opt,name=users"`
-	Groups []string `json:"groups,omitempty" protobuf:"bytes,2,opt,name=groups"`
+	UserRestriction  *UserRestriction  `json:"userRestriction,omitempty" protobuf:"bytes,1,opt,name=userRestriction"`
+	GroupRestriction *GroupRestriction `json:"groupRestriction,omitempty" protobuf:"bytes,2,opt,name=groupRestriction"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

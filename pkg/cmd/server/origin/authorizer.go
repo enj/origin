@@ -25,7 +25,8 @@ func NewAuthorizer(informers InformerAccess, projectRequestDenyMessage string) a
 	scopeLimitedAuthorizer := scope.NewAuthorizer(rbacInformers.ClusterRoles().Lister(), messageMaker)
 
 	accessRestrictionLister := informers.GetAuthorizationInformers().Authorization().InternalVersion().AccessRestrictions().Lister()
-	accessRestrictionAuthorizer := accessrestriction.NewAuthorizer(accessRestrictionLister)
+	userInformer := informers.GetUserInformers().User().V1()
+	accessRestrictionAuthorizer := accessrestriction.NewAuthorizer(accessRestrictionLister, userInformer.Users().Lister(), userInformer.Groups().Lister())
 
 	kubeAuthorizer := rbacauthorizer.New(
 		&rbacauthorizer.RoleGetter{Lister: rbacInformers.Roles().Lister()},
