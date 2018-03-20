@@ -37,7 +37,7 @@ func ValidateRole(role *rbac.Role) field.ErrorList {
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, true, minimalNameRequirements, field.NewPath("metadata"))...)
 
 	for i, rule := range role.Rules {
-		if err := validatePolicyRule(rule, true, field.NewPath("rules").Index(i)); err != nil {
+		if err := ValidatePolicyRule(rule, true, field.NewPath("rules").Index(i)); err != nil {
 			allErrs = append(allErrs, err...)
 		}
 	}
@@ -59,7 +59,7 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, false, minimalNameRequirements, field.NewPath("metadata"))...)
 
 	for i, rule := range role.Rules {
-		if err := validatePolicyRule(rule, false, field.NewPath("rules").Index(i)); err != nil {
+		if err := ValidatePolicyRule(rule, false, field.NewPath("rules").Index(i)); err != nil {
 			allErrs = append(allErrs, err...)
 		}
 	}
@@ -92,7 +92,7 @@ func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole
 	return allErrs
 }
 
-func validatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
+func ValidatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rule.Verbs) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value"))
