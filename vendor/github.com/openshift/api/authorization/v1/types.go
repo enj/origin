@@ -679,9 +679,9 @@ type AccessRestriction struct {
 
 // TOOD all fields
 type AccessRestrictionSpec struct {
-	MatchAttributes []rbacv1.PolicyRule `json:"matchAttributes" protobuf:"bytes,1,opt,name=matchAttributes"`
-	AllowedSubjects []SubjectMatcher    `json:"allowedSubjects,omitempty" protobuf:"bytes,2,opt,name=allowedSubjects"`
-	DeniedSubjects  []SubjectMatcher    `json:"deniedSubjects,omitempty" protobuf:"bytes,3,opt,name=deniedSubjects"`
+	MatchAttributes []rbacv1.PolicyRule `json:"matchAttributes" patchStrategy:"merge" protobuf:"bytes,1,opt,name=matchAttributes"`
+	AllowedSubjects []SubjectMatcher    `json:"allowedSubjects,omitempty" patchStrategy:"merge" protobuf:"bytes,2,opt,name=allowedSubjects"`
+	DeniedSubjects  []SubjectMatcher    `json:"deniedSubjects,omitempty" patchStrategy:"merge" protobuf:"bytes,3,opt,name=deniedSubjects"`
 }
 
 // TODO all fields
