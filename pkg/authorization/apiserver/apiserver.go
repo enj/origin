@@ -128,7 +128,7 @@ func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error building roleBindingRestrictions REST storage: %v", err)
 	}
-	accessRestrictionStorage, err := accessrestrictionetcd.NewREST(c.GenericConfig.RESTOptionsGetter)
+	accessRestrictionStorage, err := accessrestrictionetcd.NewREST(c.GenericConfig.RESTOptionsGetter, c.ExtraConfig.RuleResolver)
 	if err != nil {
 		return nil, fmt.Errorf("error building accessRestrictions REST storage: %v", err)
 	}
