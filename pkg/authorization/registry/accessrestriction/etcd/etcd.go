@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -70,7 +70,7 @@ func NewREST(optsGetter restoptions.Getter, ruleResolver rbacregistryvalidation.
 	return &REST{readStorage: store, storage: store, ruleResolver: ruleResolver}, nil
 }
 
-func (s *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (s *REST) Create(ctx request.Context, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := s.confirmFullAuthority(ctx, obj.(*authorizationapi.AccessRestriction).Name); err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (s *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createV
 	return s.storage.Create(ctx, obj, createValidatingAdmission, includeUninitialized)
 }
 
-func (s *REST) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *REST) Update(ctx request.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	if err := s.confirmFullAuthority(ctx, name); err != nil {
 		return nil, false, err
 	}
@@ -86,7 +86,7 @@ func (s *REST) Update(ctx genericapirequest.Context, name string, obj rest.Updat
 	return s.storage.Update(ctx, name, obj, createValidation, updateValidation)
 }
 
-func (s *REST) Delete(ctx genericapirequest.Context, name string, options *v1.DeleteOptions) (runtime.Object, bool, error) {
+func (s *REST) Delete(ctx request.Context, name string, options *v1.DeleteOptions) (runtime.Object, bool, error) {
 	if err := s.confirmFullAuthority(ctx, name); err != nil {
 		return nil, false, err
 	}
@@ -94,7 +94,7 @@ func (s *REST) Delete(ctx genericapirequest.Context, name string, options *v1.De
 	return s.storage.Delete(ctx, name, options)
 }
 
-func (s *REST) DeleteCollection(ctx genericapirequest.Context, options *v1.DeleteOptions, listOptions *internalversion.ListOptions) (runtime.Object, error) {
+func (s *REST) DeleteCollection(ctx request.Context, options *v1.DeleteOptions, listOptions *internalversion.ListOptions) (runtime.Object, error) {
 	if err := s.confirmFullAuthority(ctx, ""); err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (s *REST) DeleteCollection(ctx genericapirequest.Context, options *v1.Delet
 	return s.storage.DeleteCollection(ctx, options, listOptions)
 }
 
-func (s *REST) confirmFullAuthority(ctx genericapirequest.Context, name string) error {
+func (s *REST) confirmFullAuthority(ctx request.Context, name string) error {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return nil
 	}
