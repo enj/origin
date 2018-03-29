@@ -70,20 +70,20 @@ func NewREST(optsGetter restoptions.Getter, ruleResolver rbacregistryvalidation.
 	return &REST{readStorage: store, storage: store, ruleResolver: ruleResolver}, nil
 }
 
-func (s *REST) Create(ctx request.Context, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (s *REST) Create(ctx request.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := s.confirmFullAuthority(ctx, obj.(*authorizationapi.AccessRestriction).Name); err != nil {
 		return nil, err
 	}
 
-	return s.storage.Create(ctx, obj, createValidatingAdmission, includeUninitialized)
+	return s.storage.Create(ctx, obj, createValidation, includeUninitialized)
 }
 
-func (s *REST) Update(ctx request.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (s *REST) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	if err := s.confirmFullAuthority(ctx, name); err != nil {
 		return nil, false, err
 	}
 
-	return s.storage.Update(ctx, name, obj, createValidation, updateValidation)
+	return s.storage.Update(ctx, name, objInfo, createValidation, updateValidation)
 }
 
 func (s *REST) Delete(ctx request.Context, name string, options *v1.DeleteOptions) (runtime.Object, bool, error) {
