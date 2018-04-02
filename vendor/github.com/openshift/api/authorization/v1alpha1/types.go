@@ -32,15 +32,18 @@ type AccessRestrictionSpec struct {
 	// If AllowedSubjects is set, then only those subjects can perform the matching actions.
 	// If DeniedSubjects is set, then only those subjects are restricted from performing the matching actions.
 	// Required.
+	// +patchStrategy=merge
 	MatchAttributes []rbacv1.PolicyRule `json:"matchAttributes" patchStrategy:"merge" protobuf:"bytes,1,opt,name=matchAttributes"`
 
 	// The whitelist of subjects that are allowed to perform the actions defined by MatchAttributes.
 	// Note that this only prevents a denial due to the access restriction.
 	// The subject must still have a matching RBAC binding to actually perform the current action.
+	// +patchStrategy=merge
 	AllowedSubjects []SubjectMatcher `json:"allowedSubjects,omitempty" patchStrategy:"merge" protobuf:"bytes,2,opt,name=allowedSubjects"`
 
 	// The blacklist of subjects that are not allowed to perform the actions defined by MatchAttributes.
 	// This restriction is processed before all RBAC data, and thus will reject actions that RBAC may otherwise permit.
+	// +patchStrategy=merge
 	DeniedSubjects []SubjectMatcher `json:"deniedSubjects,omitempty" patchStrategy:"merge" protobuf:"bytes,3,opt,name=deniedSubjects"`
 }
 
