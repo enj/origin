@@ -42,15 +42,18 @@ message AccessRestrictionSpec {
   // If AllowedSubjects is set, then only those subjects can perform the matching actions.
   // If DeniedSubjects is set, then only those subjects are restricted from performing the matching actions.
   // Required.
+  // +patchStrategy=merge
   repeated k8s.io.api.rbac.v1.PolicyRule matchAttributes = 1;
 
   // The whitelist of subjects that are allowed to perform the actions defined by MatchAttributes.
   // Note that this only prevents a denial due to the access restriction.
   // The subject must still have a matching RBAC binding to actually perform the current action.
+  // +patchStrategy=merge
   repeated SubjectMatcher allowedSubjects = 2;
 
   // The blacklist of subjects that are not allowed to perform the actions defined by MatchAttributes.
   // This restriction is processed before all RBAC data, and thus will reject actions that RBAC may otherwise permit.
+  // +patchStrategy=merge
   repeated SubjectMatcher deniedSubjects = 3;
 }
 
