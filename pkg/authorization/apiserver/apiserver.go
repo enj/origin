@@ -17,6 +17,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 
 	authorizationapiv1 "github.com/openshift/api/authorization/v1"
+	accessrestrictionetcd "github.com/openshift/origin/pkg/authorization/registry/accessrestriction/etcd"
 	"github.com/openshift/origin/pkg/authorization/registry/clusterrole"
 	"github.com/openshift/origin/pkg/authorization/registry/clusterrolebinding"
 	"github.com/openshift/origin/pkg/authorization/registry/localresourceaccessreview"
@@ -125,7 +126,11 @@ func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
 	localResourceAccessReviewStorage := localresourceaccessreview.NewREST(resourceAccessReviewRegistry)
 	roleBindingRestrictionStorage, err := rolebindingrestrictionetcd.NewREST(c.GenericConfig.RESTOptionsGetter)
 	if err != nil {
-		return nil, fmt.Errorf("error building REST storage: %v", err)
+		return nil, fmt.Errorf("error building roleBindingRestrictions REST storage: %v", err)
+	}
+	accessRestrictionStorage, err := accessrestrictionetcd.NewREST(c.GenericConfig.RESTOptionsGetter, c.ExtraConfig.RuleResolver)
+	if err != nil {
+		return nil, fmt.Errorf("error building accessRestrictions REST storage: %v", err)
 	}
 
 	v1Storage := map[string]rest.Storage{}
@@ -140,5 +145,6 @@ func (c *completedConfig) newV1RESTStorage() (map[string]rest.Storage, error) {
 	v1Storage["clusterRoles"] = clusterrole.NewREST(rbacClient.RESTClient())
 	v1Storage["clusterRoleBindings"] = clusterrolebinding.NewREST(rbacClient.RESTClient())
 	v1Storage["roleBindingRestrictions"] = roleBindingRestrictionStorage
+	v1Storage["accessRestrictions"] = accessRestrictionStorage
 	return v1Storage, nil
 }
