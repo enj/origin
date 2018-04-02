@@ -11,6 +11,7 @@ import (
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 	"github.com/openshift/origin/pkg/authorization/apis/authorization/rbacconversion"
 	authorizationapiv1 "github.com/openshift/origin/pkg/authorization/apis/authorization/v1"
+	authorizationapiv1alpha1 "github.com/openshift/origin/pkg/authorization/apis/authorization/v1alpha1"
 )
 
 func init() {
@@ -23,12 +24,13 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  authorizationapi.GroupName,
-			VersionPreferenceOrder:     []string{authorizationapiv1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{authorizationapiv1.SchemeGroupVersion.Version, authorizationapiv1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: internalObjectsToScheme,
 			RootScopedKinds:            sets.NewString("ClusterRole", "ClusterRoleBinding", "ClusterPolicy", "ClusterPolicyBinding", "SubjectAccessReview", "ResourceAccessReview", "ResourceAccessReviewResponse", "SubjectAccessReviewResponse", "AccessRestriction"),
 		},
 		announced.VersionToSchemeFunc{
-			authorizationapiv1.SchemeGroupVersion.Version: authorizationapiv1.AddToScheme,
+			authorizationapiv1.SchemeGroupVersion.Version:       authorizationapiv1.AddToScheme,
+			authorizationapiv1alpha1.SchemeGroupVersion.Version: authorizationapiv1alpha1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
