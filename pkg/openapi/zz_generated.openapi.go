@@ -3198,6 +3198,178 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
 		},
+		"github.com/openshift/api/authorization/v1alpha1.AccessRestriction": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "AccessRestriction is used to guard specific actions without invasive changes to the cluster's default RBAC policy. It supports either a whitelist or a blacklist based restriction.  It never grants any privileges - it can only be used to take privileges away.",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							},
+						},
+						"spec": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Spec defines when this restriction is imposed and how to satisfy it.",
+								Ref:         ref("github.com/openshift/api/authorization/v1alpha1.AccessRestrictionSpec"),
+							},
+						},
+					},
+					Required: []string{"spec"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/api/authorization/v1alpha1.AccessRestrictionSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+		},
+		"github.com/openshift/api/authorization/v1alpha1.AccessRestrictionList": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "AccessRestrictionList is a collection of AccessRestrictions",
+					Properties: map[string]spec.Schema{
+						"kind": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"apiVersion": {
+							SchemaProps: spec.SchemaProps{
+								Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"metadata": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Standard object's metadata.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							},
+						},
+						"items": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Items is a list of AccessRestriction objects.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("github.com/openshift/api/authorization/v1alpha1.AccessRestriction"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"items"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/api/authorization/v1alpha1.AccessRestriction", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+		},
+		"github.com/openshift/api/authorization/v1alpha1.AccessRestrictionSpec": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "AccessRestrictionSpec holds the matching requirements. MatchAttributes is required. One of AllowedSubjects or DeniedSubjects must be specified.",
+					Properties: map[string]spec.Schema{
+						"matchAttributes": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-strategy": "merge",
+								},
+							},
+							SchemaProps: spec.SchemaProps{
+								Description: "If these rules cover the current request, then this restriction applies. If AllowedSubjects is set, then only those subjects can perform the matching actions. If DeniedSubjects is set, then only those subjects are restricted from performing the matching actions. Required.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/api/rbac/v1.PolicyRule"),
+										},
+									},
+								},
+							},
+						},
+						"allowedSubjects": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-strategy": "merge",
+								},
+							},
+							SchemaProps: spec.SchemaProps{
+								Description: "The whitelist of subjects that are allowed to perform the actions defined by MatchAttributes. Note that this only prevents a denial due to the access restriction. The subject must still have a matching RBAC binding to actually perform the current action.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("github.com/openshift/api/authorization/v1alpha1.SubjectMatcher"),
+										},
+									},
+								},
+							},
+						},
+						"deniedSubjects": {
+							VendorExtensible: spec.VendorExtensible{
+								Extensions: spec.Extensions{
+									"x-kubernetes-patch-strategy": "merge",
+								},
+							},
+							SchemaProps: spec.SchemaProps{
+								Description: "The blacklist of subjects that are not allowed to perform the actions defined by MatchAttributes. This restriction is processed before all RBAC data, and thus will reject actions that RBAC may otherwise permit.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("github.com/openshift/api/authorization/v1alpha1.SubjectMatcher"),
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"matchAttributes"},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/api/authorization/v1alpha1.SubjectMatcher", "k8s.io/api/rbac/v1.PolicyRule"},
+		},
+		"github.com/openshift/api/authorization/v1alpha1.SubjectMatcher": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "SubjectMatcher defines how an access restriction matches against the current user or service account or group. Exactly one field must be non-nil.",
+					Properties: map[string]spec.Schema{
+						"userRestriction": {
+							SchemaProps: spec.SchemaProps{
+								Description: "UserRestriction matches against user or service account subjects. Use system:serviceaccount:NAMESPACE:NAME to target a specific service account.",
+								Ref:         ref("github.com/openshift/api/authorization/v1.UserRestriction"),
+							},
+						},
+						"groupRestriction": {
+							SchemaProps: spec.SchemaProps{
+								Description: "GroupRestriction matches against group subjects. Use system:serviceaccount:NAMESPACE to target all service accounts in a specific namespace. Use system:serviceaccounts to target all service accounts.",
+								Ref:         ref("github.com/openshift/api/authorization/v1.GroupRestriction"),
+							},
+						},
+					},
+				},
+			},
+			Dependencies: []string{
+				"github.com/openshift/api/authorization/v1.GroupRestriction", "github.com/openshift/api/authorization/v1.UserRestriction"},
+		},
 		"github.com/openshift/api/build/v1.BinaryBuildRequestOptions": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
