@@ -22,6 +22,7 @@ import (
 	appslisters "github.com/openshift/origin/pkg/apps/generated/listers/apps/internalversion"
 	authorizationinformer "github.com/openshift/origin/pkg/authorization/generated/informers/internalversion"
 	authorizationclient "github.com/openshift/origin/pkg/authorization/generated/internalclientset"
+	authorizationinternalversion "github.com/openshift/origin/pkg/authorization/generated/internalclientset/typed/authorization/internalversion"
 	buildinformer "github.com/openshift/origin/pkg/build/generated/informers/internalversion"
 	buildclient "github.com/openshift/origin/pkg/build/generated/internalclientset"
 	imageinformer "github.com/openshift/origin/pkg/image/generated/informers/internalversion"
@@ -151,7 +152,7 @@ func NewInformers(clientConfig *rest.Config) (*informerHolder, error) {
 	if err != nil {
 		return nil, err
 	}
-	authorizationClient, err := authorizationclient.NewForConfig(clientConfig)
+	authorizationClient, err := getAuthorizationClient(clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -320,4 +321,44 @@ func (i *informerHolder) ToGenericInformer() GenericResourceInformer {
 			return i.GetUserInformers().ForResource(resource)
 		}),
 	)
+}
+
+// getAuthorizationClient builds an authorization client that uses the default version (v1)
+// for all types except access restrictions (for which it uses v1alpha1 instead)
+func getAuthorizationClient(clientConfig *rest.Config) (authorizationclient.Interface, error) {
+	authorizationClient, err := authorizationclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	clientConfigCopy := *clientConfig
+	clientConfigCopy.GroupVersion = &schema.GroupVersion{Group: "authorization.openshift.io", Version: "v1alpha1"}
+	v1alpha1AuthorizationClient, err := authorizationclient.NewForConfig(&clientConfigCopy)
+	if err != nil {
+		return nil, err
+	}
+	return &authorizationWrapper{
+		Interface:                 authorizationClient,
+		v1alpha1AccessRestriction: v1alpha1AuthorizationClient.Authorization().AccessRestrictions(),
+	}, nil
+}
+
+type authorizationWrapper struct {
+	authorizationclient.Interface
+	v1alpha1AccessRestriction authorizationinternalversion.AccessRestrictionInterface
+}
+
+func (c *authorizationWrapper) Authorization() authorizationinternalversion.AuthorizationInterface {
+	return &accessRestrictionsWrapper{
+		AuthorizationInterface:    c.Interface.Authorization(),
+		v1alpha1AccessRestriction: c.v1alpha1AccessRestriction,
+	}
+}
+
+type accessRestrictionsWrapper struct {
+	authorizationinternalversion.AuthorizationInterface
+	v1alpha1AccessRestriction authorizationinternalversion.AccessRestrictionInterface
+}
+
+func (c *accessRestrictionsWrapper) AccessRestrictions() authorizationinternalversion.AccessRestrictionInterface {
+	return c.v1alpha1AccessRestriction
 }
