@@ -1,5 +1,7 @@
 package internalversion
 
+type AccessRestrictionExpansion interface{}
+
 type ClusterPolicyExpansion interface{}
 
 type ClusterPolicyBindingExpansion interface{}
