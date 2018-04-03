@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -104,6 +105,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authorizationapiv1.GroupName, c.ExtraConfig.Registry, c.ExtraConfig.Scheme, metav1.ParameterCodec, c.ExtraConfig.Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = authorizationapiv1.SchemeGroupVersion
+	apiGroupInfo.GroupMeta.GroupVersions = []schema.GroupVersion{authorizationapiv1.SchemeGroupVersion, authorizationapiv1alpha1.SchemeGroupVersion}
 	apiGroupInfo.VersionedResourcesStorageMap[authorizationapiv1.SchemeGroupVersion.Version] = v1Storage
 	apiGroupInfo.VersionedResourcesStorageMap[authorizationapiv1alpha1.SchemeGroupVersion.Version] = v1alpha1Storage
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
