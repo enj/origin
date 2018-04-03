@@ -49,6 +49,7 @@ func StorageOptions(options configapi.MasterConfig) (restoptions.Getter, error) 
 		},
 		// storage versions: use legacy group name "" for all resources that existed when apigroups were introduced
 		map[schema.GroupResource]schema.GroupVersion{
+			{Group: "authorization.openshift.io", Resource: "accessrestrictions"}:      {Group: "authorization.openshift.io", Version: "v1alpha1"},
 			{Group: "authorization.openshift.io", Resource: "clusterpolicybindings"}:   legacyCoreV1,
 			{Group: "authorization.openshift.io", Resource: "clusterpolicies"}:         legacyCoreV1,
 			{Group: "authorization.openshift.io", Resource: "policybindings"}:          legacyCoreV1,
