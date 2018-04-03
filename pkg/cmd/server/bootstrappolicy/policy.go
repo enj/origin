@@ -167,6 +167,7 @@ func GetOpenshiftBootstrapClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(read...).Groups(certificatesGroup).Resources("certificatesigningrequests", "certificatesigningrequests/approval", "certificatesigningrequests/status").RuleOrDie(),
 
 				rbac.NewRule(read...).Groups(authzGroup, legacyAuthzGroup).Resources("clusterroles", "clusterrolebindings", "roles", "rolebindings", "rolebindingrestrictions").RuleOrDie(),
+				rbac.NewRule(read...).Groups(authzGroup).Resources("accessrestrictions").RuleOrDie(),
 
 				rbac.NewRule(read...).Groups(buildGroup, legacyBuildGroup).Resources("builds", "builds/details", "buildconfigs", "buildconfigs/webhooks", "builds/log").RuleOrDie(),
 
