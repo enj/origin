@@ -625,3 +625,66 @@ type ServiceAccountReference struct {
 	// which the ServiceAccountReference is embedded is used.
 	Namespace string
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AccessRestriction is used to guard specific actions without invasive changes to the cluster's default RBAC policy.
+// It supports either a whitelist or a blacklist based restriction.  It never grants any privileges - it can only be
+// used to take privileges away.
+type AccessRestriction struct {
+	metav1.TypeMeta
+
+	// Standard object's metadata.
+	metav1.ObjectMeta
+
+	// Spec defines when this restriction is imposed and how to satisfy it.
+	Spec AccessRestrictionSpec
+}
+
+// AccessRestrictionSpec holds the matching requirements.
+// MatchAttributes is required.
+// One of AllowedSubjects or DeniedSubjects must be specified.
+type AccessRestrictionSpec struct {
+	// If these rules cover the current request, then this restriction applies.
+	// If AllowedSubjects is set, then only those subjects can perform the matching actions.
+	// If DeniedSubjects is set, then only those subjects are restricted from performing the matching actions.
+	// Required.
+	MatchAttributes []rbac.PolicyRule
+
+	// The whitelist of subjects that are allowed to perform the actions defined by MatchAttributes.
+	// Note that this only prevents a denial due to the access restriction.
+	// The subject must still have a matching RBAC binding to actually perform the current action.
+	AllowedSubjects []SubjectMatcher
+
+	// The blacklist of subjects that are not allowed to perform the actions defined by MatchAttributes.
+	// This restriction is processed before all RBAC data, and thus will reject actions that RBAC may otherwise permit.
+	DeniedSubjects []SubjectMatcher
+}
+
+// SubjectMatcher defines how an access restriction matches against the current user or service account or group.
+// Exactly one field must be non-nil.
+type SubjectMatcher struct {
+	// UserRestriction matches against user or service account subjects.
+	// Use system:serviceaccount:NAMESPACE:NAME to target a specific service account.
+	UserRestriction *UserRestriction
+
+	// GroupRestriction matches against group subjects.
+	// Use system:serviceaccount:NAMESPACE to target all service accounts in a specific namespace.
+	// Use system:serviceaccounts to target all service accounts.
+	GroupRestriction *GroupRestriction
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AccessRestrictionList is a collection of AccessRestrictions
+type AccessRestrictionList struct {
+	metav1.TypeMeta
+
+	// Standard object's metadata.
+	metav1.ListMeta
+
+	// Items is a list of AccessRestriction objects.
+	Items []AccessRestriction
+}
