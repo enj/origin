@@ -11,6 +11,7 @@ func applyOpenShiftGCConfig(controllerManager *options.CMServer) error {
 	controllerManager.GCIgnoredResources = append(controllerManager.GCIgnoredResources,
 		// explicitly disabled from GC for now - not enough value to track them
 		componentconfig.GroupResource{Group: "authorization.openshift.io", Resource: "rolebindingrestrictions"},
+		componentconfig.GroupResource{Group: "authorization.openshift.io", Resource: "accessrestrictions"},
 		componentconfig.GroupResource{Group: "network.openshift.io", Resource: "clusternetworks"},
 		componentconfig.GroupResource{Group: "network.openshift.io", Resource: "egressnetworkpolicies"},
 		componentconfig.GroupResource{Group: "network.openshift.io", Resource: "hostsubnets"},
