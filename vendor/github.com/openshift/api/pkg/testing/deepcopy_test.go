@@ -14,7 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	apps "github.com/openshift/api/apps/v1"
-	authorization "github.com/openshift/api/authorization/v1"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
+	authorizationv1alpha1 "github.com/openshift/api/authorization/v1alpha1"
 	build "github.com/openshift/api/build/v1"
 	image "github.com/openshift/api/image/v1"
 	network "github.com/openshift/api/network/v1"
@@ -28,18 +29,19 @@ import (
 )
 
 var groups = map[schema.GroupVersion]runtime.SchemeBuilder{
-	apps.SchemeGroupVersion:          apps.SchemeBuilder,
-	authorization.SchemeGroupVersion: authorization.SchemeBuilder,
-	build.SchemeGroupVersion:         build.SchemeBuilder,
-	image.SchemeGroupVersion:         image.SchemeBuilder,
-	network.SchemeGroupVersion:       network.SchemeBuilder,
-	oauth.SchemeGroupVersion:         oauth.SchemeBuilder,
-	project.SchemeGroupVersion:       project.SchemeBuilder,
-	quota.SchemeGroupVersion:         quota.SchemeBuilder,
-	route.SchemeGroupVersion:         route.SchemeBuilder,
-	security.SchemeGroupVersion:      security.SchemeBuilder,
-	template.SchemeGroupVersion:      template.SchemeBuilder,
-	user.SchemeGroupVersion:          user.SchemeBuilder,
+	apps.SchemeGroupVersion:                  apps.SchemeBuilder,
+	authorizationv1.SchemeGroupVersion:       authorizationv1.SchemeBuilder,
+	authorizationv1alpha1.SchemeGroupVersion: authorizationv1alpha1.SchemeBuilder,
+	build.SchemeGroupVersion:                 build.SchemeBuilder,
+	image.SchemeGroupVersion:                 image.SchemeBuilder,
+	network.SchemeGroupVersion:               network.SchemeBuilder,
+	oauth.SchemeGroupVersion:                 oauth.SchemeBuilder,
+	project.SchemeGroupVersion:               project.SchemeBuilder,
+	quota.SchemeGroupVersion:                 quota.SchemeBuilder,
+	route.SchemeGroupVersion:                 route.SchemeBuilder,
+	security.SchemeGroupVersion:              security.SchemeBuilder,
+	template.SchemeGroupVersion:              template.SchemeBuilder,
+	user.SchemeGroupVersion:                  user.SchemeBuilder,
 }
 
 // TestRoundTripTypesWithoutProtobuf applies the round-trip test to all round-trippable Kinds
