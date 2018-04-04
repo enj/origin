@@ -45,7 +45,9 @@ func NewAuthorizer(informers InformerAccess, projectRequestDenyMessage string) a
 		browsersafe.NewBrowserSafeAuthorizer(scopeLimitedAuthorizer, user.AllAuthenticated),
 		// authorizes system:masters to do anything, just like upstream
 		authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup),
-		// TODO
+		// Wrap with an authorizer that detects unsafe requests and modifies verbs/resources appropriately so policy can address them separately.
+		// The deny authorizer comes after system:masters but before everything else
+		// Thus it can never permanently break the cluster because we always have a way to fix things
 		browsersafe.NewBrowserSafeAuthorizer(accessRestrictionAuthorizer, user.AllAuthenticated),
 		nodeAuthorizer,
 		// Wrap with an authorizer that detects unsafe requests and modifies verbs/resources appropriately so policy can address them separately

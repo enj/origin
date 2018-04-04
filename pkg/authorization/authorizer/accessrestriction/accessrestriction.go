@@ -3,6 +3,7 @@ package accessrestriction
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -11,6 +12,8 @@ import (
 	userlisterv1 "github.com/openshift/client-go/user/listers/user/v1"
 	"github.com/openshift/origin/pkg/authorization/apis/authorization"
 	authorizationlister "github.com/openshift/origin/pkg/authorization/generated/listers/authorization/internalversion"
+
+	"github.com/golang/glog"
 )
 
 func NewAuthorizer(accessRestrictionLister authorizationlister.AccessRestrictionLister, userLister userlisterv1.UserLister, groupLister userlisterv1.GroupLister) authorizer.Authorizer {
@@ -30,7 +33,7 @@ type accessRestrictionAuthorizer struct {
 func (a *accessRestrictionAuthorizer) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	accessRestrictions, err := a.accessRestrictionLister.List(labels.Everything())
 	if err != nil {
-		// fail closed (but this should never happen)
+		// fail closed (but this should never happen because it means some static generated code is broken)
 		return authorizer.DecisionDeny, "cannot determine access restrictions", err
 	}
 
@@ -41,8 +44,11 @@ func (a *accessRestrictionAuthorizer) Authorize(requestAttributes authorizer.Att
 			// it does match, meaning we need to check if it denies the request
 			if !a.allowed(accessRestriction, requestAttributes.GetUser()) {
 				// deny the request because it is not allowed by the current access restriction
-				return authorizer.DecisionDeny, "denied by access restriction", nil // TODO better reason?
+				// the reason is opaque because normal users have no visibility into access restriction objects
+				glog.Infof("access restriction %#v denied request attributes %#v for user %#v", accessRestriction, requestAttributes, requestAttributes.GetUser())
+				return authorizer.DecisionDeny, "denied by access restriction", nil
 			}
+			glog.V(4).Infof("access restriction %#v matched but did not deny request attributes %#v for user %#v", accessRestriction, requestAttributes, requestAttributes.GetUser())
 		}
 	}
 
@@ -53,7 +59,7 @@ func (a *accessRestrictionAuthorizer) Authorize(requestAttributes authorizer.Att
 
 func matches(accessRestriction *authorization.AccessRestriction, requestAttributes authorizer.Attributes) bool {
 	if len(accessRestriction.Spec.MatchAttributes) == 0 {
-		return true // fail closed
+		return true // fail closed (but validation prevents this)
 	}
 	return rbac.RulesAllow(requestAttributes, accessRestriction.Spec.MatchAttributes...)
 }
@@ -70,7 +76,7 @@ func (a *accessRestrictionAuthorizer) allowed(accessRestriction *authorization.A
 		return !a.subjectsMatch(s.DeniedSubjects, user)
 	}
 
-	return false // fail closed
+	return false // fail closed (but validation prevents this)
 }
 
 func (a *accessRestrictionAuthorizer) subjectsMatch(subjects []authorization.SubjectMatcher, user user.Info) bool {
@@ -89,7 +95,7 @@ func (a *accessRestrictionAuthorizer) subjectMatches(subject authorization.Subje
 	case subject.GroupRestriction != nil && subject.UserRestriction == nil:
 		return a.groupMatches(subject.GroupRestriction, user)
 	}
-	return false // fail closed
+	return false // fail closed on whitelist, fail open on blacklist
 }
 
 func (a *accessRestrictionAuthorizer) userMatches(userRestriction *authorization.UserRestriction, user user.Info) bool {
@@ -101,7 +107,7 @@ func (a *accessRestrictionAuthorizer) userMatches(userRestriction *authorization
 	}
 	for _, labelSelector := range userRestriction.Selectors {
 		for _, u := range a.labelSelectorToUsers(labelSelector) {
-			if u.Name == user.GetName() || hasAny(u.Groups, user.GetGroups()) { // TODO should we check groups here?
+			if u.Name == user.GetName() || hasAny(u.Groups, user.GetGroups()) { // TODO not sure if we should check groups here
 				return true
 			}
 		}
@@ -110,14 +116,11 @@ func (a *accessRestrictionAuthorizer) userMatches(userRestriction *authorization
 }
 
 func (a *accessRestrictionAuthorizer) labelSelectorToUsers(labelSelector v1.LabelSelector) []*userapiv1.User {
-	selector, err := v1.LabelSelectorAsSelector(&labelSelector)
+	users, err := a.userLister.List(labelSelectorAsSelector(labelSelector))
 	if err != nil {
-		return nil // TODO wat??
+		runtime.HandleError(err) // this should never happen because it means some static generated code is broken
 	}
-	users, err := a.userLister.List(selector)
-	if err != nil {
-		return nil // TODO wat??
-	}
+	// it is safe to return this even when err != nil
 	return users
 }
 
@@ -136,14 +139,11 @@ func (a *accessRestrictionAuthorizer) groupMatches(groupRestriction *authorizati
 }
 
 func (a *accessRestrictionAuthorizer) labelSelectorToGroups(labelSelector v1.LabelSelector) []*userapiv1.Group {
-	selector, err := v1.LabelSelectorAsSelector(&labelSelector)
+	groups, err := a.groupLister.List(labelSelectorAsSelector(labelSelector))
 	if err != nil {
-		return nil // TODO wat??
+		runtime.HandleError(err) // this should never happen because it means some static generated code is broken
 	}
-	groups, err := a.groupLister.List(selector)
-	if err != nil {
-		return nil // TODO wat??
-	}
+	// it is safe to return this even when err != nil
 	return groups
 }
 
@@ -163,4 +163,13 @@ func hasAny(set, any []string) bool {
 		}
 	}
 	return false
+}
+
+func labelSelectorAsSelector(labelSelector v1.LabelSelector) labels.Selector {
+	selector, err := v1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		runtime.HandleError(err) // validation prevents this from occurring
+		return labels.Nothing()  // fail closed on whitelist, fail open on blacklist
+	}
+	return selector
 }
