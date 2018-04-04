@@ -95,7 +95,7 @@ func (a *accessRestrictionAuthorizer) subjectMatches(subject authorization.Subje
 	case subject.GroupRestriction != nil && subject.UserRestriction == nil:
 		return a.groupMatches(subject.GroupRestriction, user)
 	}
-	return false // fail closed on whitelist, fail open on blacklist
+	return false // fail closed on whitelist, fail open on blacklist (but validation prevents this)
 }
 
 func (a *accessRestrictionAuthorizer) userMatches(userRestriction *authorization.UserRestriction, user user.Info) bool {
