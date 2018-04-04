@@ -305,6 +305,15 @@ items:
     - list
     - watch
   - apiGroups:
+    - authorization.openshift.io
+    attributeRestrictions: null
+    resources:
+    - accessrestrictions
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
     - ""
     - build.openshift.io
     attributeRestrictions: null
