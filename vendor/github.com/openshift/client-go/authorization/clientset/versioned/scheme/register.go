@@ -2,6 +2,7 @@ package scheme
 
 import (
 	authorizationv1 "github.com/openshift/api/authorization/v1"
+	authorizationv1alpha1 "github.com/openshift/api/authorization/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,5 +34,6 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	authorizationv1.AddToScheme(scheme)
+	authorizationv1alpha1.AddToScheme(scheme)
 
 }
