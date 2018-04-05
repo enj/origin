@@ -8,10 +8,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -163,24 +161,6 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 	clusterAdminUserClient := clusterAdminUserAPIClient.Users()
 	clusterAdminGroupClient := clusterAdminUserAPIClient.Groups()
 
-	accessRestrictionWatch, err := clusterAdminAccessRestrictionClient.Watch(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer accessRestrictionWatch.Stop()
-
-	userWatch, err := clusterAdminUserClient.Watch(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer userWatch.Stop()
-
-	groupWatch, err := clusterAdminGroupClient.Watch(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer groupWatch.Stop()
-
 	jobGroup := "can-write-jobs"
 
 	// make sure none of these restrictions intersect
@@ -241,15 +221,6 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		}
 	}
 
-	accessRestrictionEvents := accessRestrictionWatch.ResultChan()
-	for range accessRestrictions {
-		checkWatch(t, accessRestrictionEvents, watch.Added, func(object runtime.Object) {
-			if _, ok := object.(*authorizationv1alpha1.AccessRestriction); !ok {
-				t.Fatalf("unexpected object %T", object)
-			}
-		})
-	}
-
 	project := "mo-project"
 	user := "mo"
 
@@ -257,14 +228,10 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var moUser *userv1.User
-	userWatchEvents := userWatch.ResultChan()
-	checkWatch(t, userWatchEvents, watch.Added, func(obj runtime.Object) {
-		var ok bool
-		if moUser, ok = obj.(*userv1.User); !ok {
-			t.Fatalf("unexpected object %T", obj)
-		}
-	})
+	moUser, err := clusterAdminUserClient.Get(user, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	moSelfSar := moClient.Authorization()
 	moJobs := moClient.Batch().Jobs(project)
@@ -292,19 +259,10 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		groupWatchEvents := groupWatch.ResultChan()
-		checkWatch(t, groupWatchEvents, watch.Added, func(object runtime.Object) {
-			eventGroup, ok := object.(*userv1.Group)
-			if !ok {
-				t.Fatalf("unexpected object %T", object)
-			}
-			if eventGroup.Users[0] != user {
-				t.Fatalf("group is missing user: %#v", eventGroup)
-			}
-			if err := testutil.WaitForPolicyUpdate(moSelfSar, project, "create", schema.GroupResource{Group: "batch", Resource: "jobs"}, true); err != nil {
-				t.Fatalf("user permissions not updated to reflect group membership: %#v", err)
-			}
-		})
+
+		if err := testutil.WaitForPolicyUpdate(moSelfSar, project, "create", schema.GroupResource{Group: "batch", Resource: "jobs"}, true); err != nil {
+			t.Fatalf("user permissions not updated to reflect group membership: %#v", err)
+		}
 
 		validJob := &batch.Job{
 			ObjectMeta: metav1.ObjectMeta{Name: "myjob"},
@@ -338,18 +296,9 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		if _, err := clusterAdminUserClient.Update(moUser); err != nil {
 			t.Fatal(err)
 		}
-		checkWatch(t, userWatchEvents, watch.Modified, func(object runtime.Object) {
-			eventUser, ok := object.(*userv1.User)
-			if !ok {
-				t.Fatalf("unexpected object %T", object)
-			}
-			if eventUser.Labels["bad"] != "yes" {
-				t.Fatalf("user labels do not match: %#v", eventUser)
-			}
-		})
 
 		if err := testutil.WaitForPolicyUpdate(moSelfSar, project, "list", schema.GroupResource{Group: "", Resource: "pods"}, false); err != nil {
-			t.Fatalf("user permissions not updated to reflect group membership: %#v", err)
+			t.Fatalf("user permissions not updated to reflect label: %#v", err)
 		}
 
 		// list is forbidden after labeling
@@ -362,19 +311,6 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		impersonateMoPods := kcoreclient.NewForConfigOrDie(&clusterAdminClientConfigCopy).Pods(project)
 		_, err = impersonateMoPods.List(metav1.ListOptions{})
 		checkAccessRestrictionError(t, err)
-	}
-}
-
-func checkWatch(t *testing.T, c <-chan watch.Event, eventType watch.EventType, check func(runtime.Object)) {
-	t.Helper()
-	select {
-	case event := <-c:
-		if eventType != event.Type {
-			t.Fatalf("wrong watch event type, expected %v, actual %v", eventType, event.Type)
-		}
-		check(event.Object)
-	case <-time.After(10 * time.Second):
-		t.Fatal("failed to see all access restrictions")
 	}
 }
 
