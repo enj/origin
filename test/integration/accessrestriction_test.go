@@ -5,15 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/origin/pkg/authorization/apis/authorization"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 
-	"github.com/openshift/api/authorization/v1alpha1"
-	authorizationinternalversion "github.com/openshift/origin/pkg/authorization/generated/internalclientset/typed/authorization/internalversion"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
+	authorizationv1alpha1 "github.com/openshift/api/authorization/v1alpha1"
+	authorizationv1alpha1clientset "github.com/openshift/client-go/authorization/clientset/versioned/typed/authorization/v1alpha1"
 	testutil "github.com/openshift/origin/test/util"
 	testserver "github.com/openshift/origin/test/util/server"
 )
@@ -52,10 +53,7 @@ func TestAccessRestrictionEscalationCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO generate + vendor client-go and use the v1alpha1 client here
-	gv := v1alpha1.SchemeGroupVersion
-	userConfig.GroupVersion = &gv
-	accessRestrictionClient := authorizationinternalversion.NewForConfigOrDie(userConfig).AccessRestrictions()
+	accessRestrictionClient := authorizationv1alpha1clientset.NewForConfigOrDie(userConfig).AccessRestrictions()
 
 	if err := wait.ExponentialBackoff(
 		wait.Backoff{
@@ -64,7 +62,7 @@ func TestAccessRestrictionEscalationCheck(t *testing.T) {
 		},
 		func() (done bool, err error) {
 			if _, err := accessRestrictionClient.List(metav1.ListOptions{}); err != nil {
-				if errors.IsUnauthorized(err) {
+				if errors.IsForbidden(err) {
 					return false, nil
 				}
 				return false, err
@@ -74,17 +72,21 @@ func TestAccessRestrictionEscalationCheck(t *testing.T) {
 		t.Fatalf("failed to list access restriction as user: %#v", err)
 	}
 
-	_, err = accessRestrictionClient.Create(&authorization.AccessRestriction{
+	_, err = accessRestrictionClient.Create(&authorizationv1alpha1.AccessRestriction{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "does-not-matter",
 		},
-		Spec: authorization.AccessRestrictionSpec{
-			MatchAttributes: []rbac.PolicyRule{
-				rbac.NewRule(rbac.VerbAll).Groups(rbac.APIGroupAll).Resources(rbac.ResourceAll).RuleOrDie(),
-			},
-			DeniedSubjects: []authorization.SubjectMatcher{
+		Spec: authorizationv1alpha1.AccessRestrictionSpec{
+			MatchAttributes: []rbacv1.PolicyRule{
 				{
-					UserRestriction: &authorization.UserRestriction{
+					Verbs:     []string{rbacv1.VerbAll},
+					APIGroups: []string{rbacv1.APIGroupAll},
+					Resources: []string{rbacv1.ResourceAll},
+				},
+			},
+			DeniedSubjects: []authorizationv1alpha1.SubjectMatcher{
+				{
+					UserRestriction: &authorizationv1.UserRestriction{
 						Users: []string{"bad-user"},
 					},
 				},
