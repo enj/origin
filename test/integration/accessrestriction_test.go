@@ -188,7 +188,7 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "blacklist-label-user-get-pods",
+				Name: "blacklist-label-get-pods",
 			},
 			Spec: authorizationv1alpha1.AccessRestrictionSpec{
 				MatchAttributes: []rbacv1.PolicyRule{
@@ -205,6 +205,17 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 								{
 									MatchLabels: map[string]string{
 										"bad": "yes",
+									},
+								},
+							},
+						},
+					},
+					{
+						GroupRestriction: &authorizationv1.GroupRestriction{
+							Selectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"alsobad": "yup",
 									},
 								},
 							},
@@ -232,6 +243,10 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	moGroup := &userv1.Group{
+		ObjectMeta: metav1.ObjectMeta{Name: jobGroup},
+		Users:      userv1.OptionalNames{user},
+	}
 
 	moSelfSar := moClient.Authorization()
 	moJobs := moClient.Batch().Jobs(project)
@@ -253,10 +268,7 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 
 	{
 		// add user to write jobs group
-		if _, err := clusterAdminGroupClient.Create(&userv1.Group{
-			ObjectMeta: metav1.ObjectMeta{Name: jobGroup},
-			Users:      userv1.OptionalNames{user},
-		}); err != nil {
+		if moGroup, err = clusterAdminGroupClient.Create(moGroup); err != nil {
 			t.Fatal(err)
 		}
 
@@ -293,12 +305,12 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		moUser.Labels = map[string]string{
 			"bad": "yes",
 		}
-		if _, err := clusterAdminUserClient.Update(moUser); err != nil {
+		if moUser, err = clusterAdminUserClient.Update(moUser); err != nil {
 			t.Fatal(err)
 		}
 
 		if err := testutil.WaitForPolicyUpdate(moSelfSar, project, "list", schema.GroupResource{Group: "", Resource: "pods"}, false); err != nil {
-			t.Fatalf("user permissions not updated to reflect label: %#v", err)
+			t.Fatalf("user permissions not updated to reflect user label: %#v", err)
 		}
 
 		// list is forbidden after labeling
@@ -309,6 +321,42 @@ func TestAccessRestrictionAuthorizer(t *testing.T) {
 		clusterAdminClientConfigCopy := *clusterAdminClientConfig
 		clusterAdminClientConfigCopy.Impersonate.UserName = user
 		impersonateMoPods := kcoreclient.NewForConfigOrDie(&clusterAdminClientConfigCopy).Pods(project)
+		_, err = impersonateMoPods.List(metav1.ListOptions{})
+		checkAccessRestrictionError(t, err)
+
+		// remove label
+		moUser.Labels = map[string]string{}
+		if _, err := clusterAdminUserClient.Update(moUser); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := testutil.WaitForPolicyUpdate(moSelfSar, project, "list", schema.GroupResource{Group: "", Resource: "pods"}, true); err != nil {
+			t.Fatalf("user permissions not updated to reflect removed user label: %#v", err)
+		}
+
+		// list works again after removing label
+		if _, err := moPods.List(metav1.ListOptions{}); err != nil {
+			t.Fatalf("unexpected list error as unlabeled user: %#v", err)
+		}
+
+		// label group to match restriction
+		moGroup.Labels = map[string]string{
+			"alsobad": "yup",
+		}
+		if _, err := clusterAdminGroupClient.Update(moGroup); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := testutil.WaitForPolicyUpdate(moSelfSar, project, "list", schema.GroupResource{Group: "", Resource: "pods"}, false); err != nil {
+			t.Fatalf("user permissions not updated to reflect group label: %#v", err)
+		}
+
+		// list is forbidden after labeling
+		_, err = moPods.List(metav1.ListOptions{})
+		checkAccessRestrictionError(t, err)
+		// impersonation list is forbidden even though we are only impersonating the user (and not the group)
+		// this is because the access restriction authorizer checks both the groups on the request user.Info
+		// and the members of matching groups that it fetched from its shared informer
 		_, err = impersonateMoPods.List(metav1.ListOptions{})
 		checkAccessRestrictionError(t, err)
 	}
