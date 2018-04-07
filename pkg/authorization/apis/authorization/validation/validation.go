@@ -494,7 +494,7 @@ func ValidateRoleBindingRestrictionUser(user *authorizationapi.UserRestriction, 
 	for i, selector := range user.Selectors {
 		allErrs = append(allErrs,
 			unversionedvalidation.ValidateLabelSelector(&selector,
-				fld.Child("selector").Index(i))...)
+				fld.Child("labels").Index(i))...)
 	}
 
 	return allErrs
@@ -511,7 +511,7 @@ func ValidateRoleBindingRestrictionGroup(group *authorizationapi.GroupRestrictio
 	for i, selector := range group.Selectors {
 		allErrs = append(allErrs,
 			unversionedvalidation.ValidateLabelSelector(&selector,
-				fld.Child("selector").Index(i))...)
+				fld.Child("labels").Index(i))...)
 	}
 
 	return allErrs
@@ -539,7 +539,7 @@ func ValidateAccessRestrictionSpec(spec *authorizationapi.AccessRestrictionSpec,
 	allErrs := field.ErrorList{}
 
 	if len(spec.MatchAttributes) == 0 {
-		allErrs = append(allErrs, field.Required(fld.Child("matchAttributes"), ""))
+		allErrs = append(allErrs, field.Required(fld.Child("matchAttributes"), "must supply at least one policy rule"))
 	}
 
 	for i, rule := range spec.MatchAttributes {
@@ -547,11 +547,11 @@ func ValidateAccessRestrictionSpec(spec *authorizationapi.AccessRestrictionSpec,
 	}
 
 	if len(spec.AllowedSubjects) == 0 && len(spec.DeniedSubjects) == 0 {
-		allErrs = append(allErrs, field.Invalid(fld, spec, "either allowedSubjects or deniedSubjects must be specified"))
+		allErrs = append(allErrs, field.Required(fld.Child("allowedSubjects"), "either allowedSubjects or deniedSubjects must be specified"))
 	}
 
 	if len(spec.AllowedSubjects) != 0 && len(spec.DeniedSubjects) != 0 {
-		allErrs = append(allErrs, field.Invalid(fld, spec, "both allowedSubjects and deniedSubjects cannot be specified"))
+		allErrs = append(allErrs, field.Invalid(fld.Child("deniedSubjects"), "<omitted>", "both allowedSubjects and deniedSubjects cannot be specified"))
 	}
 
 	for i, subjectMatcher := range spec.AllowedSubjects {
@@ -569,11 +569,11 @@ func ValidateSubjectMatcher(subjectMatcher authorizationapi.SubjectMatcher, fld 
 	allErrs := field.ErrorList{}
 
 	if subjectMatcher.UserRestriction == nil && subjectMatcher.GroupRestriction == nil {
-		allErrs = append(allErrs, field.Invalid(fld, subjectMatcher, "either userRestriction or groupRestriction must be specified"))
+		allErrs = append(allErrs, field.Invalid(fld.Child("userRestriction"), "<omitted>", "either userRestriction or groupRestriction must be specified"))
 	}
 
 	if subjectMatcher.UserRestriction != nil && subjectMatcher.GroupRestriction != nil {
-		allErrs = append(allErrs, field.Invalid(fld, subjectMatcher, "both userRestriction and groupRestriction cannot be specified"))
+		allErrs = append(allErrs, field.Invalid(fld.Child("groupRestriction"), "<omitted>", "both userRestriction and groupRestriction cannot be specified"))
 	}
 
 	if subjectMatcher.UserRestriction != nil {
