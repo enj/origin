@@ -3,13 +3,11 @@ package integration
 import (
 	"strings"
 	"testing"
-	"time"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -55,27 +53,16 @@ func TestAccessRestrictionEscalationCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, userConfig, err := testutil.GetClientForUser(clusterAdminClientConfig, user)
+	moClient, userConfig, err := testutil.GetClientForUser(clusterAdminClientConfig, user)
 	if err != nil {
 		t.Fatal(err)
 	}
 	userAccessRestrictionClient := authorizationv1alpha1clientset.NewForConfigOrDie(userConfig).AccessRestrictions()
+	moSelfSar := moClient.Authorization()
 
 	// wait for rbac to catch up
-	if err := wait.ExponentialBackoff(
-		wait.Backoff{
-			Steps:    30,
-			Duration: time.Second,
-		},
-		func() (done bool, err error) {
-			if _, err := userAccessRestrictionClient.List(metav1.ListOptions{}); err != nil {
-				if errors.IsForbidden(err) {
-					return false, nil
-				}
-				return false, err
-			}
-			return true, nil
-		}); err != nil {
+	if err := testutil.WaitForPolicyUpdate(moSelfSar, "", "list", schema.GroupResource{Group: "authorization.openshift.io", Resource: "accessrestrictions"},
+		true); err != nil {
 		t.Fatalf("failed to list access restriction as user: %#v", err)
 	}
 
@@ -119,18 +106,8 @@ func TestAccessRestrictionEscalationCheck(t *testing.T) {
 	}
 
 	// wait for rbac to catch up
-	if err := wait.ExponentialBackoff(
-		wait.Backoff{
-			Steps:    30,
-			Duration: time.Second,
-		},
-		func() (done bool, err error) {
-			_, err = userAccessRestrictionClient.List(metav1.ListOptions{})
-			if errors.IsForbidden(err) {
-				return true, nil
-			}
-			return false, err
-		}); err != nil {
+	if err := testutil.WaitForPolicyUpdate(moSelfSar, "", "list", schema.GroupResource{Group: "authorization.openshift.io", Resource: "accessrestrictions"},
+		false); err != nil && !errors.IsForbidden(err) {
 		t.Fatalf("failed to revoke right for user: %#v", err)
 	}
 
