@@ -45,7 +45,7 @@ func (a *accessRestrictionAuthorizer) Authorize(requestAttributes authorizer.Att
 			if !a.allowed(accessRestriction, requestAttributes.GetUser()) {
 				// deny the request because it is not allowed by the current access restriction
 				// the reason is opaque because normal users have no visibility into access restriction objects
-				glog.Infof("access restriction %#v denied request attributes %#v for user %#v", accessRestriction, requestAttributes, requestAttributes.GetUser())
+				glog.V(2).Infof("access restriction %#v denied request attributes %#v for user %#v", accessRestriction, requestAttributes, requestAttributes.GetUser())
 				return authorizer.DecisionDeny, "denied by access restriction", nil
 			}
 			glog.V(4).Infof("access restriction %#v matched but did not deny request attributes %#v for user %#v", accessRestriction, requestAttributes, requestAttributes.GetUser())
