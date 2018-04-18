@@ -11,6 +11,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	userapiv1 "github.com/openshift/api/user/v1"
 	userlisterv1 "github.com/openshift/client-go/user/listers/user/v1"
@@ -37,7 +38,7 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 			AllowedSubjects: []authorization.SubjectMatcher{
 				{
 					GroupRestriction: &authorization.GroupRestriction{
-						Groups: []string{"admins"},
+						Groups: []string{"admins", "system:serviceaccounts"},
 					},
 				},
 			},
@@ -55,6 +56,7 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 			AllowedSubjects: []authorization.SubjectMatcher{
 				{
 					GroupRestriction: &authorization.GroupRestriction{
+						Groups: []string{"system:serviceaccounts:ns2"},
 						Selectors: []v1.LabelSelector{
 							{
 								MatchLabels: map[string]string{
@@ -341,7 +343,6 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 					secretWhitelistGroup,
 					podWhitelistGroup,
 				),
-				userLister: testUserLister(),
 				groupLister: testGroupLister(
 					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
 				),
@@ -357,6 +358,65 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 					Resource:        "configmaps",
 					Subresource:     "",
 					Name:            "console",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "whitelist not deny SA global group",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					podWhitelistGroup,
+					// the rest are not important for this test, just there to make sure it is ignored
+					configmapWhitelistUser,
+					secretWhitelistGroup,
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User:            serviceaccount.UserInfo("ns1", "sa1", "007"),
+					Verb:            "get",
+					APIGroup:        "",
+					Resource:        "pods",
+					Subresource:     "",
+					Name:            "api",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "whitelist not deny SA ns group",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					secretWhitelistGroup,
+					// the rest are not important for this test, just there to make sure it is ignored
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User:            serviceaccount.UserInfo("ns2", "sa2", "008"),
+					Verb:            "get",
+					APIGroup:        "",
+					Resource:        "secrets",
+					Subresource:     "",
+					Name:            "dbpass",
 					ResourceRequest: true,
 					Path:            "",
 				},
