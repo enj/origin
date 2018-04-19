@@ -1,11 +1,9 @@
 package accessrestriction
 
 import (
-	"flag"
 	"reflect"
 	"testing"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -18,12 +16,6 @@ import (
 	"github.com/openshift/origin/pkg/authorization/apis/authorization"
 	authorizationlister "github.com/openshift/origin/pkg/authorization/generated/listers/authorization/internalversion"
 )
-
-func init() {
-	flag.CommandLine.Lookup("v").Value.Set("2")
-	flag.CommandLine.Lookup("stderrthreshold").Value.Set("INFO")
-	glog.Flush()
-}
 
 func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 	podWhitelistGroup := &authorization.AccessRestriction{
@@ -100,6 +92,101 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 				{
 					UserRestriction: &authorization.UserRestriction{
 						Users: []string{"nancy"},
+					},
+				},
+			},
+		},
+	}
+	identityWhitelistSA := &authorization.AccessRestriction{
+		Spec: authorization.AccessRestrictionSpec{
+			MatchAttributes: []rbac.PolicyRule{
+				{
+					Verbs:     []string{"update"},
+					APIGroups: []string{"user.openshift.io"},
+					Resources: []string{"identities"},
+				},
+			},
+			AllowedSubjects: []authorization.SubjectMatcher{
+				{
+					UserRestriction: &authorization.UserRestriction{
+						Users:  []string{"system:serviceaccount:ns3:sa3"},
+						Groups: []string{"system:serviceaccounts:ns4"},
+						Selectors: []v1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"not": "stable",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	labeledUserEric := &userapiv1.User{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "eric",
+			Labels: map[string]string{
+				"not": "stable",
+			},
+		},
+	}
+	groupedLabeledUserRandy := &userapiv1.User{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "randy",
+			Labels: map[string]string{
+				"not": "stable",
+			},
+		},
+		Groups: []string{"sharks"},
+	}
+	saBlacklistUser := &authorization.AccessRestriction{
+		Spec: authorization.AccessRestrictionSpec{
+			MatchAttributes: []rbac.PolicyRule{
+				{
+					Verbs:     []string{"delete"},
+					APIGroups: []string{""},
+					Resources: []string{"serviceaccounts"},
+				},
+			},
+			DeniedSubjects: []authorization.SubjectMatcher{
+				{
+					UserRestriction: &authorization.UserRestriction{
+						Users:  []string{"gopher"},
+						Groups: []string{"pythons"},
+						Selectors: []v1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"pandas": "rock",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	groupedLabeledUserFrank := &userapiv1.User{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "frank",
+			Labels: map[string]string{
+				"pandas": "rock",
+			},
+		},
+		Groups: []string{"danger-zone"},
+	}
+	oauthURLBlacklistUser := &authorization.AccessRestriction{
+		Spec: authorization.AccessRestrictionSpec{
+			MatchAttributes: []rbac.PolicyRule{
+				{
+					Verbs:           []string{"GET"},
+					NonResourceURLs: []string{"/oauth/*"},
+				},
+			},
+			DeniedSubjects: []authorization.SubjectMatcher{
+				{
+					UserRestriction: &authorization.UserRestriction{
+						Users: []string{"oauth-man"},
 					},
 				},
 			},
@@ -404,7 +491,6 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 					configmapWhitelistUser,
 					podWhitelistGroup,
 				),
-				userLister: testUserLister(),
 				groupLister: testGroupLister(
 					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
 				),
@@ -419,6 +505,485 @@ func Test_accessRestrictionAuthorizer_Authorize(t *testing.T) {
 					Name:            "dbpass",
 					ResourceRequest: true,
 					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "whitelist not deny SA user",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					identityWhitelistSA,
+					// the rest are not important for this test, just there to make sure it is ignored
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User:            serviceaccount.UserInfo("ns3", "sa3", "009"),
+					Verb:            "update",
+					APIGroup:        "user.openshift.io",
+					Resource:        "identities",
+					Subresource:     "",
+					Name:            "github:bob",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "whitelist deny SA user",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					identityWhitelistSA,
+					// the rest are not important for this test, just there to make sure it is ignored
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User:            serviceaccount.UserInfo("ns3", "sa3.1", "009.1"),
+					Verb:            "update",
+					APIGroup:        "user.openshift.io",
+					Resource:        "identities",
+					Subresource:     "",
+					Name:            "github:adam",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "whitelist not deny SA user via group",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					identityWhitelistSA,
+					// the rest are not important for this test, just there to make sure it is ignored
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User:            serviceaccount.UserInfo("ns4", "sa4", "010"),
+					Verb:            "update",
+					APIGroup:        "user.openshift.io",
+					Resource:        "identities",
+					Subresource:     "",
+					Name:            "github:alice",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "whitelist deny SA user",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					identityWhitelistSA,
+					// the rest are not important for this test, just there to make sure it is ignored
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User:            serviceaccount.UserInfo("ns5", "sa5", "011"),
+					Verb:            "update",
+					APIGroup:        "user.openshift.io",
+					Resource:        "identities",
+					Subresource:     "",
+					Name:            "github:tom",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "whitelist not deny user via label",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					identityWhitelistSA,
+					// the rest are not important for this test, just there to make sure it is ignored
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					labeledUserEric,
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name: "eric",
+					},
+					Verb:            "update",
+					APIGroup:        "user.openshift.io",
+					Resource:        "identities",
+					Subresource:     "",
+					Name:            "github:derek",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "whitelist not deny user via embedded group of other labeled user",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					identityWhitelistSA,
+					// the rest are not important for this test, just there to make sure it is ignored
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					groupedLabeledUserRandy, // this matches the label selector for the AR and makes the group allowed
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name:   "some-random-name-ignored",
+						Groups: []string{"sharks"}, // this is weird because it is the randy user's label matching that allows it
+					},
+					Verb:            "update",
+					APIGroup:        "user.openshift.io",
+					Resource:        "identities",
+					Subresource:     "",
+					Name:            "github:phantom",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "simple blacklist user deny",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					saBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name: "gopher",
+					},
+					Verb:            "delete",
+					APIGroup:        "",
+					Resource:        "serviceaccounts",
+					Subresource:     "",
+					Name:            "builder",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "simple blacklist user not deny",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					saBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					groupedLabeledUserRandy, // not important for this test, just there to make sure it is ignored
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name: "not-gopher",
+					},
+					Verb:            "delete",
+					APIGroup:        "",
+					Resource:        "serviceaccounts",
+					Subresource:     "",
+					Name:            "builder",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "simple blacklist group deny",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					saBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					groupedLabeledUserRandy, // not important for this test, just there to make sure it is ignored
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name:   "not-gopher",
+						Groups: []string{"pythons"},
+					},
+					Verb:            "delete",
+					APIGroup:        "",
+					Resource:        "serviceaccounts",
+					Subresource:     "",
+					Name:            "builder",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "simple blacklist group not deny",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					saBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					groupedLabeledUserRandy, // not important for this test, just there to make sure it is ignored
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name:   "not-gopher",
+						Groups: []string{"not-pythons"},
+					},
+					Verb:            "delete",
+					APIGroup:        "",
+					Resource:        "serviceaccounts",
+					Subresource:     "",
+					Name:            "builder",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionNoOpinion,
+			want1:   "",
+			wantErr: false,
+		},
+		{
+			name: "simple blacklist label deny",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					saBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					groupedLabeledUserFrank,
+					groupedLabeledUserRandy, // not important for this test, just there to make sure it is ignored
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name:   "frank",
+						Groups: []string{"not-pythons"},
+					},
+					Verb:            "delete",
+					APIGroup:        "",
+					Resource:        "serviceaccounts",
+					Subresource:     "",
+					Name:            "builder",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "blacklist deny user via embedded group of other labeled user",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					saBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					groupedLabeledUserFrank,
+					groupedLabeledUserRandy, // not important for this test, just there to make sure it is ignored
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name:   "not-used",
+						Groups: []string{"danger-zone"}, // this is weird because it is the frank user's label matching that denies it
+					},
+					Verb:            "delete",
+					APIGroup:        "",
+					Resource:        "serviceaccounts",
+					Subresource:     "",
+					Name:            "builder",
+					ResourceRequest: true,
+					Path:            "",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "blacklist deny user path",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					oauthURLBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					saBlacklistUser,
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					// the rest are not important for this test, just there to make sure it is ignored
+					groupedLabeledUserFrank,
+					groupedLabeledUserRandy,
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name: "oauth-man",
+					},
+					Verb:            "GET",
+					ResourceRequest: false,
+					Path:            "/oauth/token",
+				},
+			},
+			want:    authorizer.DecisionDeny,
+			want1:   "denied by access restriction",
+			wantErr: false,
+		},
+		{
+			name: "blacklist not deny user path",
+			fields: fields{
+				accessRestrictionLister: testAccessRestrictionLister(
+					oauthURLBlacklistUser,
+					// the rest are not important for this test, just there to make sure it is ignored
+					saBlacklistUser,
+					identityWhitelistSA,
+					secretWhitelistGroup,
+					configmapWhitelistUser,
+					podWhitelistGroup,
+				),
+				userLister: testUserLister(
+					// the rest are not important for this test, just there to make sure it is ignored
+					groupedLabeledUserFrank,
+					groupedLabeledUserRandy,
+				),
+				groupLister: testGroupLister(
+					secretLabelGroupNoUsers, // not important for this test, just there to make sure it is ignored
+				),
+			},
+			args: args{
+				requestAttributes: &authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name: "not-oauth-man",
+					},
+					Verb:            "GET",
+					ResourceRequest: false,
+					Path:            "/oauth/token",
 				},
 			},
 			want:    authorizer.DecisionNoOpinion,
