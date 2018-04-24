@@ -28,11 +28,11 @@ const (
 	defaultGithubUserTeamURL  = "https://api.github.com/user/teams"
 	defaultGithubUserEmailURL = "https://api.github.com/user/emails"
 
-	// GitHub Enterprise OAuth endpoints with domain substitution
+	// GitHub Enterprise OAuth endpoints with hostname substitution
 	enterpriseGithubAuthorizeURL = "https://%s/login/oauth/authorize"
 	enterpriseGithubTokenURL     = "https://%s/login/oauth/access_token"
 
-	// GitHub User API endpoints with domain substitution
+	// GitHub User API endpoints with hostname substitution
 	enterpriseGithubUserApiURL   = "https://%s/api/v3/user"
 	enterpriseGithubUserOrgURL   = "https://%s/api/v3/user/orgs"
 	enterpriseGithubUserTeamURL  = "https://%s/api/v3/user/teams"
@@ -95,7 +95,7 @@ type githubTeam struct {
 	Organization githubOrg
 }
 
-func NewProvider(providerName, clientID, clientSecret, domain string, transport http.RoundTripper, organizations, teams []string) external.Provider {
+func NewProvider(providerName, clientID, clientSecret, hostname string, transport http.RoundTripper, organizations, teams []string) external.Provider {
 	allowedOrganizations := sets.NewString()
 	for _, org := range organizations {
 		if len(org) > 0 {
@@ -125,13 +125,13 @@ func NewProvider(providerName, clientID, clientSecret, domain string, transport 
 		githubUserEmailURL:   defaultGithubUserEmailURL,
 	}
 
-	if len(domain) != 0 {
-		p.githubAuthorizeURL = fmt.Sprintf(enterpriseGithubAuthorizeURL, domain)
-		p.githubTokenURL = fmt.Sprintf(enterpriseGithubTokenURL, domain)
-		p.githubUserApiURL = fmt.Sprintf(enterpriseGithubUserApiURL, domain)
-		p.githubUserOrgURL = fmt.Sprintf(enterpriseGithubUserOrgURL, domain)
-		p.githubUserTeamURL = fmt.Sprintf(enterpriseGithubUserTeamURL, domain)
-		p.githubUserEmailURL = fmt.Sprintf(enterpriseGithubUserEmailURL, domain)
+	if len(hostname) != 0 {
+		p.githubAuthorizeURL = fmt.Sprintf(enterpriseGithubAuthorizeURL, hostname)
+		p.githubTokenURL = fmt.Sprintf(enterpriseGithubTokenURL, hostname)
+		p.githubUserApiURL = fmt.Sprintf(enterpriseGithubUserApiURL, hostname)
+		p.githubUserOrgURL = fmt.Sprintf(enterpriseGithubUserOrgURL, hostname)
+		p.githubUserTeamURL = fmt.Sprintf(enterpriseGithubUserTeamURL, hostname)
+		p.githubUserEmailURL = fmt.Sprintf(enterpriseGithubUserEmailURL, hostname)
 	}
 
 	return p

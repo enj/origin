@@ -474,7 +474,7 @@ func (c *OAuthServerConfig) getOAuthProvider(identityProvider configapi.Identity
 		if err != nil {
 			return nil, err
 		}
-		return github.NewProvider(identityProvider.Name, provider.ClientID, clientSecret, provider.Domain, transport, provider.Organizations, provider.Teams), nil
+		return github.NewProvider(identityProvider.Name, provider.ClientID, clientSecret, provider.Hostname, transport, provider.Organizations, provider.Teams), nil
 
 	case (*configapi.GitLabIdentityProvider):
 		transport, err := transportFor(provider.CA, "", "")

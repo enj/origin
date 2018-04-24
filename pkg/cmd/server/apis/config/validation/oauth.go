@@ -3,11 +3,13 @@ package validation
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"path"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	kvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
@@ -354,7 +356,27 @@ func ValidateGitHubIdentityProvider(provider *configapi.GitHubIdentityProvider, 
 		}
 	}
 
+	if hostname := provider.Hostname; len(hostname) != 0 {
+		if !isValidHostname(hostname) {
+			validationResults.AddErrors(field.Invalid(fieldPath.Child("hostname"), hostname, "must be a valid DNS subdomain or IP address"))
+		}
+	}
+
+	if caFile := provider.CA; len(caFile) != 0 {
+		caPath := fieldPath.Child("ca")
+
+		validationResults.AddErrors(ValidateFile(caFile, caPath)...)
+
+		if len(provider.Hostname) == 0 {
+			validationResults.AddErrors(field.Invalid(caPath, caFile, "cannot be specified when hostname is empty"))
+		}
+	}
+
 	return validationResults
+}
+
+func isValidHostname(hostname string) bool {
+	return len(kvalidation.IsDNS1123Subdomain(hostname)) == 0 || net.ParseIP(hostname) != nil
 }
 
 func ValidateGoogleIdentityProvider(provider *configapi.GoogleIdentityProvider, challenge bool, mappingMethod string, fieldPath *field.Path) ValidationResults {
