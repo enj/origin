@@ -129,6 +129,7 @@ func GetMasterFileReferences(config *MasterConfig) []*string {
 
 			case (*GitHubIdentityProvider):
 				refs = append(refs, GetStringSourceFileReferences(&provider.ClientSecret)...)
+				refs = append(refs, &provider.CA)
 
 			}
 		}

@@ -357,8 +357,14 @@ func ValidateGitHubIdentityProvider(provider *configapi.GitHubIdentityProvider, 
 	}
 
 	if hostname := provider.Hostname; len(hostname) != 0 {
+		hostnamePath := fieldPath.Child("hostname")
+
+		if hostname == "github.com" || strings.HasSuffix(hostname, ".github.com") {
+			validationResults.AddErrors(field.Invalid(hostnamePath, hostname, "cannot equal [*.]github.com"))
+		}
+
 		if !isValidHostname(hostname) {
-			validationResults.AddErrors(field.Invalid(fieldPath.Child("hostname"), hostname, "must be a valid DNS subdomain or IP address"))
+			validationResults.AddErrors(field.Invalid(hostnamePath, hostname, "must be a valid DNS subdomain or IP address"))
 		}
 	}
 
