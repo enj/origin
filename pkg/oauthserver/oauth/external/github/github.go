@@ -95,6 +95,8 @@ type githubTeam struct {
 	Organization githubOrg
 }
 
+var _ external.Provider = &provider{}
+
 func NewProvider(providerName, clientID, clientSecret, hostname string, transport http.RoundTripper, organizations, teams []string) external.Provider {
 	allowedOrganizations := sets.NewString()
 	for _, org := range organizations {
