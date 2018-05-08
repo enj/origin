@@ -14,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -94,9 +96,25 @@ type ResourceOptions struct {
 	DryRun    bool
 	Summarize bool
 
-	// Any migrate command that exposes this must make sure that
+	// Number of parallel workers to use.
+	// Any migrate command that sets this must make sure that
 	// its SaveFn, PrintFn and FilterFn are goroutine safe.
+	// Setting this requires a positive value for QPS as well.
+	// This should not be exposed as a CLI flag.  Instead it
+	// should have a fixed value that is high enough to saturate
+	// QPS when parallel processing is desired.
 	Parallel int
+
+	// Total number of requests per second across all workers.
+	// Required to have a non-zero default if Parallel is set.
+	// Zero means "no rate limit."
+	// TODO expose globally via ResourceOptions.Bind once
+	// TransformRequests works correctly with Flatten
+	QPS float32
+
+	// The request transform that should be used by all REST clients
+	// TODO remove this field once TransformRequests works correctly with Flatten
+	RequestTransform resource.RequestTransform
 }
 
 func (o *ResourceOptions) Bind(c *cobra.Command) {
@@ -237,30 +255,13 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 		break
 	}
 
-	o.Builder = f.NewBuilder().
-		AllNamespaces(allNamespaces).
-		FilenameParam(false, &resource.FilenameOptions{Recursive: false, Filenames: o.Filenames}).
-		ContinueOnError().
-		DefaultNamespace().
-		RequireObject(true).
-		SelectAllParam(true).
-		Flatten()
-
-	if o.Unstructured {
-		o.Builder = o.Builder.Unstructured()
-	} else {
-		o.Builder = o.Builder.Internal()
-	}
-
-	if !allNamespaces {
-		o.Builder.NamespaceParam(namespace)
-	}
-	if len(o.Filenames) == 0 {
-		o.Builder.ResourceTypes(o.Include...)
+	// any command that uses parallel must have a non-zero default QPS
+	if o.Parallel > 1 && o.QPS == 0 && !c.Flags().Changed("qps") {
+		return fmt.Errorf("invalid default value %f for QPS, must be greater than zero", o.QPS)
 	}
 
 	// we need at least one worker
-	if !c.Flags().Changed("parallel") {
+	if o.Parallel == 0 {
 		o.Parallel = 1
 	}
 
@@ -268,6 +269,45 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 	if o.Parallel > 1 {
 		o.Out = &syncedWriter{writer: o.Out}
 		o.ErrOut = &syncedWriter{writer: o.ErrOut}
+	}
+
+	// assume no rate limiting by default
+	// this is safe because migrate runs with a single worker unless otherwise specified
+	rateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	if o.QPS > 0 {
+		// rate limit based on QPS if provided
+		// we use a burst value that scales linearly with the number of workers
+		rateLimiter = flowcontrol.NewTokenBucketRateLimiter(o.QPS, 10*o.Parallel)
+	}
+
+	// Store transform for later use if needed
+	// TODO remove this once TransformRequests works correctly with Flatten
+	o.RequestTransform = func(req *rest.Request) {
+		req.Throttle(rateLimiter)
+	}
+
+	o.Builder = f.NewBuilder().
+		AllNamespaces(allNamespaces).
+		FilenameParam(false, &resource.FilenameOptions{Recursive: false, Filenames: o.Filenames}).
+		ContinueOnError().
+		DefaultNamespace().
+		RequireObject(true).
+		SelectAllParam(true).
+		Flatten().
+		TransformRequests(o.RequestTransform)
+
+	if o.Unstructured {
+		o.Builder.Unstructured()
+	} else {
+		o.Builder.Internal()
+	}
+
+	if !allNamespaces {
+		o.Builder.NamespaceParam(namespace)
+	}
+
+	if len(o.Filenames) == 0 {
+		o.Builder.ResourceTypes(o.Include...)
 	}
 
 	return nil
@@ -278,7 +318,10 @@ func (o *ResourceOptions) Validate() error {
 		return fmt.Errorf("you must specify at least one resource or resource type to migrate with --include or --filenames")
 	}
 	if o.Parallel < 1 {
-		return fmt.Errorf("invalid value %d for --parallel, must be at least 1", o.Parallel)
+		return fmt.Errorf("invalid value %d for parallel, must be at least 1", o.Parallel)
+	}
+	if o.QPS < 0 {
+		return fmt.Errorf("invalid value %f for --qps, must be at least 0", o.QPS)
 	}
 	return nil
 }
@@ -344,13 +387,13 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 		results:             results,
 	}
 
-	// use wg to track when workers have finished processing
-	wg := sync.WaitGroup{}
+	// use a wait group to track when workers have finished processing
+	workersWG := sync.WaitGroup{}
 	// spawn and track all workers
 	for w := 0; w < o.Parallel; w++ {
-		wg.Add(1)
+		workersWG.Add(1)
 		go func() {
-			defer wg.Done()
+			defer workersWG.Done()
 			worker := &migrateWorker{
 				retries:   10, // how many times should this worker retry per resource
 				work:      work,
@@ -363,11 +406,11 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 		}()
 	}
 
-	// use wg2 to track when the consumer (migrateTracker) has finished tracking stats
-	wg2 := sync.WaitGroup{}
-	wg2.Add(1)
+	// use another wait group to track when the consumer (migrateTracker) has finished tracking stats
+	consumerWG := sync.WaitGroup{}
+	consumerWG.Add(1)
 	go func() {
-		defer wg2.Done()
+		defer consumerWG.Done()
 		t.run()
 	}()
 
@@ -380,11 +423,11 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	// signal that we are done sending work
 	close(work)
 	// wait for the workers to finish processing
-	wg.Wait()
+	workersWG.Wait()
 	// signal that all workers have processed and sent completed work
 	close(results)
 	// wait for the consumer to finish recording the results from processing
-	wg2.Wait()
+	consumerWG.Wait()
 
 	if summarize {
 		if dryRun {

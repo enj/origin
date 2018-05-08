@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"io"
+	"runtime"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -168,8 +169,13 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 		},
 	}
 	options.ResourceOptions.Bind(cmd)
+
 	// opt-in to allow parallel execution since we know this command is goroutine safe
-	cmd.Flags().IntVar(&options.Parallel, "parallel", 1, "Number of workers to use during storage migration.")
+	// storage migration is IO bound so we make sure that we have enough workers to saturate the rate limiter
+	options.Parallel = 32 * runtime.NumCPU()
+	// opt-in to allow QPS to be configured
+	// TODO remove this once QPS is exposed via ResourceOptions.Bind
+	cmd.Flags().Float32Var(&options.QPS, "qps", 10, "Average number of requests per second to use during storage migration.")
 
 	return cmd
 }
@@ -195,11 +201,15 @@ func (o MigrateAPIStorageOptions) Run() error {
 // if the input type cannot be saved. It returns migrate.ErrRecalculate if migration should be re-run
 // on the provided object.
 func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Reporter) error {
+	// Build a client with the same request transform
+	// TODO remove this once TransformRequests works correctly with Flatten
+	infoClient := resource.NewClientWithOptions(info.Client, o.RequestTransform)
+
 	switch info.Object.(type) {
 	// TODO: add any custom mutations necessary
 	default:
 		// load the body and save it back, without transformation to avoid losing fields
-		get := info.Client.Get().
+		get := infoClient.Get().
 			Resource(info.Mapping.Resource).
 			NamespaceIfScoped(info.Namespace, info.Mapping.Scope.Name() == meta.RESTScopeNameNamespace).
 			Name(info.Name).Do()
@@ -211,7 +221,7 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 			// that DefaultRetriable can correctly determine if the error is safe to retry.
 			return migrate.DefaultRetriable(info, get.Error())
 		}
-		update := info.Client.Put().
+		update := infoClient.Put().
 			Resource(info.Mapping.Resource).
 			NamespaceIfScoped(info.Namespace, info.Mapping.Scope.Name() == meta.RESTScopeNameNamespace).
 			Name(info.Name).Body(data).
