@@ -14,8 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -99,22 +97,10 @@ type ResourceOptions struct {
 	// Number of parallel workers to use.
 	// Any migrate command that sets this must make sure that
 	// its SaveFn, PrintFn and FilterFn are goroutine safe.
-	// Setting this requires a positive value for QPS as well.
 	// This should not be exposed as a CLI flag.  Instead it
 	// should have a fixed value that is high enough to saturate
-	// QPS when parallel processing is desired.
+	// the desired IOPS when parallel processing is desired.
 	Parallel int
-
-	// Total number of requests per second across all workers.
-	// Required to have a non-zero default if Parallel is set.
-	// Zero means "no rate limit."
-	// TODO expose globally via ResourceOptions.Bind once
-	// TransformRequests works correctly with Flatten
-	QPS float32
-
-	// The request transform that should be used by all REST clients
-	// TODO remove this field once TransformRequests works correctly with Flatten
-	RequestTransform resource.RequestTransform
 }
 
 func (o *ResourceOptions) Bind(c *cobra.Command) {
@@ -255,11 +241,6 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 		break
 	}
 
-	// any command that uses parallel must have a non-zero default QPS
-	if o.Parallel > 1 && o.QPS == 0 && !c.Flags().Changed("qps") {
-		return fmt.Errorf("invalid default value %f for QPS, must be greater than zero", o.QPS)
-	}
-
 	// we need at least one worker
 	if o.Parallel == 0 {
 		o.Parallel = 1
@@ -271,21 +252,6 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 		o.ErrOut = &syncedWriter{writer: o.ErrOut}
 	}
 
-	// assume no rate limiting by default
-	// this is safe because migrate runs with a single worker unless otherwise specified
-	rateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
-	if o.QPS > 0 {
-		// rate limit based on QPS if provided
-		// we use a burst value that scales linearly with the number of workers
-		rateLimiter = flowcontrol.NewTokenBucketRateLimiter(o.QPS, 10*o.Parallel)
-	}
-
-	// Store transform for later use if needed
-	// TODO remove this once TransformRequests works correctly with Flatten
-	o.RequestTransform = func(req *rest.Request) {
-		req.Throttle(rateLimiter)
-	}
-
 	o.Builder = f.NewBuilder().
 		AllNamespaces(allNamespaces).
 		FilenameParam(false, &resource.FilenameOptions{Recursive: false, Filenames: o.Filenames}).
@@ -293,8 +259,7 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 		DefaultNamespace().
 		RequireObject(true).
 		SelectAllParam(true).
-		Flatten().
-		TransformRequests(o.RequestTransform)
+		Flatten()
 
 	if o.Unstructured {
 		o.Builder.Unstructured()
@@ -319,9 +284,6 @@ func (o *ResourceOptions) Validate() error {
 	}
 	if o.Parallel < 1 {
 		return fmt.Errorf("invalid value %d for parallel, must be at least 1", o.Parallel)
-	}
-	if o.QPS < 0 {
-		return fmt.Errorf("invalid value %f for --qps, must be at least 0", o.QPS)
 	}
 	return nil
 }
