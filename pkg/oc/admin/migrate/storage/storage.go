@@ -45,17 +45,14 @@ var (
 		result in significant intra-cluster traffic.`)
 
 	internalMigrateStorageExample = templates.Examples(`
-		# Perform a dry-run of updating all objects
+	  # Perform an update of all objects
 	  %[1]s
 
-	  # To actually perform the update, the confirm flag must be appended
-	  %[1]s --confirm
-
 	  # Only migrate pods
-	  %[1]s --include=pods --confirm
+	  %[1]s --include=pods
 
 	  # Only pods that are in namespaces starting with "bar"
-	  %[1]s --include=pods --confirm --from-key=bar/ --to-key=bar/\xFF`)
+	  %[1]s --include=pods --from-key=bar/ --to-key=bar/\xFF`)
 )
 
 const (
@@ -70,12 +67,11 @@ const (
 type MigrateAPIStorageOptions struct {
 	migrate.ResourceOptions
 
-	// Total number of requests per second across all workers.  // TODO fix
+	// Total IO in bytes per second across all workers.
 	// Zero means "no rate limit."
 	iops float32
-
-	// TODO
-	limiter internalLimiter
+	// used to enforce iops value
+	limiter *tokenLimiter
 }
 
 // NewCmdMigrateAPIStorage implements a MigrateStorage command
@@ -189,18 +185,30 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 		},
 	}
 	options.ResourceOptions.Bind(cmd)
+	flags := cmd.Flags()
 
 	// opt-in to allow parallel execution since we know this command is goroutine safe
 	// storage migration is IO bound so we make sure that we have enough workers to saturate the rate limiter
 	options.Parallel = 32 * runtime.NumCPU()
 	// expose a flag to allow rate limiting the workers based on IOPS (this attempts to mimic AWS I/O metrics)
-	cmd.Flags().Float32Var(&options.iops, "iops", 256,
+	flags.Float32Var(&options.iops, "iops", 256,
 		"Average number of input/output operations per second measured in KiB to use during storage migration.  Zero means no limit.")
+
+	// remove flags that do not make sense
+	flags.MarkDeprecated("confirm", "storage migration does not support dry run, this flag is ignored")
+	flags.MarkHidden("confirm")
+	flags.MarkDeprecated("output", "storage migration does not support dry run, this flag is ignored")
+	flags.MarkHidden("output")
 
 	return cmd
 }
 
 func (o *MigrateAPIStorageOptions) Complete(f *clientcmd.Factory, c *cobra.Command, args []string) error {
+	// force unset output, it does not make sense for this command
+	c.Flags().Set("output", "")
+	// force confirm, dry run does not make sense for this command
+	o.Confirm = true
+
 	o.ResourceOptions.SaveFn = o.save
 	if err := o.ResourceOptions.Complete(f, c); err != nil {
 		return err
@@ -214,11 +222,13 @@ func (o *MigrateAPIStorageOptions) Complete(f *clientcmd.Factory, c *cobra.Comma
 		func(req *rest.Request) {
 			req.Throttle(always)
 		},
-	)
+	).
+		// we use info.Client to directly fetch objects
+		RequireObject(false)
 
-	// handle zero as a special case so we do not have the overhead
-	o.limiter = noLimit{}
-	// otherwise limit accordingly
+	// iops < 0 means error
+	// iops == 0 means "no limit", we use a nil check to minimize overhead
+	// iops > 0 means limit accordingly
 	if o.iops > 0 {
 		o.limiter = newTokenLimiter(o.iops, o.Parallel)
 	}
@@ -260,12 +270,15 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 			return migrate.DefaultRetriable(info, get.Error())
 		}
 
-		// we have to wait until after the GET to determine how much data we will PUT
-		// thus we need to double the amount to account for both operations
-		latency := o.limiter.take(2 * len(data))
-		// mimic Request.tryThrottle logging logic
-		if latency > longThrottleLatency {
-			glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", r.URL().String())
+		// a nil limiter means "no limit"
+		if o.limiter != nil {
+			// we have to wait until after the GET to determine how much data we will PUT
+			// thus we need to double the amount to account for both operations
+			latency := o.limiter.take(2 * len(data))
+			// mimic Request.tryThrottle logging logic
+			if latency > longThrottleLatency {
+				glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", r.URL().String())
+			}
 		}
 
 		update := info.Client.Put().
@@ -295,24 +308,14 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 	return nil
 }
 
-type internalLimiter interface {
-	take(n int) time.Duration
-}
-
-var (
-	_ internalLimiter = noLimit{}
-	_ internalLimiter = &tokenLimiter{}
-)
-
-type noLimit struct{}
-
-func (noLimit) take(_ int) time.Duration { return 0 }
-
 type tokenLimiter struct {
 	burst       int
 	rateLimiter *rate.Limiter
 }
 
+// take n bytes from the rateLimiter, and sleep if needed
+// return the length of the sleep
+// is go routine safe
 func (t *tokenLimiter) take(n int) time.Duration {
 	// if n > burst, we need to split the reservation otherwise ReserveN will fail
 	var extra time.Duration
