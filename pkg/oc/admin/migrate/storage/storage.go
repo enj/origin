@@ -316,12 +316,16 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 type tokenLimiter struct {
 	burst       int
 	rateLimiter *rate.Limiter
+	nowFunc     func() time.Time // for unit testing
 }
 
 // take n bytes from the rateLimiter, and sleep if needed
 // return the length of the sleep
 // is goroutine safe
 func (t *tokenLimiter) take(n int) time.Duration {
+	if n <= 0 {
+		return 0
+	}
 	// if n > burst, we need to split the reservation otherwise ReserveN will fail
 	var extra time.Duration
 	for ; n > t.burst; n -= t.burst {
@@ -334,7 +338,7 @@ func (t *tokenLimiter) take(n int) time.Duration {
 }
 
 func (t *tokenLimiter) getDuration(n int) time.Duration {
-	now := time.Now()
+	now := t.nowFunc()
 	reservation := t.rateLimiter.ReserveN(now, n)
 	if !reservation.OK() {
 		// this should never happen but we do not want to hang a worker forever
@@ -348,5 +352,5 @@ func (t *tokenLimiter) getDuration(n int) time.Duration {
 // we use a burst value that scales linearly with the number of workers
 func newTokenLimiter(iops, workers int) *tokenLimiter {
 	burst := 100 * kibToBytes * workers // 100 KiB of burst per worker
-	return &tokenLimiter{burst: burst, rateLimiter: rate.NewLimiter(rate.Limit(iops*mibToKiB*kibToBytes), burst)}
+	return &tokenLimiter{burst: burst, rateLimiter: rate.NewLimiter(rate.Limit(iops*mibToKiB*kibToBytes), burst), nowFunc: time.Now}
 }
