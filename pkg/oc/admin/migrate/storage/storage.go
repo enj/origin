@@ -60,6 +60,8 @@ const (
 	// throttle for more than longThrottleLatency will be logged.
 	longThrottleLatency = 50 * time.Millisecond
 
+	// 1 MiB == 1024 KiB
+	mibToKiB = 1024
 	// 1 KiB == 1024 bytes
 	kibToBytes = 1024
 )
@@ -67,9 +69,9 @@ const (
 type MigrateAPIStorageOptions struct {
 	migrate.ResourceOptions
 
-	// Total IO in bytes per second across all workers.
+	// Total IO in megabytes per second across all workers.
 	// Zero means "no rate limit."
-	iops float32
+	iops int
 	// used to enforce iops value
 	limiter *tokenLimiter
 }
@@ -191,8 +193,8 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 	// storage migration is IO bound so we make sure that we have enough workers to saturate the rate limiter
 	options.Parallel = 32 * runtime.NumCPU()
 	// expose a flag to allow rate limiting the workers based on IOPS (this attempts to mimic AWS I/O metrics)
-	flags.Float32Var(&options.iops, "iops", 256,
-		"Average number of input/output operations per second measured in KiB to use during storage migration.  Zero means no limit.")
+	flags.IntVar(&options.iops, "iops", 1,
+		"Average number of input/output operations per second measured in MiB to use during storage migration.  Zero means no limit.")
 
 	// remove flags that do not make sense
 	flags.MarkDeprecated("confirm", "storage migration does not support dry run, this flag is ignored")
@@ -216,7 +218,7 @@ func (o *MigrateAPIStorageOptions) Complete(f *clientcmd.Factory, c *cobra.Comma
 
 	// do not limit the builder as we handle throttling via our own limiter
 	// thus the list calls that the builder makes are never rate limited
-	// we do not have a way to track their IO usage so this is the best we can do
+	// we estimate their IO usage in our call to o.limiter.take
 	always := flowcontrol.NewFakeAlwaysRateLimiter()
 	o.Builder.TransformRequests(
 		func(req *rest.Request) {
@@ -274,7 +276,10 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 		if o.limiter != nil {
 			// we have to wait until after the GET to determine how much data we will PUT
 			// thus we need to double the amount to account for both operations
-			latency := o.limiter.take(2 * len(data))
+			// we also need to account for the initial list operation which is roughly another GET per object
+			// thus we can amortize the cost of the list by adding another GET to our calculations
+			// so we have 2 GETs + 1 PUT == 3 * size of data
+			latency := o.limiter.take(3 * len(data))
 			// mimic Request.tryThrottle logging logic
 			if latency > longThrottleLatency {
 				glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", r.URL().String())
@@ -315,7 +320,7 @@ type tokenLimiter struct {
 
 // take n bytes from the rateLimiter, and sleep if needed
 // return the length of the sleep
-// is go routine safe
+// is goroutine safe
 func (t *tokenLimiter) take(n int) time.Duration {
 	// if n > burst, we need to split the reservation otherwise ReserveN will fail
 	var extra time.Duration
@@ -341,7 +346,7 @@ func (t *tokenLimiter) getDuration(n int) time.Duration {
 
 // rate limit based on IOPS after conversion to bytes
 // we use a burst value that scales linearly with the number of workers
-func newTokenLimiter(iops float32, workers int) *tokenLimiter {
-	burst := 10 * kibToBytes * workers
-	return &tokenLimiter{burst: burst, rateLimiter: rate.NewLimiter(rate.Limit(iops*kibToBytes), burst)}
+func newTokenLimiter(iops, workers int) *tokenLimiter {
+	burst := 100 * kibToBytes * workers // 100 KiB of burst per worker
+	return &tokenLimiter{burst: burst, rateLimiter: rate.NewLimiter(rate.Limit(iops*mibToKiB*kibToBytes), burst)}
 }

@@ -259,7 +259,8 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 		DefaultNamespace().
 		RequireObject(true).
 		SelectAllParam(true).
-		Flatten()
+		Flatten().
+		RequestChunksOf(500)
 
 	if o.Unstructured {
 		o.Builder.Unstructured()
