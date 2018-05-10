@@ -207,7 +207,9 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 
 func (o *MigrateAPIStorageOptions) Complete(f *clientcmd.Factory, c *cobra.Command, args []string) error {
 	// force unset output, it does not make sense for this command
-	c.Flags().Set("output", "")
+	if err := c.Flags().Set("output", ""); err != nil {
+		return err
+	}
 	// force confirm, dry run does not make sense for this command
 	o.Confirm = true
 

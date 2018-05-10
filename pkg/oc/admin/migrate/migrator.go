@@ -293,7 +293,7 @@ func (o *ResourceOptions) Validate() error {
 func (o *ResourceOptions) Visitor() *ResourceVisitor {
 	return &ResourceVisitor{
 		Out:      o.Out,
-		Builder:  o.Builder,
+		Builder:  &resourceBuilder{builder: o.Builder},
 		SaveFn:   o.SaveFn,
 		PrintFn:  o.PrintFn,
 		FilterFn: o.FilterFn,
@@ -302,10 +302,25 @@ func (o *ResourceOptions) Visitor() *ResourceVisitor {
 	}
 }
 
+// Builder allows for mocking of resource.Builder
+type Builder interface {
+	// Visitor returns a resource.Visitor that ignores errors that match the given resource.ErrMatchFuncs
+	Visitor(fns ...resource.ErrMatchFunc) (resource.Visitor, error)
+}
+
+type resourceBuilder struct {
+	builder *resource.Builder
+}
+
+func (r *resourceBuilder) Visitor(fns ...resource.ErrMatchFunc) (resource.Visitor, error) {
+	result := r.builder.Do().IgnoreErrors(fns...)
+	return result, result.Err()
+}
+
 type ResourceVisitor struct {
 	Out io.Writer
 
-	Builder *resource.Builder
+	Builder Builder
 
 	SaveFn   MigrateActionFunc
 	PrintFn  MigrateActionFunc
@@ -330,13 +345,11 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	}
 	out := o.Out
 
-	result := o.Builder.Do()
-	if result.Err() != nil {
-		return result.Err()
-	}
-
 	// Ignore any resource that does not support GET
-	result.IgnoreErrors(errors.IsMethodNotSupported, errors.IsNotFound)
+	visitor, err := o.Builder.Visitor(errors.IsMethodNotSupported, errors.IsNotFound)
+	if err != nil {
+		return err
+	}
 
 	// the producer (result.Visit) uses this to send data to the workers
 	work := make(chan workData, 1024)
@@ -378,7 +391,7 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 		t.run()
 	}()
 
-	err := result.Visit(func(info *resource.Info, err error) error {
+	err = visitor.Visit(func(info *resource.Info, err error) error {
 		// send data from producer visitor to workers
 		work <- workData{info: info, err: err}
 		return nil
