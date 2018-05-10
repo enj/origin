@@ -63,10 +63,11 @@ type syncedWriter struct {
 	writer io.Writer
 }
 
-func (w *syncedWriter) Write(p []byte) (n int, err error) {
+func (w *syncedWriter) Write(p []byte) (int, error) {
 	w.lock.Lock()
-	defer w.lock.Unlock()
-	return w.writer.Write(p)
+	n, err := w.writer.Write(p)
+	w.lock.Unlock()
+	return n, err
 }
 
 // ResourceOptions assists in performing migrations on any object that
@@ -554,7 +555,7 @@ type migrateWorker struct {
 }
 
 // run processes data until t.work is closed
-func (t migrateWorker) run() {
+func (t *migrateWorker) run() {
 	for data := range t.work {
 		// if we have no error and a filter func, determine if we need to ignore this resource
 		if data.err == nil && t.filterFn != nil {
@@ -586,7 +587,7 @@ func (t migrateWorker) run() {
 
 // try will mutate the info and attempt to save, recalculating if there are any retries left.
 // The result of the attempt or an error will be returned.
-func (t migrateWorker) try(info *resource.Info, retries int) (attemptResult, error) {
+func (t *migrateWorker) try(info *resource.Info, retries int) (attemptResult, error) {
 	reporter, err := t.migrateFn(info)
 	if err != nil {
 		return attemptResultError, err
