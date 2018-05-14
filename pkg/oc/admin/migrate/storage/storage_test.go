@@ -10,6 +10,7 @@ import (
 
 // Test_tokenLimiter_take makes sure that the -1/0/+1 boundary cases work with burst
 // The exact values in "want" are generally irrelevant because they are controlled by rate.Limiter
+// They must be kept under one minute to make sure we can detect a reservation failure
 func Test_tokenLimiter_take(t *testing.T) {
 	nowFunc := func() time.Time {
 		return time.Time{} // current time is always 0

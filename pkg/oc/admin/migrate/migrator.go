@@ -55,9 +55,20 @@ func timeStampNow() string {
 	return time.Now().Format("0102 15:04:05.000000")
 }
 
+// used to check if an io.Writer is a *bufio.Writer or similar
+type flusher interface {
+	Flush() error
+}
+
+// used to check if an io.Writer is a *os.File or similar
+type syncer interface {
+	Sync() error
+}
+
 var _ io.Writer = &syncedWriter{}
 
 // syncedWriter makes the given writer goroutine safe
+// it will attempt to flush and sync on each write
 type syncedWriter struct {
 	lock   sync.Mutex
 	writer io.Writer
@@ -65,15 +76,31 @@ type syncedWriter struct {
 
 func (w *syncedWriter) Write(p []byte) (int, error) {
 	w.lock.Lock()
-	n, err := w.writer.Write(p)
+	n, err := w.write(p)
 	w.lock.Unlock()
+	return n, err
+}
+
+// must only be called when w.lock is held
+func (w *syncedWriter) write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	// attempt to flush buffered IO
+	if f, ok := w.writer.(flusher); ok {
+		f.Flush() // ignore error
+	}
+	// attempt to sync file
+	if s, ok := w.writer.(syncer); ok {
+		s.Sync() // ignore error
+	}
 	return n, err
 }
 
 // ResourceOptions assists in performing migrations on any object that
 // can be retrieved via the API.
 type ResourceOptions struct {
-	In          io.Reader
+	// To prevent any issues with multiple workers trying
+	// to read from this, the field was simply removed
+	// In          io.Reader
 	Out, ErrOut io.Writer
 
 	Unstructured  bool
@@ -98,10 +125,14 @@ type ResourceOptions struct {
 	// Number of parallel workers to use.
 	// Any migrate command that sets this must make sure that
 	// its SaveFn, PrintFn and FilterFn are goroutine safe.
+	// If multiple workers may attempt to write to Out or ErrOut
+	// at the same time, SyncOut must also be set to true.
 	// This should not be exposed as a CLI flag.  Instead it
 	// should have a fixed value that is high enough to saturate
-	// the desired IOPS when parallel processing is desired.
-	Parallel int
+	// the desired bandwidth when parallel processing is desired.
+	Workers int
+	// If true, Out and ErrOut will be wrapped to make them goroutine safe.
+	SyncOut bool
 }
 
 func (o *ResourceOptions) Bind(c *cobra.Command) {
@@ -243,12 +274,16 @@ func (o *ResourceOptions) Complete(f *clientcmd.Factory, c *cobra.Command) error
 	}
 
 	// we need at least one worker
-	if o.Parallel == 0 {
-		o.Parallel = 1
+	if o.Workers == 0 {
+		o.Workers = 1
 	}
 
 	// make sure we do not print to std out / err from multiple workers at once
-	if o.Parallel > 1 {
+	if len(o.Output) > 0 && o.Workers > 1 {
+		o.SyncOut = true
+	}
+	// the command requires synchronized output
+	if o.SyncOut {
 		o.Out = &syncedWriter{writer: o.Out}
 		o.ErrOut = &syncedWriter{writer: o.ErrOut}
 	}
@@ -284,8 +319,8 @@ func (o *ResourceOptions) Validate() error {
 	if len(o.Filenames) == 0 && len(o.Include) == 0 {
 		return fmt.Errorf("you must specify at least one resource or resource type to migrate with --include or --filenames")
 	}
-	if o.Parallel < 1 {
-		return fmt.Errorf("invalid value %d for parallel, must be at least 1", o.Parallel)
+	if o.Workers < 1 {
+		return fmt.Errorf("invalid value %d for workers, must be at least 1", o.Workers)
 	}
 	return nil
 }
@@ -298,7 +333,7 @@ func (o *ResourceOptions) Visitor() *ResourceVisitor {
 		PrintFn:  o.PrintFn,
 		FilterFn: o.FilterFn,
 		DryRun:   o.DryRun,
-		Parallel: o.Parallel,
+		Workers:  o.Workers,
 	}
 }
 
@@ -328,7 +363,7 @@ type ResourceVisitor struct {
 
 	DryRun bool
 
-	Parallel int
+	Workers int
 }
 
 func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
@@ -352,9 +387,9 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	}
 
 	// the producer (result.Visit) uses this to send data to the workers
-	work := make(chan workData, 10*o.Parallel) // 10 slots per worker
+	work := make(chan workData, 10*o.Workers) // 10 slots per worker
 	// the workers use this to send processed work to the consumer (migrateTracker)
-	results := make(chan resultData, 10*o.Parallel) // 10 slots per worker
+	results := make(chan resultData, 10*o.Workers) // 10 slots per worker
 
 	// migrateTracker tracks stats for this migrate run
 	t := &migrateTracker{
@@ -367,7 +402,7 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	// use a wait group to track when workers have finished processing
 	workersWG := sync.WaitGroup{}
 	// spawn and track all workers
-	for w := 0; w < o.Parallel; w++ {
+	for w := 0; w < o.Workers; w++ {
 		workersWG.Add(1)
 		go func() {
 			defer workersWG.Done()

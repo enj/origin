@@ -426,7 +426,7 @@ func TestResourceVisitor_Visit(t *testing.T) {
 		PrintFn  MigrateActionFunc
 		FilterFn MigrateFilterFunc
 		DryRun   bool
-		Parallel int
+		Workers  int
 	}
 	type args struct {
 		fn MigrateVisitFunc
@@ -446,7 +446,7 @@ func TestResourceVisitor_Visit(t *testing.T) {
 				PrintFn:  nil,                   // must be nil to use SaveFn
 				FilterFn: nil,                   // we want no filtering
 				DryRun:   false,                 // must be false to use SaveFn
-				Parallel: 32 * runtime.NumCPU(), // same as migrate storage
+				Workers:  32 * runtime.NumCPU(), // same as migrate storage
 			},
 			args: args{
 				fn: AlwaysRequiresMigration, // same as migrate storage
@@ -463,7 +463,7 @@ func TestResourceVisitor_Visit(t *testing.T) {
 				PrintFn:  tt.fields.PrintFn,
 				FilterFn: tt.fields.FilterFn,
 				DryRun:   tt.fields.DryRun,
-				Parallel: tt.fields.Parallel,
+				Workers:  tt.fields.Workers,
 			}
 			// how many infos are we expected to process
 			expectedInfos := int(tt.fields.Builder)

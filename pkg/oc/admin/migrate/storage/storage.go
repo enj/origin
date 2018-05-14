@@ -60,19 +60,22 @@ const (
 	// throttle for more than longThrottleLatency will be logged.
 	longThrottleLatency = 50 * time.Millisecond
 
-	// 1 MiB == 1024 KiB
-	mibToKiB = 1024
-	// 1 KiB == 1024 bytes
-	kibToBytes = 1024
+	// 1 MB == 1000 KB
+	mbToKB = 1000
+	// 1 KB == 1000 bytes
+	kbToBytes = 1000
+	// 1 byte == 8 bits
+	// we use a float to avoid truncating on division
+	byteToBits = 8.0
 )
 
 type MigrateAPIStorageOptions struct {
 	migrate.ResourceOptions
 
-	// Total IO in megabytes per second across all workers.
+	// Total network IO in megabits per second across all workers.
 	// Zero means "no rate limit."
-	iops int
-	// used to enforce iops value
+	bandwidth int
+	// used to enforce bandwidth value
 	limiter *tokenLimiter
 }
 
@@ -80,7 +83,6 @@ type MigrateAPIStorageOptions struct {
 func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.Reader, out, errout io.Writer) *cobra.Command {
 	options := &MigrateAPIStorageOptions{
 		ResourceOptions: migrate.ResourceOptions{
-			In:     in,
 			Out:    out,
 			ErrOut: errout,
 
@@ -191,10 +193,10 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 
 	// opt-in to allow parallel execution since we know this command is goroutine safe
 	// storage migration is IO bound so we make sure that we have enough workers to saturate the rate limiter
-	options.Parallel = 32 * runtime.NumCPU()
-	// expose a flag to allow rate limiting the workers based on IOPS (this attempts to mimic AWS I/O metrics)
-	flags.IntVar(&options.iops, "iops", 1,
-		"Average number of input/output operations per second measured in MiB to use during storage migration.  Zero means no limit.")
+	options.Workers = 32 * runtime.NumCPU()
+	// expose a flag to allow rate limiting the workers based on network bandwidth
+	flags.IntVar(&options.bandwidth, "bandwidth", 10,
+		"Average network bandwidth measured in megabits per second (Mbps) to use during storage migration.  Zero means no limit.")
 
 	// remove flags that do not make sense
 	flags.MarkDeprecated("confirm", "storage migration does not support dry run, this flag is ignored")
@@ -231,19 +233,19 @@ func (o *MigrateAPIStorageOptions) Complete(f *clientcmd.Factory, c *cobra.Comma
 		// this is just documentation, it does not really change anything because we fetch and decode lists of all objects regardless
 		RequireObject(false)
 
-	// iops < 0 means error
-	// iops == 0 means "no limit", we use a nil check to minimize overhead
-	// iops > 0 means limit accordingly
-	if o.iops > 0 {
-		o.limiter = newTokenLimiter(o.iops, o.Parallel)
+	// bandwidth < 0 means error
+	// bandwidth == 0 means "no limit", we use a nil check to minimize overhead
+	// bandwidth > 0 means limit accordingly
+	if o.bandwidth > 0 {
+		o.limiter = newTokenLimiter(o.bandwidth, o.Workers)
 	}
 
 	return nil
 }
 
 func (o MigrateAPIStorageOptions) Validate() error {
-	if o.iops < 0 {
-		return fmt.Errorf("invalid value %d for --iops, must be at least 0", o.iops)
+	if o.bandwidth < 0 {
+		return fmt.Errorf("invalid value %d for --bandwidth, must be at least 0", o.bandwidth)
 	}
 	return o.ResourceOptions.Validate()
 }
@@ -283,7 +285,7 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 			// thus we can amortize the cost of the list by adding another GET to our calculations
 			// so we have 2 GETs + 1 PUT == 3 * size of data
 			latency := o.limiter.take(3 * len(data))
-			// mimic Request.tryThrottle logging logic
+			// mimic rest.Request.tryThrottle logging logic
 			if latency > longThrottleLatency {
 				glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", r.URL().String())
 			}
@@ -351,9 +353,9 @@ func (t *tokenLimiter) getDuration(n int) time.Duration {
 	return reservation.DelayFrom(now)
 }
 
-// rate limit based on IOPS after conversion to bytes
+// rate limit based on bandwidth after conversion to bytes
 // we use a burst value that scales linearly with the number of workers
-func newTokenLimiter(iops, workers int) *tokenLimiter {
-	burst := 100 * kibToBytes * workers // 100 KiB of burst per worker
-	return &tokenLimiter{burst: burst, rateLimiter: rate.NewLimiter(rate.Limit(iops*mibToKiB*kibToBytes), burst), nowFunc: time.Now}
+func newTokenLimiter(bandwidth, workers int) *tokenLimiter {
+	burst := 100 * kbToBytes * workers // 100 KB of burst per worker
+	return &tokenLimiter{burst: burst, rateLimiter: rate.NewLimiter(rate.Limit(bandwidth*mbToKB*kbToBytes/byteToBits), burst), nowFunc: time.Now}
 }
