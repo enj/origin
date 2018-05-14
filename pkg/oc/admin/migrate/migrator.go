@@ -100,7 +100,7 @@ func (w *syncedWriter) write(p []byte) (int, error) {
 type ResourceOptions struct {
 	// To prevent any issues with multiple workers trying
 	// to read from this, the field was simply removed
-	// In          io.Reader
+	// In       io.Reader
 	Out, ErrOut io.Writer
 
 	Unstructured  bool
