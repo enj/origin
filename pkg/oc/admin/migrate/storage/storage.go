@@ -196,7 +196,7 @@ func NewCmdMigrateAPIStorage(name, fullName string, f *clientcmd.Factory, in io.
 	options.Workers = 32 * runtime.NumCPU()
 	// expose a flag to allow rate limiting the workers based on network bandwidth
 	flags.IntVar(&options.bandwidth, "bandwidth", 10,
-		"Average network bandwidth measured in megabits per second (Mbps) to use during storage migration.  Zero means no limit.")
+		"Average network bandwidth measured in megabits per second (Mbps) to use during storage migration.  Zero means no limit.  This flag is alpha and may change in the future.")
 
 	// remove flags that do not make sense
 	flags.MarkDeprecated("confirm", "storage migration does not support dry run, this flag is ignored")
