@@ -8,11 +8,10 @@ import (
 	"os/user"
 	"strings"
 
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/alexbrainman/sspi"
 	"github.com/alexbrainman/sspi/negotiate"
-
 	"github.com/golang/glog"
 )
 
@@ -47,12 +46,11 @@ func (s *sspiNegotiater) InitSecContext(requestURL string, challengeToken []byte
 		}
 		s.cred = cred
 
-		hostname, err := getHostname(requestURL)
+		serviceName, err := getServiceName('/', requestURL)
 		if err != nil {
 			return nil, err
 		}
 
-		serviceName := "HTTP/" + hostname // TODO refactor these together if they are the same
 		glog.V(5).Infof("importing service name %s", serviceName)
 		ctx, token, err := negotiate.NewClientContext(s.cred, serviceName)
 		if err != nil {
@@ -78,7 +76,7 @@ func (s *sspiNegotiater) IsComplete() bool {
 
 func (s *sspiNegotiater) Release() error {
 	glog.V(5).Info("Attempt to release SSPI")
-	var errs []error // TODO make sure these errors and the ones in InitSecContext are safe to use => I think they are
+	var errs []error
 	if s.ctx != nil {
 		if err := s.ctx.Release(); err != nil {
 			errs = append(errs, err)
@@ -89,13 +87,16 @@ func (s *sspiNegotiater) Release() error {
 			errs = append(errs, err)
 		}
 	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
 	return utilerrors.NewAggregate(errs)
 }
 
 func (s *sspiNegotiater) getUserCredentials() (*sspi.Credentials, error) {
 	// Try to use principalName if possible
 	// Fallback to the current user if principalName referred to the same user or was unspecified
-	if len(s.principalName) != 0 {
+	if len(s.principalName) > 0 {
 		username, domain, err := s.splitDomainAndUsername()
 		if err != nil {
 			return nil, err

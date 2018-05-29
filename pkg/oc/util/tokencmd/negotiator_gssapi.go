@@ -88,12 +88,11 @@ func (g *gssapiNegotiator) InitSecContext(requestURL string, challengeToken []by
 			g.cred = lib.GSS_C_NO_CREDENTIAL
 		}
 
-		hostname, err := getHostname(requestURL)
+		serviceName, err := getServiceName('@', requestURL)
 		if err != nil {
 			return nil, err
 		}
 
-		serviceName := "HTTP@" + hostname
 		glog.V(5).Infof("importing service name %s", serviceName)
 		nameBuf, err := lib.MakeBufferString(serviceName)
 		if err != nil {

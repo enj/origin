@@ -2,22 +2,16 @@ package tokencmd
 
 import (
 	"errors"
-	"net"
 	"net/url"
 )
 
-func getHostname(requestURL string) (string, error) {
+func getServiceName(sep rune, requestURL string) (string, error) {
 	u, err := url.Parse(requestURL)
 	if err != nil {
 		return "", err
 	}
 
-	hostname := u.Host
-	if h, _, err := net.SplitHostPort(u.Host); err == nil {
-		hostname = h
-	}
-
-	return hostname, nil
+	return "HTTP" + string(sep) + u.Hostname(), nil
 }
 
 type negotiateUnsupported struct {
@@ -25,7 +19,7 @@ type negotiateUnsupported struct {
 }
 
 func newUnsupportedNegotiator(name string) Negotiater {
-	return &negotiateUnsupported{errors.New(name + " support is not enabled")}
+	return &negotiateUnsupported{error: errors.New(name + " support is not enabled")}
 }
 
 func (n *negotiateUnsupported) Load() error {
