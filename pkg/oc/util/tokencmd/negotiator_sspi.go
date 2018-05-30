@@ -37,6 +37,8 @@ func (s *sspiNegotiator) Load() error {
 
 func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte) ([]byte, error) {
 	if s.cred == nil || s.ctx == nil {
+		glog.V(5).Infof("Start SSPI flow: %s", requestURL)
+
 		cred, err := s.getUserCredentials()
 		if err != nil {
 			glog.V(5).Infof("getUserCredentials returned error: %v", err)
@@ -61,6 +63,8 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		return outputToken, nil
 	}
 
+	glog.V(5).Info("Continue SSPI flow")
+
 	complete, outputToken, err := s.ctx.Update(challengeToken)
 	if err != nil {
 		glog.V(5).Infof("Update returned error: %v", err)
@@ -79,11 +83,13 @@ func (s *sspiNegotiator) Release() error {
 	var errs []error
 	if s.ctx != nil {
 		if err := s.ctx.Release(); err != nil {
+			glog.V(5).Infof("SSPI context release failed: %v", err)
 			errs = append(errs, err)
 		}
 	}
 	if s.cred != nil {
 		if err := s.cred.Release(); err != nil {
+			glog.V(5).Infof("SSPI credential release failed: %v", err)
 			errs = append(errs, err)
 		}
 	}
