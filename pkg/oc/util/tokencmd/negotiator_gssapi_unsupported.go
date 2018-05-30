@@ -6,6 +6,6 @@ func GSSAPIEnabled() bool {
 	return false
 }
 
-func NewGSSAPINegotiator(string) Negotiater {
+func NewGSSAPINegotiator(string) Negotiator {
 	return newUnsupportedNegotiator("GSSAPI")
 }

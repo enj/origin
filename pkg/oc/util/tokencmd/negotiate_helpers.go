@@ -18,7 +18,7 @@ type negotiateUnsupported struct {
 	error
 }
 
-func newUnsupportedNegotiator(name string) Negotiater {
+func newUnsupportedNegotiator(name string) Negotiator {
 	return &negotiateUnsupported{error: errors.New(name + " support is not enabled")}
 }
 
