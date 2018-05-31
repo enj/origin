@@ -80,11 +80,11 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 
 	complete, outputToken, err := s.ctx.Update(challengeToken)
 	if err != nil {
-		glog.V(5).Infof("Update returned error: %v", err)
+		glog.V(5).Infof("context Update returned error: %v", err)
 		return nil, err
 	}
 	s.complete = complete
-	glog.V(5).Infof("Update successful, complete=%v", s.complete)
+	glog.V(5).Infof("context Update successful, complete=%v", s.complete)
 	return outputToken, nil
 }
 
