@@ -110,7 +110,8 @@ func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
 		if err != nil {
 			return nil, err
 		}
-		glog.V(5).Infof("Using AcquireUserCredentials because principalName is not empty, principalName=%s, username=%s, domain=%s",
+		glog.V(5).Infof(
+			"Using AcquireUserCredentials because principalName is not empty, principalName=%s, username=%s, domain=%s",
 			s.principalName, username, domain)
 		cred, err := negotiate.AcquireUserCredentials(domain, username, s.password)
 		if err != nil {
@@ -129,7 +130,8 @@ const domainSeparator = `\`
 func (s *sspiNegotiator) splitDomainAndUsername() (string, string, error) {
 	data := strings.Split(s.principalName, domainSeparator)
 	if len(data) != 2 {
-		return "", "", fmt.Errorf(`invalid principalName %s, must be in format DOMAIN\username`, s.principalName)
+		return "", "", fmt.Errorf(`invalid username %s, must be in Fully Qualified User Name format (ex: DOMAIN\Username)`,
+			s.principalName)
 	}
 	domain := data[0]
 	username := data[1]
