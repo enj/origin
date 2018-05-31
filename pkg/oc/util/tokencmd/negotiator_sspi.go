@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/alexbrainman/sspi"
 	"github.com/alexbrainman/sspi/negotiate"
@@ -36,6 +37,7 @@ func (s *sspiNegotiator) Load() error {
 }
 
 func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte) ([]byte, error) {
+	defer runtime.HandleCrash()
 	if s.cred == nil || s.ctx == nil {
 		glog.V(5).Infof("Start SSPI flow: %s", requestURL)
 
@@ -71,6 +73,7 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		return nil, err
 	}
 	s.complete = complete
+	glog.V(5).Infof("Update successful, complete=%v", s.complete)
 	return outputToken, nil
 }
 
@@ -79,6 +82,7 @@ func (s *sspiNegotiator) IsComplete() bool {
 }
 
 func (s *sspiNegotiator) Release() error {
+	defer runtime.HandleCrash()
 	glog.V(5).Info("Attempt to release SSPI")
 	var errs []error
 	if s.ctx != nil {
