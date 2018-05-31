@@ -14,6 +14,16 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	flags = sspi.ISC_REQ_CONFIDENTIALITY |
+		sspi.ISC_REQ_INTEGRITY |
+		sspi.ISC_REQ_MUTUAL_AUTH |
+		sspi.ISC_REQ_REPLAY_DETECT |
+		sspi.ISC_REQ_SEQUENCE_DETECT
+
+	domainSeparator = `\`
+)
+
 func SSPIEnabled() bool {
 	return true
 }
@@ -33,6 +43,7 @@ func NewSSPINegotiator(principalName, password string) Negotiator {
 
 func (s *sspiNegotiator) Load() error {
 	glog.V(5).Info("Attempt to load SSPI")
+	// do nothing since SSPI uses lazy DLL loading
 	return nil
 }
 
@@ -55,7 +66,7 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		}
 
 		glog.V(5).Infof("importing service name %s", serviceName)
-		ctx, outputToken, err := negotiate.NewClientContext(s.cred, serviceName)
+		ctx, outputToken, err := negotiate.NewClientContext(s.cred, serviceName) // TODO flags
 		if err != nil {
 			glog.V(5).Infof("NewClientContext returned error: %v", err)
 			return nil, err
@@ -124,8 +135,6 @@ func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
 	glog.V(5).Info("Using AcquireCurrentUserCredentials because principalName is empty")
 	return negotiate.AcquireCurrentUserCredentials()
 }
-
-const domainSeparator = `\`
 
 func (s *sspiNegotiator) splitDomainAndUsername() (string, string, error) {
 	data := strings.Split(s.principalName, domainSeparator)
