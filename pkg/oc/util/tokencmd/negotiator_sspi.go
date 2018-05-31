@@ -29,16 +29,35 @@ func SSPIEnabled() bool {
 }
 
 type sspiNegotiator struct {
+	// optional DOMAIN\Username and password
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa374714(v=vs.85).aspx
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa380131(v=vs.85).aspx
+	// pAuthData [in]: If credentials are supplied, they are passed via a pointer to a sspi.SEC_WINNT_AUTH_IDENTITY
+	// structure that includes those credentials.
+	// When using the Negotiate package, the maximum character lengths for user name, password, and domain are
+	// 256, 256, and 15, respectively.
+	// TODO should we validate the lengths?
 	principalName string
 	password      string
 
-	cred     *sspi.Credentials
-	ctx      *negotiate.ClientContext
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/ms721572(v=vs.85).aspx#_security_credentials_gly
+	// phCredential [in, optional]: A handle to the credentials returned by AcquireCredentialsHandle (Negotiate).
+	// This handle is used to build the security context.  sspi.SECPKG_CRED_OUTBOUND is used to request OUTBOUND credentials.
+	cred *sspi.Credentials
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/ms721625(v=vs.85).aspx#_security_security_context_gly
+	// Manages all steps of the Negotiate negotiation.
+	ctx *negotiate.ClientContext
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa375509(v=vs.85).aspx
+	// fContextReq [in]: Bit flags that indicate requests for the context.
+	flags uint32
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa375509(v=vs.85).aspx
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa374764(v=vs.85).aspx
+	// Set to true once InitializeSecurityContext or CompleteAuthToken return sspi.SEC_E_OK
 	complete bool
 }
 
 func NewSSPINegotiator(principalName, password string) Negotiator {
-	return &sspiNegotiator{principalName: principalName, password: password}
+	return &sspiNegotiator{principalName: principalName, password: password, flags: flags}
 }
 
 func (s *sspiNegotiator) Load() error {
@@ -66,7 +85,7 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		}
 
 		glog.V(5).Infof("importing service name %s", serviceName)
-		ctx, outputToken, err := negotiate.NewClientContext(s.cred, serviceName) // TODO flags
+		ctx, outputToken, err := negotiate.NewClientContext(s.cred, serviceName) // TODO send s.flags
 		if err != nil {
 			glog.V(5).Infof("NewClientContext returned error: %v", err)
 			return nil, err
@@ -83,6 +102,8 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		glog.V(5).Infof("context Update returned error: %v", err)
 		return nil, err
 	}
+	// TODO we need a way to verify s.ctx.sctxt.EstablishedFlags matches s.ctx.sctxt.RequestedFlags (s.flags)
+	// we will need to update upstream to add the verification or use reflection hacks here
 	s.complete = complete
 	glog.V(5).Infof("context Update successful, complete=%v", s.complete)
 	return outputToken, nil
