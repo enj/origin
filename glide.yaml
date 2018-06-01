@@ -160,6 +160,9 @@ import:
 # auth (for sally)
 - package: github.com/gorilla/sessions
   version: a3acf13e802c358d65f249324d14ed24aac11370
+# auth (for oc kerberos on windows)
+- package: github.com/alexbrainman/sspi
+  version: cd643d8364541445aa4a2c48f3b0f5cd7e8cf490
 # new-app
 - package: github.com/joho/godotenv
   version: 6d367c18edf6ca7fd004efd6863e4c5728fa858e
