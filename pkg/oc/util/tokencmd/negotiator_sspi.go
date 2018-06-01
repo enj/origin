@@ -15,12 +15,15 @@ import (
 )
 
 const (
+	// sane set of default flags, see sspiNegotiator.flags
+	// TODO make configurable?
 	flags = sspi.ISC_REQ_CONFIDENTIALITY |
 		sspi.ISC_REQ_INTEGRITY |
 		sspi.ISC_REQ_MUTUAL_AUTH |
 		sspi.ISC_REQ_REPLAY_DETECT |
 		sspi.ISC_REQ_SEQUENCE_DETECT
 
+	// separator used in fully qualified user name format
 	domainSeparator = `\`
 )
 
@@ -28,6 +31,8 @@ func SSPIEnabled() bool {
 	return true
 }
 
+// sspiNegotiator handles negotiate flows on windows via SSPI
+// It expects sspiNegotiator.InitSecContext to be called until sspiNegotiator.IsComplete returns true
 type sspiNegotiator struct {
 	// optional DOMAIN\Username and password
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa374714(v=vs.85).aspx
