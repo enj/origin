@@ -25,6 +25,11 @@ const (
 
 	// separator used in fully qualified user name format
 	domainSeparator = `\`
+
+	// max lengths for various fields, see sspiNegotiator.principalName
+	maxUsername = 256
+	maxPassword = 256
+	maxDomain   = 15
 )
 
 func SSPIEnabled() bool {
@@ -41,7 +46,6 @@ type sspiNegotiator struct {
 	// structure that includes those credentials.
 	// When using the Negotiate package, the maximum character lengths for user name, password, and domain are
 	// 256, 256, and 15, respectively.
-	// TODO should we validate the lengths?
 	principalName string
 	password      string
 
@@ -170,5 +174,15 @@ func (s *sspiNegotiator) splitDomainAndUsername() (string, string, error) {
 	}
 	domain := data[0]
 	username := data[1]
+	if domainLen,
+		usernameLen,
+		passwordLen := len(domain),
+		len(username),
+		len(s.password); domainLen > maxDomain || usernameLen > maxUsername || passwordLen > maxPassword {
+		return "", "", fmt.Errorf(
+			"the maximum character lengths for user name, password, and domain are 256, 256, and 15, respectively:\n"+
+				"fully qualifed username=%s username=%s,len=%d domain=%s,len=%d password=<redacted>,len=%d",
+			s.principalName, username, usernameLen, domain, domainLen, passwordLen)
+	}
 	return domain, username, nil
 }
