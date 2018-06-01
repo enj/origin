@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/alexbrainman/sspi"
@@ -137,7 +137,7 @@ func (s *sspiNegotiator) Release() error {
 	if len(errs) == 1 {
 		return errs[0]
 	}
-	return utilerrors.NewAggregate(errs)
+	return errors.NewAggregate(errs)
 }
 
 func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
