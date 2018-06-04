@@ -94,7 +94,7 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		}
 
 		glog.V(5).Infof("importing service name %s", serviceName)
-		ctx, outputToken, err := negotiate.NewClientContext(s.cred, serviceName) // TODO send s.flags
+		ctx, outputToken, err := negotiate.NewClientContextWithFlags(s.cred, serviceName, s.flags)
 		if err != nil {
 			glog.V(5).Infof("NewClientContext returned error: %v", err)
 			return nil, err
