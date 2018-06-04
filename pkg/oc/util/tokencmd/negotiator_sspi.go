@@ -106,6 +106,12 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 
 	glog.V(5).Info("Continue SSPI flow")
 
+	// ClientContext.Update does not return errors for success codes:
+	// 1. sspi.SEC_E_OK (complete=true and err=nil)
+	// 2. sspi.SEC_I_CONTINUE_NEEDED (complete=false and err=nil)
+	// 3. sspi.SEC_I_COMPLETE_AND_CONTINUE and sspi.SEC_I_COMPLETE_NEEDED
+	// complete=false and err=nil as long as sspi.CompleteAuthToken returns sspi.SEC_E_OK
+	// Thus we can safely assume that any error returned here is an error code
 	complete, outputToken, err := s.ctx.Update(challengeToken)
 	if err != nil {
 		glog.V(5).Infof("context Update returned error: %v", err)
