@@ -15,13 +15,18 @@ import (
 )
 
 const (
-	// sane set of default flags, see sspiNegotiator.flags
+	// sane set of default flags, see sspiNegotiator.desiredFlags
 	// TODO make configurable?
-	flags = sspi.ISC_REQ_CONFIDENTIALITY |
+	desiredFlags = sspi.ISC_REQ_CONFIDENTIALITY |
 		sspi.ISC_REQ_INTEGRITY |
 		sspi.ISC_REQ_MUTUAL_AUTH |
 		sspi.ISC_REQ_REPLAY_DETECT |
 		sspi.ISC_REQ_SEQUENCE_DETECT
+	// subset of desiredFlags that must be set, see sspiNegotiator.requiredFlags
+	// TODO make configurable?
+	requiredFlags = sspi.ISC_REQ_CONFIDENTIALITY |
+		sspi.ISC_REQ_INTEGRITY |
+		sspi.ISC_REQ_MUTUAL_AUTH
 
 	// separator used in fully qualified user name format
 	domainSeparator = `\`
@@ -58,7 +63,9 @@ type sspiNegotiator struct {
 	ctx *negotiate.ClientContext
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa375509(v=vs.85).aspx
 	// fContextReq [in]: Bit flags that indicate requests for the context.
-	flags uint32
+	desiredFlags uint32
+	// requiredFlags is the subset of desiredFlags that must be set for flag verification to succeed
+	requiredFlags uint32
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa375509(v=vs.85).aspx
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa374764(v=vs.85).aspx
 	// Set to true once InitializeSecurityContext or CompleteAuthToken return sspi.SEC_E_OK
@@ -66,7 +73,7 @@ type sspiNegotiator struct {
 }
 
 func NewSSPINegotiator(principalName, password string) Negotiator {
-	return &sspiNegotiator{principalName: principalName, password: password, flags: flags}
+	return &sspiNegotiator{principalName: principalName, password: password, desiredFlags: desiredFlags, requiredFlags: requiredFlags}
 }
 
 func (s *sspiNegotiator) Load() error {
@@ -75,14 +82,14 @@ func (s *sspiNegotiator) Load() error {
 	return nil
 }
 
-func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte) ([]byte, error) {
+func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte) (tokenToSend []byte, err error) {
 	defer runtime.HandleCrash()
 	if s.cred == nil || s.ctx == nil {
 		glog.V(5).Infof("Start SSPI flow: %s", requestURL)
 
 		cred, err := s.getUserCredentials()
 		if err != nil {
-			glog.V(5).Infof("getUserCredentials returned error: %v", err)
+			glog.V(5).Infof("getUserCredentials failed: %v", err)
 			return nil, err
 		}
 		s.cred = cred
@@ -94,33 +101,24 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 		}
 
 		glog.V(5).Infof("importing service name %s", serviceName)
-		ctx, outputToken, err := negotiate.NewClientContextWithFlags(s.cred, serviceName, s.flags)
+		ctx, outputToken, err := negotiate.NewClientContextWithFlags(s.cred, serviceName, s.desiredFlags)
 		if err != nil {
-			glog.V(5).Infof("NewClientContext returned error: %v", err)
+			glog.V(5).Infof("NewClientContextWithFlags failed: %v", err)
 			return nil, err
 		}
 		s.ctx = ctx
-		glog.V(5).Info("NewClientContext successful")
+		glog.V(5).Info("NewClientContextWithFlags successful")
 		return outputToken, nil
 	}
 
 	glog.V(5).Info("Continue SSPI flow")
 
-	// ClientContext.Update does not return errors for success codes:
-	// 1. sspi.SEC_E_OK (complete=true and err=nil)
-	// 2. sspi.SEC_I_CONTINUE_NEEDED (complete=false and err=nil)
-	// 3. sspi.SEC_I_COMPLETE_AND_CONTINUE and sspi.SEC_I_COMPLETE_NEEDED
-	// complete=false and err=nil as long as sspi.CompleteAuthToken returns sspi.SEC_E_OK
-	// Thus we can safely assume that any error returned here is an error code
-	complete, outputToken, err := s.ctx.Update(challengeToken)
+	outputToken, err := s.updateContext(challengeToken)
 	if err != nil {
-		glog.V(5).Infof("context Update returned error: %v", err)
+		glog.V(5).Infof("updateContext failed: %v", err)
 		return nil, err
 	}
-	// TODO we need a way to verify s.ctx.sctxt.EstablishedFlags matches s.ctx.sctxt.RequestedFlags (s.flags)
-	// we will need to update upstream to add the verification or use reflection hacks here
-	s.complete = complete
-	glog.V(5).Infof("context Update successful, complete=%v", s.complete)
+	glog.V(5).Info("updateContext successful")
 	return outputToken, nil
 }
 
@@ -172,14 +170,14 @@ func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
 	return negotiate.AcquireCurrentUserCredentials()
 }
 
-func (s *sspiNegotiator) splitDomainAndUsername() (string, string, error) {
+func (s *sspiNegotiator) splitDomainAndUsername() (domain, username string, err error) {
 	data := strings.Split(s.principalName, domainSeparator)
 	if len(data) != 2 {
 		return "", "", fmt.Errorf(`invalid username %s, must be in Fully Qualified User Name format (ex: DOMAIN\Username)`,
 			s.principalName)
 	}
-	domain := data[0]
-	username := data[1]
+	domain = data[0]
+	username = data[1]
 	if domainLen,
 		usernameLen,
 		passwordLen := len(domain),
@@ -191,4 +189,34 @@ func (s *sspiNegotiator) splitDomainAndUsername() (string, string, error) {
 			s.principalName, username, usernameLen, domain, domainLen, passwordLen)
 	}
 	return domain, username, nil
+}
+
+func (s *sspiNegotiator) updateContext(challengeToken []byte) (outputToken []byte, err error) {
+	// ClientContext.Update does not return errors for success codes:
+	// 1. sspi.SEC_E_OK (complete=true and err=nil)
+	// 2. sspi.SEC_I_CONTINUE_NEEDED (complete=false and err=nil)
+	// 3. sspi.SEC_I_COMPLETE_AND_CONTINUE and sspi.SEC_I_COMPLETE_NEEDED
+	// complete=false and err=nil as long as sspi.CompleteAuthToken returns sspi.SEC_E_OK
+	// Thus we can safely assume that any error returned here is an error code
+	authCompleted, outputToken, err := s.ctx.Update(challengeToken)
+	if err != nil {
+		glog.V(5).Infof("ClientContext.Update failed: %v", err)
+		return nil, err
+	}
+	s.complete = authCompleted
+	glog.V(5).Infof("ClientContext.Update successful, complete=%v", s.complete)
+
+	// TODO should we skip the flag check if complete = true?
+	if nonFatalErr := s.ctx.VerifyFlags(); nonFatalErr == nil {
+		glog.V(5).Infof("ClientContext.VerifyFlags successful, flags=%b", s.desiredFlags)
+	} else {
+		glog.V(5).Infof("ClientContext.VerifyFlags failed: %v", nonFatalErr)
+		if fatalErr := s.ctx.VerifySelectiveFlags(s.requiredFlags); fatalErr != nil {
+			glog.V(5).Infof("ClientContext.VerifySelectiveFlags failed: %v", fatalErr)
+			return nil, fatalErr
+		}
+		glog.V(5).Infof("ClientContext.VerifySelectiveFlags successful, flags=%b", s.requiredFlags)
+	}
+
+	return outputToken, nil
 }
