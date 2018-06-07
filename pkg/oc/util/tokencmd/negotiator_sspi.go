@@ -225,10 +225,10 @@ func logSSPI(format string, args ...interface{}) {
 	if glog.V(5) {
 		for i, arg := range args {
 			if errno, ok := arg.(syscall.Errno); ok {
-				args[i] = fmt.Sprintf("%v code=%x", errno, uintptr(errno))
+				args[i] = fmt.Sprintf("%v, code=0x%X", errno, uintptr(errno))
 			}
 		}
-		s := fmt.Sprintf(format, args)
+		s := fmt.Sprintf(format, args...)
 		glog.InfoDepth(1, s)
 	}
 }
