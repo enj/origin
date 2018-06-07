@@ -5,6 +5,7 @@ package tokencmd
 import (
 	"fmt"
 	"strings"
+	"syscall"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -86,7 +87,7 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 	defer runtime.HandleCrash()
 
 	if needsInit := s.cred == nil || s.ctx == nil; needsInit {
-		glog.V(5).Infof("Start SSPI flow: %s", requestURL)
+		logSSPI("Start SSPI flow: %s", requestURL)
 		return s.initContext(requestURL)
 	}
 
@@ -97,7 +98,7 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 func (s *sspiNegotiator) initContext(requestURL string) (outputToken []byte, err error) {
 	cred, err := s.getUserCredentials()
 	if err != nil {
-		glog.V(5).Infof("getUserCredentials failed: %v", err)
+		logSSPI("getUserCredentials failed: %v", err)
 		return nil, err
 	}
 	s.cred = cred
@@ -108,10 +109,10 @@ func (s *sspiNegotiator) initContext(requestURL string) (outputToken []byte, err
 		return nil, err
 	}
 
-	glog.V(5).Infof("importing service name %s", serviceName)
+	logSSPI("importing service name %s", serviceName)
 	ctx, outputToken, err := negotiate.NewClientContextWithFlags(s.cred, serviceName, s.desiredFlags)
 	if err != nil {
-		glog.V(5).Infof("NewClientContextWithFlags failed: %v", err)
+		logSSPI("NewClientContextWithFlags failed: %v", err)
 		return nil, err
 	}
 	s.ctx = ctx
@@ -129,13 +130,13 @@ func (s *sspiNegotiator) Release() error {
 	var errs []error
 	if s.ctx != nil {
 		if err := s.ctx.Release(); err != nil {
-			glog.V(5).Infof("SSPI context release failed: %v", err)
+			logSSPI("SSPI context release failed: %v", err)
 			errs = append(errs, err)
 		}
 	}
 	if s.cred != nil {
 		if err := s.cred.Release(); err != nil {
-			glog.V(5).Infof("SSPI credential release failed: %v", err)
+			logSSPI("SSPI credential release failed: %v", err)
 			errs = append(errs, err)
 		}
 	}
@@ -152,12 +153,12 @@ func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
 		if err != nil {
 			return nil, err
 		}
-		glog.V(5).Infof(
+		logSSPI(
 			"Using AcquireUserCredentials because principalName is not empty, principalName=%s, username=%s, domain=%s",
 			s.principalName, username, domain)
 		cred, err := negotiate.AcquireUserCredentials(domain, username, s.password)
 		if err != nil {
-			glog.V(5).Infof("AcquireUserCredentials failed: %v", err)
+			logSSPI("AcquireUserCredentials failed: %v", err)
 			return nil, err
 		}
 		glog.V(5).Info("AcquireUserCredentials successful")
@@ -197,23 +198,37 @@ func (s *sspiNegotiator) updateContext(challengeToken []byte) (outputToken []byt
 	// Thus we can safely assume that any error returned here is an error code
 	authCompleted, outputToken, err := s.ctx.Update(challengeToken)
 	if err != nil {
-		glog.V(5).Infof("ClientContext.Update failed: %v", err)
+		logSSPI("ClientContext.Update failed: %v", err)
 		return nil, err
 	}
 	s.complete = authCompleted
-	glog.V(5).Infof("ClientContext.Update successful, complete=%v", s.complete)
+	logSSPI("ClientContext.Update successful, complete=%v", s.complete)
 
 	// TODO should we skip the flag check if complete = true?
 	if nonFatalErr := s.ctx.VerifyFlags(); nonFatalErr == nil {
 		glog.V(5).Info("ClientContext.VerifyFlags successful")
 	} else {
-		glog.V(5).Infof("ClientContext.VerifyFlags failed: %v", nonFatalErr)
+		logSSPI("ClientContext.VerifyFlags failed: %v", nonFatalErr)
 		if fatalErr := s.ctx.VerifySelectiveFlags(s.requiredFlags); fatalErr != nil {
-			glog.V(5).Infof("ClientContext.VerifySelectiveFlags failed: %v", fatalErr)
+			logSSPI("ClientContext.VerifySelectiveFlags failed: %v", fatalErr)
 			return nil, fatalErr
 		}
 		glog.V(5).Info("ClientContext.VerifySelectiveFlags successful")
 	}
 
 	return outputToken, nil
+}
+
+// logSSPI is the equivalent of glog.V(5).Infof(format, args) except it
+// includes error code information for any syscall.Errno contained in args
+func logSSPI(format string, args ...interface{}) {
+	if glog.V(5) {
+		for i, arg := range args {
+			if errno, ok := arg.(syscall.Errno); ok {
+				args[i] = fmt.Sprintf("%v code=%x", errno, uintptr(errno))
+			}
+		}
+		s := fmt.Sprintf(format, args)
+		glog.InfoDepth(1, s)
+	}
 }
