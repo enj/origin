@@ -84,41 +84,38 @@ func (s *sspiNegotiator) Load() error {
 
 func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte) (tokenToSend []byte, err error) {
 	defer runtime.HandleCrash()
-	if s.cred == nil || s.ctx == nil {
+
+	if needsInit := s.cred == nil || s.ctx == nil; needsInit {
 		glog.V(5).Infof("Start SSPI flow: %s", requestURL)
-
-		cred, err := s.getUserCredentials()
-		if err != nil {
-			glog.V(5).Infof("getUserCredentials failed: %v", err)
-			return nil, err
-		}
-		s.cred = cred
-		glog.V(5).Info("getUserCredentials successful")
-
-		serviceName, err := getServiceName('/', requestURL)
-		if err != nil {
-			return nil, err
-		}
-
-		glog.V(5).Infof("importing service name %s", serviceName)
-		ctx, outputToken, err := negotiate.NewClientContextWithFlags(s.cred, serviceName, s.desiredFlags)
-		if err != nil {
-			glog.V(5).Infof("NewClientContextWithFlags failed: %v", err)
-			return nil, err
-		}
-		s.ctx = ctx
-		glog.V(5).Info("NewClientContextWithFlags successful")
-		return outputToken, nil
+		return s.initContext(requestURL)
 	}
 
 	glog.V(5).Info("Continue SSPI flow")
+	return s.updateContext(challengeToken)
+}
 
-	outputToken, err := s.updateContext(challengeToken)
+func (s *sspiNegotiator) initContext(requestURL string) (outputToken []byte, err error) {
+	cred, err := s.getUserCredentials()
 	if err != nil {
-		glog.V(5).Infof("updateContext failed: %v", err)
+		glog.V(5).Infof("getUserCredentials failed: %v", err)
 		return nil, err
 	}
-	glog.V(5).Info("updateContext successful")
+	s.cred = cred
+	glog.V(5).Info("getUserCredentials successful")
+
+	serviceName, err := getServiceName('/', requestURL)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(5).Infof("importing service name %s", serviceName)
+	ctx, outputToken, err := negotiate.NewClientContextWithFlags(s.cred, serviceName, s.desiredFlags)
+	if err != nil {
+		glog.V(5).Infof("NewClientContextWithFlags failed: %v", err)
+		return nil, err
+	}
+	s.ctx = ctx
+	glog.V(5).Info("NewClientContextWithFlags successful")
 	return outputToken, nil
 }
 
