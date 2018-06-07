@@ -205,14 +205,14 @@ func (s *sspiNegotiator) updateContext(challengeToken []byte) (outputToken []byt
 
 	// TODO should we skip the flag check if complete = true?
 	if nonFatalErr := s.ctx.VerifyFlags(); nonFatalErr == nil {
-		glog.V(5).Infof("ClientContext.VerifyFlags successful, flags=%b", s.desiredFlags)
+		glog.V(5).Info("ClientContext.VerifyFlags successful")
 	} else {
 		glog.V(5).Infof("ClientContext.VerifyFlags failed: %v", nonFatalErr)
 		if fatalErr := s.ctx.VerifySelectiveFlags(s.requiredFlags); fatalErr != nil {
 			glog.V(5).Infof("ClientContext.VerifySelectiveFlags failed: %v", fatalErr)
 			return nil, fatalErr
 		}
-		glog.V(5).Infof("ClientContext.VerifySelectiveFlags successful, flags=%b", s.requiredFlags)
+		glog.V(5).Info("ClientContext.VerifySelectiveFlags successful")
 	}
 
 	return outputToken, nil
