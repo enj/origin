@@ -4,11 +4,15 @@ package tokencmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"syscall"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
+
+	"github.com/openshift/origin/pkg/cmd/util/term"
 
 	"github.com/alexbrainman/sspi"
 	"github.com/alexbrainman/sspi/negotiate"
@@ -55,6 +59,13 @@ type sspiNegotiator struct {
 	principalName string
 	password      string
 
+	// reader is used to prompt for a password if principalName is non-empty and password is empty.
+	reader io.Reader
+	// writer is used to output prompts when prompting for password.
+	writer io.Writer
+	// host is the server being authenticated to.  Used only for displaying messages when prompting for password.
+	host string
+
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/ms721572(v=vs.85).aspx#_security_credentials_gly
 	// phCredential [in, optional]: A handle to the credentials returned by AcquireCredentialsHandle (Negotiate).
 	// This handle is used to build the security context.  sspi.SECPKG_CRED_OUTBOUND is used to request OUTBOUND credentials.
@@ -73,8 +84,16 @@ type sspiNegotiator struct {
 	complete bool
 }
 
-func NewSSPINegotiator(principalName, password string) Negotiator {
-	return &sspiNegotiator{principalName: principalName, password: password, desiredFlags: desiredFlags, requiredFlags: requiredFlags}
+func NewSSPINegotiator(principalName, password, host string, reader io.Reader) Negotiator {
+	return &sspiNegotiator{
+		principalName: principalName,
+		password:      password,
+		reader:        reader,
+		writer:        os.Stdout,
+		host:          host,
+		desiredFlags:  desiredFlags,
+		requiredFlags: requiredFlags,
+	}
 }
 
 func (s *sspiNegotiator) Load() error {
@@ -140,16 +159,25 @@ func (s *sspiNegotiator) Release() error {
 }
 
 func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
+	if len(s.principalName) == 0 && len(s.password) > 0 {
+		return nil, fmt.Errorf("username cannot be empty with non-empty password")
+	}
+
 	// Try to use principalName if specified
 	if len(s.principalName) > 0 {
-		domain, username, err := s.splitDomainAndUsername()
+		domain, username, err := s.getDomainAndUsername()
 		if err != nil {
 			return nil, err
 		}
-		logSSPI(
-			"Using AcquireUserCredentials because principalName is not empty, principalName=%s, username=%s, domain=%s",
+		password, err := s.getPassword(domain, username)
+		if err != nil {
+			return nil, err
+		}
+
+		logSSPI("Using AcquireUserCredentials because principalName is not empty, principalName=%s, username=%s, domain=%s",
 			s.principalName, username, domain)
-		cred, err := negotiate.AcquireUserCredentials(domain, username, s.password)
+		// this call seems to never fail, even when domain / username / password are nonsense
+		cred, err := negotiate.AcquireUserCredentials(domain, username, password)
 		if err != nil {
 			logSSPI("AcquireUserCredentials failed: %v", err)
 			return nil, err
@@ -157,11 +185,12 @@ func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
 		glog.V(5).Info("AcquireUserCredentials successful")
 		return cred, nil
 	}
+
 	glog.V(5).Info("Using AcquireCurrentUserCredentials because principalName is empty")
 	return negotiate.AcquireCurrentUserCredentials()
 }
 
-func (s *sspiNegotiator) splitDomainAndUsername() (domain, username string, err error) {
+func (s *sspiNegotiator) getDomainAndUsername() (domain, username string, err error) {
 	data := strings.Split(s.principalName, domainSeparator)
 	if len(data) != 2 {
 		return "", "", fmt.Errorf(`invalid username %s, must be in Fully Qualified User Name format (ex: DOMAIN\Username)`,
@@ -180,6 +209,26 @@ func (s *sspiNegotiator) splitDomainAndUsername() (domain, username string, err 
 			s.principalName, username, usernameLen, domain, domainLen, passwordLen)
 	}
 	return domain, username, nil
+}
+
+func (s *sspiNegotiator) getPassword(domain, username string) (string, error) {
+	password := s.password
+
+	if missingPassword := len(password) == 0; missingPassword {
+		// mimic output from basic auth prompt
+		fmt.Fprintf(s.writer, "Authentication required for %s (%s)\nUsername: %s\n", s.host, domain, username)
+		// empty password from prompt is ok
+		// we do not need to worry about being stuck in a prompt loop because ClientContext.Update
+		// will fail if the password is incorrect and that will end the challenge flow
+		password = term.PromptForPasswordString(s.reader, s.writer, "Password: ")
+	}
+
+	// try to provide useful error messages
+	if passwordLen := len(password); passwordLen > maxPassword {
+		return "", fmt.Errorf("the maximum character length for password is %d: password=<redacted>,len=%d", maxPassword, passwordLen)
+	}
+
+	return password, nil
 }
 
 func (s *sspiNegotiator) updateContext(challengeToken []byte) (outputToken []byte, err error) {
