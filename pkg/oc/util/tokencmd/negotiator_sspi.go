@@ -128,22 +128,15 @@ func (s *sspiNegotiator) Release() error {
 	defer runtime.HandleCrash()
 	glog.V(5).Info("Attempt to release SSPI")
 	var errs []error
-	if s.ctx != nil {
-		if err := s.ctx.Release(); err != nil {
-			logSSPI("SSPI context release failed: %v", err)
-			errs = append(errs, err)
-		}
+	if err := s.ctx.Release(); err != nil {
+		logSSPI("SSPI context release failed: %v", err)
+		errs = append(errs, err)
 	}
-	if s.cred != nil {
-		if err := s.cred.Release(); err != nil {
-			logSSPI("SSPI credential release failed: %v", err)
-			errs = append(errs, err)
-		}
+	if err := s.cred.Release(); err != nil {
+		logSSPI("SSPI credential release failed: %v", err)
+		errs = append(errs, err)
 	}
-	if len(errs) == 1 {
-		return errs[0]
-	}
-	return errors.NewAggregate(errs)
+	return errors.Reduce(errors.NewAggregate(errs))
 }
 
 func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
