@@ -34,9 +34,20 @@ const (
 		sspi.ISC_REQ_MUTUAL_AUTH
 
 	// separator used in fully qualified user name format
+	// TODO
 	domainSeparator = `\`
+	// https://msdn.microsoft.com/en-us/library/ms677605(v=vs.85).aspx#userPrincipalName
+	// TODO
+	upnSeparator = "@"
+	// https://msdn.microsoft.com/en-us/library/system.environment.userdomainname(v=vs.110).aspx
+	// TODO
+	shortDomainEnvVar = "USERDOMAIN"
+	// TODO
+	// optional DOMAIN\Username and password
 
-	// max lengths for various fields, see sspiNegotiator.principalName
+	// max lengths for various fields, see sspiNegotiator.getDomainAndUsername and sspiNegotiator.getPassword
+	// When using the Negotiate package, the maximum character lengths for user name, password, and domain are
+	// 256, 256, and 15, respectively.
 	maxUsername = 256
 	maxPassword = 256
 	maxDomain   = 15
@@ -49,15 +60,15 @@ func SSPIEnabled() bool {
 // sspiNegotiator handles negotiate flows on windows via SSPI
 // It expects sspiNegotiator.InitSecContext to be called until sspiNegotiator.IsComplete returns true
 type sspiNegotiator struct {
-	// optional DOMAIN\Username and password
+	// principalName is an optional username (in fully qualified, user principal name or short format).
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa374714(v=vs.85).aspx
 	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa380131(v=vs.85).aspx
 	// pAuthData [in]: If credentials are supplied, they are passed via a pointer to a sspi.SEC_WINNT_AUTH_IDENTITY
 	// structure that includes those credentials.
-	// When using the Negotiate package, the maximum character lengths for user name, password, and domain are
-	// 256, 256, and 15, respectively.
 	principalName string
-	password      string
+	// password is an optional password used to log into a specific account if principalName is non-empty.
+	// This allows logging in via username and password even when basic auth is not enabled.
+	password string
 
 	// reader is used to prompt for a password if principalName is non-empty and password is empty.
 	reader io.Reader
@@ -191,23 +202,37 @@ func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
 }
 
 func (s *sspiNegotiator) getDomainAndUsername() (domain, username string, err error) {
-	data := strings.Split(s.principalName, domainSeparator)
-	if len(data) != 2 {
-		return "", "", fmt.Errorf(`invalid username %s, must be in Fully Qualified User Name format (ex: DOMAIN\Username)`,
-			s.principalName)
+	switch {
+	case strings.Contains(s.principalName, domainSeparator):
+		data := strings.Split(s.principalName, domainSeparator)
+		// try to provide useful error messages
+		if len(data) != 2 {
+			return "", "", fmt.Errorf(
+				`invalid username %s, fully qualified user name format must have single backslash (ex: DOMAIN\Username)`,
+				s.principalName)
+		}
+		domain = data[0]
+		username = data[1]
+
+	case strings.Contains(s.principalName, upnSeparator):
+		// leave domain empty and assume it is qualified in the username (UPN format)
+		username = s.principalName
+
+	default:
+		// this is a short name meaning we will need to lookup the current user's domain
+		// TODO should we use syscall.NetGetJoinInformation first and then fallback to the env var?
+		domain, _ = os.LookupEnv(shortDomainEnvVar)
+		username = s.principalName
 	}
-	domain = data[0]
-	username = data[1]
-	if domainLen,
-		usernameLen,
-		passwordLen := len(domain),
-		len(username),
-		len(s.password); domainLen > maxDomain || usernameLen > maxUsername || passwordLen > maxPassword {
-		return "", "", fmt.Errorf(
-			"the maximum character lengths for user name, password, and domain are 256, 256, and 15, respectively:\n"+
-				"fully qualifed username=%s username=%s,len=%d domain=%s,len=%d password=<redacted>,len=%d",
-			s.principalName, username, usernameLen, domain, domainLen, passwordLen)
+
+	// try to provide useful error messages
+	if domainLen, usernameLen := len(domain), len(username); domainLen > maxDomain || usernameLen > maxUsername {
+		return "", "",
+			fmt.Errorf("the maximum character lengths for user name and domain are %d and %d, respectively:\n"+
+				"input username=%s username=%s,len=%d domain=%s,len=%d",
+				maxUsername, maxDomain, s.principalName, username, usernameLen, domain, domainLen)
 	}
+
 	return domain, username, nil
 }
 
@@ -225,7 +250,8 @@ func (s *sspiNegotiator) getPassword(domain, username string) (string, error) {
 
 	// try to provide useful error messages
 	if passwordLen := len(password); passwordLen > maxPassword {
-		return "", fmt.Errorf("the maximum character length for password is %d: password=<redacted>,len=%d", maxPassword, passwordLen)
+		return "", fmt.Errorf("the maximum character length for password is %d: password=<redacted>,len=%d",
+			maxPassword, passwordLen)
 	}
 
 	return password, nil
