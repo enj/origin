@@ -481,7 +481,7 @@ func (c *OAuthServerConfig) getOAuthProvider(identityProvider configapi.Identity
 		if err != nil {
 			return nil, err
 		}
-		return gitlab.NewProvider(identityProvider.Name, transport, provider.URL, provider.ClientID, clientSecret)
+		return gitlab.NewProvider(identityProvider.Name, provider.URL, provider.ClientID, clientSecret, transport)
 
 	case (*configapi.GoogleIdentityProvider):
 		clientSecret, err := configapi.ResolveStringValue(provider.ClientSecret)
