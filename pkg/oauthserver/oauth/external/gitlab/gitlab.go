@@ -14,6 +14,7 @@ import (
 
 	authapi "github.com/openshift/origin/pkg/oauthserver/api"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external"
+	"github.com/openshift/origin/pkg/oauthserver/oauth/external/openid"
 )
 
 const (
@@ -49,6 +50,27 @@ func NewProvider(providerName string, transport http.RoundTripper, URL, clientID
 	u, err := url.Parse(URL)
 	if err != nil {
 		return nil, errors.New("Host URL is invalid")
+	}
+
+	if providerName == "oidc_hax" {
+		config := openid.Config{
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+
+			AuthorizeURL: appendPath(*u, gitlabAuthorizePath),
+			TokenURL:     appendPath(*u, gitlabTokenPath),
+			UserInfoURL:  appendPath(*u, "/oauth/userinfo"),
+
+			Scopes: []string{"openid"},
+
+			// this is broken because it is the hash of ID
+			// https://gitlab.com/gitlab-org/gitlab-ce/blob/583ef9458c5e5c32a14629f5754bc53ed0ad8a33/config/initializers/doorkeeper_openid_connect.rb#L22
+			IDClaims:                []string{"sub"},
+			PreferredUsernameClaims: []string{"nickname"},
+			EmailClaims:             []string{"email"},
+			NameClaims:              []string{"name", "nickname"},
+		}
+		return openid.NewProvider(providerName, transport, config)
 	}
 
 	return &provider{
