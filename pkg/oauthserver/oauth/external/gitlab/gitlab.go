@@ -68,7 +68,7 @@ func NewProvider(providerName string, transport http.RoundTripper, URL, clientID
 			IDClaims:                []string{"sub"},
 			PreferredUsernameClaims: []string{"nickname"},
 			EmailClaims:             []string{"email"},
-			NameClaims:              []string{"name", "nickname"},
+			NameClaims:              []string{"name"},
 		}
 		return openid.NewProvider(providerName, transport, config)
 	}
