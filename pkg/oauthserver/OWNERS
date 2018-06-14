@@ -1,9 +1,4 @@
 reviewers:
-  - liggitt
-  - deads2k
-  - stevekuznetsov
-  - smarterclayton
-  - soltysh
   - enj
   - ericavonb
   - mrogers950
@@ -11,7 +6,6 @@ reviewers:
 approvers:
   - liggitt
   - deads2k
-  - stevekuznetsov
   - smarterclayton
   - enj
   - simo5
