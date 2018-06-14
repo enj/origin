@@ -1,5 +1,5 @@
-hash: 1511c1c08d724d5b2f6c586490bfa154f305c5b0038fb2a4bf3c0404aabc72a6
-updated: 2018-06-13T17:31:37.381725-04:00
+hash: d59a4fc6621fa9d258ff4f66ec628c8f45be40349ac08090d10a3ab05b4c9998
+updated: 2018-06-14T08:49:43.57082596-04:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -14,6 +14,10 @@ imports:
   - auth
 - name: github.com/abbot/go-http-auth
   version: c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35
+- name: github.com/alexbrainman/sspi
+  version: e580b900e9f5657daa5473021296289be6da2661
+  subpackages:
+  - negotiate
 - name: github.com/apcera/gssapi
   version: 5fb4217df13b8e6878046fe1e5c10e560e1b86dc
 - name: github.com/appc/spec
@@ -393,7 +397,7 @@ imports:
   subpackages:
   - log
 - name: github.com/emicklei/go-restful-swagger12
-  version: 5e28dc7157ebd9247a268c26dd1bee7818aa33f7
+  version: f1854a45c13b3f2b1e6df2f01554c638c1621df9
   repo: https://github.com/openshift/emicklei-go-restful-swagger12
 - name: github.com/euank/go-kmsg-parser
   version: 5ba4d492e455a77d25dcf0d2c4acc9f2afebef4e
@@ -1073,7 +1077,7 @@ imports:
 - name: github.com/sirupsen/logrus
   version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - name: github.com/skynetservices/skydns
-  version: 775ef406696380ce92b76e72421e86b6868905d8
+  version: 2f1b0b5fc71c7aa7f31cfe5083b48020e27f7b94
   repo: https://github.com/openshift/skynetservices-skydns
   subpackages:
   - cache
@@ -1815,7 +1819,7 @@ imports:
   - pkg/util/proto
   - pkg/util/proto/validation
 - name: k8s.io/kubernetes
-  version: 8afc46914f13dc03452e1d2df354a01ab738e2f0
+  version: 5eb363ab70f49a688ef12cccf5bef94204d29b4e
   repo: https://github.com/openshift/kubernetes.git
   subpackages:
   - cmd/controller-manager/app
