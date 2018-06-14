@@ -33,17 +33,18 @@ const (
 		sspi.ISC_REQ_INTEGRITY |
 		sspi.ISC_REQ_MUTUAL_AUTH
 
-	// separator used in fully qualified user name format
-	// TODO
+	// various windows user name formats
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa380525(v=vs.85).aspx
+	// https://msdn.microsoft.com/en-us/library/ms724268(VS.85).aspx
+	// separator used in fully qualified user name or down-level logon name format (DOMAIN\Username)
 	domainSeparator = `\`
 	// https://msdn.microsoft.com/en-us/library/ms677605(v=vs.85).aspx#userPrincipalName
-	// TODO
+	// separator used in user principal name (UPN) format (username@domain.com)
 	upnSeparator = "@"
 	// https://msdn.microsoft.com/en-us/library/system.environment.userdomainname(v=vs.110).aspx
-	// TODO
+	// environment variable that holds the network domain name associated with the current user
+	// this is the NetBIOS domain name which should fit within the length requirement (see maxDomain)
 	shortDomainEnvVar = "USERDOMAIN"
-	// TODO
-	// optional DOMAIN\Username and password
 
 	// max lengths for various fields, see sspiNegotiator.getDomainAndUsername and sspiNegotiator.getPassword
 	// When using the Negotiate package, the maximum character lengths for user name, password, and domain are
@@ -125,6 +126,25 @@ func (s *sspiNegotiator) InitSecContext(requestURL string, challengeToken []byte
 	return s.updateContext(challengeToken)
 }
 
+func (s *sspiNegotiator) IsComplete() bool {
+	return s.complete
+}
+
+func (s *sspiNegotiator) Release() error {
+	defer runtime.HandleCrash()
+	glog.V(5).Info("Attempt to release SSPI")
+	var errs []error
+	if err := s.ctx.Release(); err != nil {
+		logSSPI("SSPI context release failed: %v", err)
+		errs = append(errs, err)
+	}
+	if err := s.cred.Release(); err != nil {
+		logSSPI("SSPI credential release failed: %v", err)
+		errs = append(errs, err)
+	}
+	return errors.Reduce(errors.NewAggregate(errs))
+}
+
 func (s *sspiNegotiator) initContext(requestURL string) (outputToken []byte, err error) {
 	cred, err := s.getUserCredentials()
 	if err != nil {
@@ -148,25 +168,6 @@ func (s *sspiNegotiator) initContext(requestURL string) (outputToken []byte, err
 	s.ctx = ctx
 	glog.V(5).Info("NewClientContextWithFlags successful")
 	return outputToken, nil
-}
-
-func (s *sspiNegotiator) IsComplete() bool {
-	return s.complete
-}
-
-func (s *sspiNegotiator) Release() error {
-	defer runtime.HandleCrash()
-	glog.V(5).Info("Attempt to release SSPI")
-	var errs []error
-	if err := s.ctx.Release(); err != nil {
-		logSSPI("SSPI context release failed: %v", err)
-		errs = append(errs, err)
-	}
-	if err := s.cred.Release(); err != nil {
-		logSSPI("SSPI credential release failed: %v", err)
-		errs = append(errs, err)
-	}
-	return errors.Reduce(errors.NewAggregate(errs))
 }
 
 func (s *sspiNegotiator) getUserCredentials() (*sspi.Credentials, error) {
@@ -206,9 +207,9 @@ func (s *sspiNegotiator) getDomainAndUsername() (domain, username string, err er
 	case strings.Contains(s.principalName, domainSeparator):
 		data := strings.Split(s.principalName, domainSeparator)
 		// try to provide useful error messages
-		if len(data) != 2 {
+		if len(data) != 2 || len(data[1]) == 0 {
 			return "", "", fmt.Errorf(
-				`invalid username %s, fully qualified user name format must have single backslash (ex: DOMAIN\Username)`,
+				`invalid username %s, fully qualified user name format must have single backslash and non-empty user (ex: DOMAIN\Username)`,
 				s.principalName)
 		}
 		domain = data[0]
@@ -241,7 +242,12 @@ func (s *sspiNegotiator) getPassword(domain, username string) (string, error) {
 
 	if missingPassword := len(password) == 0; missingPassword {
 		// mimic output from basic auth prompt
-		fmt.Fprintf(s.writer, "Authentication required for %s (%s)\nUsername: %s\n", s.host, domain, username)
+		if hasDomain := len(domain) > 0; hasDomain {
+			fmt.Fprintf(s.writer, "Authentication required for %s (%s)\n", s.host, domain)
+		} else {
+			fmt.Fprintf(s.writer, "Authentication required for %s\n", s.host)
+		}
+		fmt.Fprintf(s.writer, "Username: %s\n", username)
 		// empty password from prompt is ok
 		// we do not need to worry about being stuck in a prompt loop because ClientContext.Update
 		// will fail if the password is incorrect and that will end the challenge flow
