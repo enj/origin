@@ -1,10 +1,11 @@
 package gitlab
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external/openid"
@@ -23,7 +24,8 @@ const (
 	// The ability to authenticate using GitLab, and read-only access to the user's profile information and group memberships
 	gitlabOIDCScope = "openid"
 
-	// An opaque token that uniquely identifies the user
+	// The ID of the user
+	// See above comment about GitLab 11.1.0 and the custom IDTokenValidator below
 	// Along with providerName, builds the identity object's Name field (see Identity.ProviderUserName)
 	gitlabIDClaim = "sub"
 	// The user's GitLab username
@@ -41,7 +43,7 @@ func NewProvider(providerName, URL, clientID, clientSecret string, transport htt
 	// Create service URLs
 	u, err := url.Parse(URL)
 	if err != nil {
-		return nil, errors.New("gitlab host URL is invalid")
+		return nil, fmt.Errorf("gitlab host URL %q is invalid", URL)
 	}
 
 	config := openid.Config{
@@ -58,6 +60,22 @@ func NewProvider(providerName, URL, clientID, clientSecret string, transport htt
 		PreferredUsernameClaims: []string{gitlabPreferredUsernameClaim},
 		EmailClaims:             []string{gitlabEmailClaim},
 		NameClaims:              []string{gitlabDisplayNameClaim},
+
+		// make sure that gitlabIDClaim is a valid uint64, see above comment about GitLab 11.1.0
+		IDTokenValidator: func(idTokenClaims map[string]interface{}) error {
+			gitlabID, ok := idTokenClaims[gitlabIDClaim].(string)
+			if !ok {
+				return nil // this is an OIDC spec violation which is handled by the default code path
+			}
+			if isPossibleSHA256HexDigest(gitlabID) {
+				return fmt.Errorf("incompatible gitlab IDP, ID claim %s=%s is SHA256 hex digest instead of digit",
+					gitlabIDClaim, gitlabID)
+			}
+			if !isValidUint64(gitlabID, 10) {
+				return fmt.Errorf("invalid gitlab IDP, ID claim %s=%s is not a digit", gitlabIDClaim, gitlabID)
+			}
+			return nil
+		},
 	}
 
 	return openid.NewProvider(providerName, transport, config)
@@ -66,4 +84,20 @@ func NewProvider(providerName, URL, clientID, clientSecret string, transport htt
 func appendPath(u url.URL, subpath string) string {
 	u.Path = path.Join(u.Path, subpath)
 	return u.String()
+}
+
+func isPossibleSHA256HexDigest(s string) bool {
+	const (
+		// Have 256 bits from hex digest
+		// In hexadecimal each digit encodes 4 bits
+		// Thus we need 64 digits to represent 256 bits
+		sha256Len = 256 / 4
+		hexBase   = 16
+	)
+	return len(s) == sha256Len && isValidUint64(s, hexBase)
+}
+
+func isValidUint64(s string, base int) bool {
+	_, err := strconv.ParseUint(s, base, 64)
+	return err == nil
 }
