@@ -41,7 +41,7 @@ type gitlabUser struct {
 	Name     string
 }
 
-func NewOAuthProvider(providerName string, transport http.RoundTripper, URL, clientID, clientSecret string) (external.Provider, error) {
+func NewOAuthProvider(providerName, URL, clientID, clientSecret string, transport http.RoundTripper) (external.Provider, error) {
 	// Create service URLs
 	u, err := url.Parse(URL)
 	if err != nil {
@@ -78,8 +78,7 @@ func (p *provider) NewConfig() (*osincli.ClientConfig, error) {
 }
 
 // AddCustomParameters implements external/interfaces/Provider.AddCustomParameters
-func (p *provider) AddCustomParameters(req *osincli.AuthorizeRequest) {
-}
+func (p *provider) AddCustomParameters(req *osincli.AuthorizeRequest) {}
 
 // GetUserIdentity implements external/interfaces/Provider.GetUserIdentity
 func (p *provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentityInfo, bool, error) {
