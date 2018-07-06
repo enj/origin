@@ -523,7 +523,7 @@ type AccessRestrictionSpec struct {
 	// If AllowedSubjects is set, then only those subjects can perform the matching actions.
 	// If DeniedSubjects is set, then only those subjects are restricted from performing the matching actions.
 	// Required.
-	MatchAttributes []rbac.PolicyRule
+	MatchAttributes []rbacapi.PolicyRule
 
 	// The whitelist of subjects that are allowed to perform the actions defined by MatchAttributes.
 	// Note that this only prevents a denial due to the access restriction.
