@@ -72,6 +72,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openshift/api/authorization/v1.SubjectRulesReviewSpec":                                  schema_openshift_api_authorization_v1_SubjectRulesReviewSpec(ref),
 		"github.com/openshift/api/authorization/v1.SubjectRulesReviewStatus":                                schema_openshift_api_authorization_v1_SubjectRulesReviewStatus(ref),
 		"github.com/openshift/api/authorization/v1.UserRestriction":                                         schema_openshift_api_authorization_v1_UserRestriction(ref),
+		"github.com/openshift/api/authorization/v1alpha1.AccessRestriction":                                 schema_openshift_api_authorization_v1alpha1_AccessRestriction(ref),
+		"github.com/openshift/api/authorization/v1alpha1.AccessRestrictionList":                             schema_openshift_api_authorization_v1alpha1_AccessRestrictionList(ref),
+		"github.com/openshift/api/authorization/v1alpha1.AccessRestrictionSpec":                             schema_openshift_api_authorization_v1alpha1_AccessRestrictionSpec(ref),
+		"github.com/openshift/api/authorization/v1alpha1.SubjectMatcher":                                    schema_openshift_api_authorization_v1alpha1_SubjectMatcher(ref),
 		"github.com/openshift/api/build/v1.BinaryBuildRequestOptions":                                       schema_openshift_api_build_v1_BinaryBuildRequestOptions(ref),
 		"github.com/openshift/api/build/v1.BinaryBuildSource":                                               schema_openshift_api_build_v1_BinaryBuildSource(ref),
 		"github.com/openshift/api/build/v1.BitbucketWebHookCause":                                           schema_openshift_api_build_v1_BitbucketWebHookCause(ref),
@@ -235,6 +239,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/openshift/api/security/v1.SecurityContextConstraintsList":                               schema_openshift_api_security_v1_SecurityContextConstraintsList(ref),
 		"github.com/openshift/api/security/v1.ServiceAccountPodSecurityPolicyReviewStatus":                  schema_openshift_api_security_v1_ServiceAccountPodSecurityPolicyReviewStatus(ref),
 		"github.com/openshift/api/security/v1.SupplementalGroupsStrategyOptions":                            schema_openshift_api_security_v1_SupplementalGroupsStrategyOptions(ref),
+		"github.com/openshift/api/servicecertsigner/v1alpha1.APIServiceCABundleInjectorConfig":              schema_openshift_api_servicecertsigner_v1alpha1_APIServiceCABundleInjectorConfig(ref),
+		"github.com/openshift/api/servicecertsigner/v1alpha1.ConfigMapCABundleInjectorConfig":               schema_openshift_api_servicecertsigner_v1alpha1_ConfigMapCABundleInjectorConfig(ref),
 		"github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthentication":                       schema_openshift_api_servicecertsigner_v1alpha1_DelegatedAuthentication(ref),
 		"github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthorization":                        schema_openshift_api_servicecertsigner_v1alpha1_DelegatedAuthorization(ref),
 		"github.com/openshift/api/servicecertsigner/v1alpha1.ServiceCertSignerOperatorConfig":               schema_openshift_api_servicecertsigner_v1alpha1_ServiceCertSignerOperatorConfig(ref),
@@ -3915,6 +3921,175 @@ func schema_openshift_api_authorization_v1_UserRestriction(ref common.ReferenceC
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+	}
+}
+
+func schema_openshift_api_authorization_v1alpha1_AccessRestriction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AccessRestriction is used to guard specific actions without invasive changes to the cluster's default RBAC policy. It supports a required blacklist based restriction with an optional whitelist opt-out. It never grants any privileges - it can only be used to take privileges away.",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines when this restriction is imposed and how to satisfy it.",
+							Ref:         ref("github.com/openshift/api/authorization/v1alpha1.AccessRestrictionSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openshift/api/authorization/v1alpha1.AccessRestrictionSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_openshift_api_authorization_v1alpha1_AccessRestrictionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AccessRestrictionList is a collection of AccessRestrictions",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is a list of AccessRestriction objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openshift/api/authorization/v1alpha1.AccessRestriction"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openshift/api/authorization/v1alpha1.AccessRestriction", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_openshift_api_authorization_v1alpha1_AccessRestrictionSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AccessRestrictionSpec holds the matching requirements. MatchAttributes and DeniedSubjects (blacklist) are required. AllowedSubjects (whitelist) may optionally be specified.",
+				Properties: map[string]spec.Schema{
+					"matchAttributes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If these rules cover the current request, then this restriction applies. If AllowedSubjects is set, those subjects can perform the matching actions even if they exist in DeniedSubjects. The subjects in DeniedSubjects are restricted from performing the matching actions unless they exist in AllowedSubjects. If the subject does not exist in either AllowedSubjects or DeniedSubjects, then this authorizer has no opinion on the request. Required.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/rbac/v1.PolicyRule"),
+									},
+								},
+							},
+						},
+					},
+					"allowedSubjects": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The whitelist of subjects that are allowed to perform the actions defined by MatchAttributes. This list has priority over DeniedSubjects.  Thus DeniedSubjects is ignored if the subject exists in this list. Note that this only prevents a denial due to the access restriction. The subject must still have a matching RBAC binding to actually perform the current action. Optional.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openshift/api/authorization/v1alpha1.SubjectMatcher"),
+									},
+								},
+							},
+						},
+					},
+					"deniedSubjects": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The blacklist of subjects that are not allowed to perform the actions defined by MatchAttributes. AllowedSubjects has priority over this list.  It is ignored if the subject exists in AllowedSubjects. This restriction is processed before all RBAC data, and thus will reject actions that RBAC may otherwise permit. Required.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/openshift/api/authorization/v1alpha1.SubjectMatcher"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"matchAttributes"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openshift/api/authorization/v1alpha1.SubjectMatcher", "k8s.io/api/rbac/v1.PolicyRule"},
+	}
+}
+
+func schema_openshift_api_authorization_v1alpha1_SubjectMatcher(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SubjectMatcher defines how an access restriction matches against the current user or service account or group. Exactly one field must be non-nil.",
+				Properties: map[string]spec.Schema{
+					"userRestriction": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UserRestriction matches against user or service account subjects. Use system:serviceaccount:NAMESPACE:NAME to target a specific service account.",
+							Ref:         ref("github.com/openshift/api/authorization/v1.UserRestriction"),
+						},
+					},
+					"groupRestriction": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GroupRestriction matches against group subjects. Use system:serviceaccount:NAMESPACE to target all service accounts in a specific namespace. Use system:serviceaccounts to target all service accounts.",
+							Ref:         ref("github.com/openshift/api/authorization/v1.GroupRestriction"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openshift/api/authorization/v1.GroupRestriction", "github.com/openshift/api/authorization/v1.UserRestriction"},
 	}
 }
 
@@ -11642,6 +11817,114 @@ func schema_openshift_api_security_v1_SupplementalGroupsStrategyOptions(ref comm
 	}
 }
 
+func schema_openshift_api_servicecertsigner_v1alpha1_APIServiceCABundleInjectorConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIServiceCABundleInjectorConfig provides information to configure an APIService CA Bundle Injector controller",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"servingInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServingInfo is the HTTP serving information for the controller's endpoints",
+							Ref:         ref("github.com/openshift/api/config/v1.HTTPServingInfo"),
+						},
+					},
+					"authentication": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authentication allows configuration of authentication for the endpoints",
+							Ref:         ref("github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthentication"),
+						},
+					},
+					"authorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorization allows configuration of authentication for the endpoints",
+							Ref:         ref("github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthorization"),
+						},
+					},
+					"caBundleFile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "caBundleFile holds the ca bundle to apply to APIServices",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"caBundleFile"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openshift/api/config/v1.HTTPServingInfo", "github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthentication", "github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthorization"},
+	}
+}
+
+func schema_openshift_api_servicecertsigner_v1alpha1_ConfigMapCABundleInjectorConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConfigMapCABundleInjectorConfig provides information to configure a ConfigMap CA Bundle Injector controller",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"servingInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServingInfo is the HTTP serving information for the controller's endpoints",
+							Ref:         ref("github.com/openshift/api/config/v1.HTTPServingInfo"),
+						},
+					},
+					"authentication": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authentication allows configuration of authentication for the endpoints",
+							Ref:         ref("github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthentication"),
+						},
+					},
+					"authorization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorization allows configuration of authentication for the endpoints",
+							Ref:         ref("github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthorization"),
+						},
+					},
+					"caBundleFile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "caBundleFile holds the ca bundle to apply to ConfigMaps",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"caBundleFile"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/openshift/api/config/v1.HTTPServingInfo", "github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthentication", "github.com/openshift/api/servicecertsigner/v1alpha1.DelegatedAuthorization"},
+	}
+}
+
 func schema_openshift_api_servicecertsigner_v1alpha1_DelegatedAuthentication(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -11812,8 +12095,20 @@ func schema_openshift_api_servicecertsigner_v1alpha1_ServiceCertSignerOperatorCo
 							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
 						},
 					},
+					"apiServiceCABundleInjectorConfig": {
+						SchemaProps: spec.SchemaProps{
+							Description: "apiServiceCABundleInjectorConfig holds a sparse config that the user wants for this component.  It only needs to be the overrides from the defaults it will end up overlaying in the following order: 1. hardcoded default 2. this config",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+					"configMapCABundleInjectorConfig": {
+						SchemaProps: spec.SchemaProps{
+							Description: "configMapCABundleInjectorConfig holds a sparse config that the user wants for this component.  It only needs to be the overrides from the defaults it will end up overlaying in the following order: 1. hardcoded default 2. this config",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
 				},
-				Required: []string{"managementState", "imagePullSpec", "version", "serviceServingCertSignerConfig"},
+				Required: []string{"managementState", "imagePullSpec", "version", "serviceServingCertSignerConfig", "apiServiceCABundleInjectorConfig", "configMapCABundleInjectorConfig"},
 			},
 		},
 		Dependencies: []string{
