@@ -13,6 +13,7 @@ import (
 	v1 "k8s.io/api/rbac/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func init() {
@@ -62,17 +63,7 @@ func Convert_authorization_AccessRestriction_To_v1alpha1_AccessRestriction(in *a
 
 func autoConvert_v1alpha1_AccessRestrictionList_To_authorization_AccessRestrictionList(in *v1alpha1.AccessRestrictionList, out *authorization.AccessRestrictionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]authorization.AccessRestriction, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_AccessRestriction_To_authorization_AccessRestriction(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]authorization.AccessRestriction)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -83,17 +74,7 @@ func Convert_v1alpha1_AccessRestrictionList_To_authorization_AccessRestrictionLi
 
 func autoConvert_authorization_AccessRestrictionList_To_v1alpha1_AccessRestrictionList(in *authorization.AccessRestrictionList, out *v1alpha1.AccessRestrictionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]v1alpha1.AccessRestriction, len(*in))
-		for i := range *in {
-			if err := Convert_authorization_AccessRestriction_To_v1alpha1_AccessRestriction(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]v1alpha1.AccessRestriction)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -103,18 +84,7 @@ func Convert_authorization_AccessRestrictionList_To_v1alpha1_AccessRestrictionLi
 }
 
 func autoConvert_v1alpha1_AccessRestrictionSpec_To_authorization_AccessRestrictionSpec(in *v1alpha1.AccessRestrictionSpec, out *authorization.AccessRestrictionSpec, s conversion.Scope) error {
-	if in.MatchAttributes != nil {
-		in, out := &in.MatchAttributes, &out.MatchAttributes
-		*out = make([]unnameable_Unsupported, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchAttributes = nil
-	}
+	out.MatchAttributes = *(*[]rbac.PolicyRule)(unsafe.Pointer(&in.MatchAttributes))
 	out.AllowedSubjects = *(*[]authorization.SubjectMatcher)(unsafe.Pointer(&in.AllowedSubjects))
 	out.DeniedSubjects = *(*[]authorization.SubjectMatcher)(unsafe.Pointer(&in.DeniedSubjects))
 	return nil
@@ -126,18 +96,7 @@ func Convert_v1alpha1_AccessRestrictionSpec_To_authorization_AccessRestrictionSp
 }
 
 func autoConvert_authorization_AccessRestrictionSpec_To_v1alpha1_AccessRestrictionSpec(in *authorization.AccessRestrictionSpec, out *v1alpha1.AccessRestrictionSpec, s conversion.Scope) error {
-	if in.MatchAttributes != nil {
-		in, out := &in.MatchAttributes, &out.MatchAttributes
-		*out = make([]v1.PolicyRule, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchAttributes = nil
-	}
+	out.MatchAttributes = *(*[]v1.PolicyRule)(unsafe.Pointer(&in.MatchAttributes))
 	out.AllowedSubjects = *(*[]v1alpha1.SubjectMatcher)(unsafe.Pointer(&in.AllowedSubjects))
 	out.DeniedSubjects = *(*[]v1alpha1.SubjectMatcher)(unsafe.Pointer(&in.DeniedSubjects))
 	return nil

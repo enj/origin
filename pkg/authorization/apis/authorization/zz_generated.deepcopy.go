@@ -77,9 +77,9 @@ func (in *AccessRestrictionSpec) DeepCopyInto(out *AccessRestrictionSpec) {
 	*out = *in
 	if in.MatchAttributes != nil {
 		in, out := &in.MatchAttributes, &out.MatchAttributes
-		*out = make([]unnameable_Unsupported, len(*in))
+		*out = make([]rbac.PolicyRule, len(*in))
 		for i := range *in {
-			(*out)[i] = (*in)[i].DeepCopy()
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.AllowedSubjects != nil {
