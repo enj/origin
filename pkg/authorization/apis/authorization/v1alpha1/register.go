@@ -12,7 +12,7 @@ const GroupName = "authorization.openshift.io"
 var (
 	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
-	SchemeBuilder = runtime.NewSchemeBuilder(v1alpha1.SchemeBuilder.AddToScheme, RegisterDefaults, RegisterConversions)
+	SchemeBuilder = runtime.NewSchemeBuilder(v1alpha1.AddToScheme, RegisterDefaults, RegisterConversions)
 	AddToScheme   = SchemeBuilder.AddToScheme
 
 	localSchemeBuilder = &SchemeBuilder
