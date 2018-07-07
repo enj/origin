@@ -1,11 +1,14 @@
 package accessrestriction
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
+	rbacapiv1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 
 	userapiv1 "github.com/openshift/api/user/v1"
@@ -61,7 +64,17 @@ func matches(accessRestriction *authorization.AccessRestriction, requestAttribut
 	if len(accessRestriction.Spec.MatchAttributes) == 0 {
 		return true // fail closed (but validation prevents this)
 	}
-	return rbac.RulesAllow(requestAttributes, accessRestriction.Spec.MatchAttributes...)
+	return rbac.RulesAllow(requestAttributes, hax(accessRestriction.Spec.MatchAttributes)...)
+}
+
+func hax(in []rbacapi.PolicyRule) []rbacv1.PolicyRule {
+	out := make([]rbacv1.PolicyRule, len(in), len(in))
+	for i := range in {
+		if err := rbacapiv1.Convert_rbac_PolicyRule_To_v1_PolicyRule(&in[i], &out[i], nil); err != nil {
+			panic(err)
+		}
+	}
+	return out
 }
 
 func (a *accessRestrictionAuthorizer) allowed(accessRestriction *authorization.AccessRestriction, user user.Info) bool {
