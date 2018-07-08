@@ -48,7 +48,7 @@ var (
 
 	emptyGroupKind       = schema.GroupKind{} // Used with static redirect URIs
 	routeGroupKind       = routeapi.SchemeGroupVersion.WithKind(routeKind).GroupKind()
-	legacyRouteGroupKind = routeapi.LegacySchemeGroupVersion.WithKind(routeKind).GroupKind() // to support redirect reference with old group
+	legacyRouteGroupKind = schema.GroupKind{Kind: routeKind} // to support redirect reference with old group
 
 	scheme       = runtime.NewScheme()
 	codecFactory = serializer.NewCodecFactory(scheme)
