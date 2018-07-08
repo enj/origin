@@ -29,6 +29,7 @@ type readStorage interface {
 	rest.Watcher
 	rest.Exporter
 	rest.TableConvertor
+	rest.Scoper
 }
 
 type REST struct {
