@@ -57,7 +57,7 @@ var (
 func init() {
 	corev1.AddToScheme(scheme)
 	oauthapi.AddToScheme(scheme)
-	oauthapi.AddToSchemeInCoreGroup(scheme)
+	oauthapi.Install(scheme)
 }
 
 // namesToObjMapperFunc is linked to a given GroupKind.
