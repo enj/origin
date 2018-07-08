@@ -11,6 +11,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	restclient "k8s.io/client-go/rest"
@@ -38,7 +39,7 @@ func init() {
 	// TODO only use external versions, so we only add external types
 	legacy.InstallLegacyBuild(buildEnvVarScheme)
 	utilruntime.Must(buildapiv1.AddToScheme(buildEnvVarScheme))
-	buildEnvVarJSONCodec = buildEnvVarCodecFactory.LegacyCodec(buildapiv1.SchemeGroupVersion, buildapiv1.LegacySchemeGroupVersion)
+	buildEnvVarJSONCodec = buildEnvVarCodecFactory.LegacyCodec(buildapiv1.SchemeGroupVersion, schema.GroupVersion{Version: "v1"})
 }
 
 type builder interface {

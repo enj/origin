@@ -16,9 +16,10 @@ import (
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	authorizerrbac "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 
-	oauthapi "github.com/openshift/api/oauth/v1"
+	oauthapiv1 "github.com/openshift/api/oauth/v1"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 	imageapi "github.com/openshift/origin/pkg/image/apis/image"
+	oauthapi "github.com/openshift/origin/pkg/oauth/apis/oauth"
 	projectapi "github.com/openshift/origin/pkg/project/apis/project"
 	userapi "github.com/openshift/origin/pkg/user/apis/user"
 )
@@ -474,7 +475,7 @@ func removeEscalatingResources(in rbacv1.PolicyRule) rbacv1.PolicyRule {
 	return in
 }
 
-func ValidateScopeRestrictions(client *oauthapi.OAuthClient, scopes ...string) error {
+func ValidateScopeRestrictions(client *oauthapiv1.OAuthClient, scopes ...string) error {
 	if len(client.ScopeRestrictions) == 0 {
 		return nil
 	}
@@ -492,7 +493,7 @@ func ValidateScopeRestrictions(client *oauthapi.OAuthClient, scopes ...string) e
 	return kutilerrors.NewAggregate(errs)
 }
 
-func validateScopeRestrictions(client *oauthapi.OAuthClient, scope string) error {
+func validateScopeRestrictions(client *oauthapiv1.OAuthClient, scope string) error {
 	errs := []error{}
 
 	if len(client.ScopeRestrictions) == 0 {
@@ -538,7 +539,7 @@ func validateLiteralScopeRestrictions(scope string, literals []string) error {
 	return fmt.Errorf("%v not found in %v", scope, literals)
 }
 
-func validateClusterRoleScopeRestrictions(scope string, restriction oauthapi.ClusterRoleScopeRestriction) error {
+func validateClusterRoleScopeRestrictions(scope string, restriction oauthapiv1.ClusterRoleScopeRestriction) error {
 	role, namespace, escalating, err := clusterRoleEvaluatorInstance.parseScope(scope)
 	if err != nil {
 		return err
