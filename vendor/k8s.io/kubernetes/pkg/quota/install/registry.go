@@ -58,6 +58,7 @@ var ignoredResources = map[schema.GroupResource]struct{}{
 	{Group: "authorization.openshift.io", Resource: "rolebindings"}:               {},
 	{Group: "authorization.openshift.io", Resource: "clusterroles"}:               {},
 	{Group: "authorization.openshift.io", Resource: "clusterrolebindings"}:        {},
+	{Group: "authorization.openshift.io", Resource: "accessrestrictions"}:         {},
 	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:                    {},
 	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}:        {},
 }
