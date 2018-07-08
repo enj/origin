@@ -30,7 +30,7 @@ func init() {
 	annotationDecodingScheme := runtime.NewScheme()
 	utilruntime.Must(buildv1.AddToScheme(annotationDecodingScheme))
 	utilruntime.Must(buildv1helpers.AddToScheme(annotationDecodingScheme))
-	utilruntime.Must(buildv1.AddToSchemeInCoreGroup(annotationDecodingScheme))
+	utilruntime.Must(buildv1.DeprecatedInstallWithoutGroup(annotationDecodingScheme))
 	utilruntime.Must(buildv1helpers.AddToSchemeInCoreGroup(annotationDecodingScheme))
 	// TODO eventually we shouldn't deal in internal versions, but for now decode into one.
 	utilruntime.Must(buildapi.AddToScheme(annotationDecodingScheme))
