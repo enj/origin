@@ -102,8 +102,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authorizationapiv1.GroupName, c.ExtraConfig.Scheme, metav1.ParameterCodec, c.ExtraConfig.Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = authorizationapiv1.SchemeGroupVersion
-	apiGroupInfo.GroupMeta.GroupVersions = []schema.GroupVersion{authorizationapiv1.SchemeGroupVersion, authorizationapiv1alpha1.SchemeGroupVersion}
+	apiGroupInfo.PrioritizedVersions = []schema.GroupVersion{authorizationapiv1.SchemeGroupVersion, authorizationapiv1alpha1.SchemeGroupVersion}
 	apiGroupInfo.VersionedResourcesStorageMap[authorizationapiv1.SchemeGroupVersion.Version] = v1Storage
 	apiGroupInfo.VersionedResourcesStorageMap[authorizationapiv1alpha1.SchemeGroupVersion.Version] = v1alpha1Storage
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
