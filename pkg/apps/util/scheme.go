@@ -26,7 +26,7 @@ func init() {
 	// TODO automatically do this in appsv1 AddToScheme
 	utilruntime.Must(corev1.AddToScheme(annotationDecodingScheme))
 	utilruntime.Must(appsv1.AddToScheme(annotationDecodingScheme))
-	utilruntime.Must(appsv1.AddToSchemeInCoreGroup(annotationDecodingScheme))
+	utilruntime.Must(appsv1.DeprecatedInstallWithoutGroup(annotationDecodingScheme))
 	// TODO eventually we shouldn't deal in internal versions, but for now decode into one.
 	utilruntime.Must(appsv1helpers.AddToScheme(annotationDecodingScheme))
 	utilruntime.Must(appsv1helpers.AddToSchemeInCoreGroup(annotationDecodingScheme))
