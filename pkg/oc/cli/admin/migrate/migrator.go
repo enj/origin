@@ -215,8 +215,10 @@ func (o *ResourceOptions) Complete(f kcmdutil.Factory, c *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	// but invalidate its cache to force it to have the latest data
+	// but invalidate its cache to force it to fetch the latest data
 	discoveryClient.Invalidate()
+	// and do a no-op call to cause the latest data to be written to disk
+	_, _ = discoveryClient.ServerResources()
 	// so that the REST mapper will never use stale discovery data
 	mapper, err := f.ToRESTMapper()
 	if err != nil {
@@ -725,7 +727,7 @@ func DefaultRetriable(info *resource.Info, err error) error {
 // represented.
 // TODO: add a field to APIResources for "virtual" (or that points to the canonical resource).
 // TODO: fallback to the scheme when discovery is not possible.
-func FindAllCanonicalResources(d discovery.DiscoveryInterface, m meta.RESTMapper) ([]schema.GroupResource, error) {
+func FindAllCanonicalResources(d discovery.ServerResourcesInterface, m meta.RESTMapper) ([]schema.GroupResource, error) {
 	set := make(map[schema.GroupResource]struct{})
 	all, err := d.ServerResources()
 	if err != nil {
