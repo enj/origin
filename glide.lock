@@ -1,5 +1,5 @@
-hash: 424aaf9eb0319384574a012df2886bbf6cd77b479e7065462bc48a61e99a9b3f
-updated: 2018-07-12T22:59:32.292828018-07:00
+hash: ec1cc74fc95d3aff64a7da55d510a5512a914ce856b0fa29f74cabff04118063
+updated: 2018-07-17T13:26:27.95321816-04:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -819,11 +819,13 @@ imports:
   - go-selinux
   - go-selinux/label
 - name: github.com/openshift/api
-  version: 12a230f9f9225237f1a35b86171848da610900bb
+  version: e29723d97aec8fe0cd60bf9d5593ea3298bbaee5
+  repo: https://github.com/enj/api.git
   subpackages:
   - apps/v1
   - authorization
   - authorization/v1
+  - authorization/v1alpha1
   - build/v1
   - config/v1
   - image/docker10
@@ -842,7 +844,8 @@ imports:
   - user/v1
   - webconsole/v1
 - name: github.com/openshift/client-go
-  version: b22949ca0eae046da7611d0d20c8089dcec212d6
+  version: 37b73d9e9bc14e56bcb151323c14816f4138526a
+  repo: https://github.com/enj/client-go.git
   subpackages:
   - apps/clientset/versioned
   - apps/clientset/versioned/scheme
@@ -857,11 +860,15 @@ imports:
   - authorization/clientset/versioned/scheme
   - authorization/clientset/versioned/typed/authorization/v1
   - authorization/clientset/versioned/typed/authorization/v1/fake
+  - authorization/clientset/versioned/typed/authorization/v1alpha1
+  - authorization/clientset/versioned/typed/authorization/v1alpha1/fake
   - authorization/informers/externalversions
   - authorization/informers/externalversions/authorization
   - authorization/informers/externalversions/authorization/v1
+  - authorization/informers/externalversions/authorization/v1alpha1
   - authorization/informers/externalversions/internalinterfaces
   - authorization/listers/authorization/v1
+  - authorization/listers/authorization/v1alpha1
   - build/clientset/versioned
   - build/clientset/versioned/fake
   - build/clientset/versioned/scheme
@@ -956,7 +963,7 @@ imports:
   - signal
   - strslice
 - name: github.com/openshift/library-go
-  version: 4bdffb3d6ca083fad9ee9f51d3273d328d349dbc
+  version: d366b6f2e76695de0e702cb9d06767bd517753b0
   subpackages:
   - pkg/config/client
   - pkg/config/leaderelection
@@ -966,9 +973,10 @@ imports:
   - pkg/operator/resource/resourceapply
   - pkg/operator/resource/resourcecread
   - pkg/operator/resource/resourcemerge
+  - pkg/operator/v1alpha1helpers
   - pkg/serviceability
 - name: github.com/openshift/service-serving-cert-signer
-  version: 10d530a76d1e98ae342df2fa5a3cbefd5dc3f241
+  version: 9337a18300a63e369f34d411b2080b4bd877e7a9
   subpackages:
   - pkg/controller/servingcert
   - pkg/controller/servingcert/cryptoextensions
