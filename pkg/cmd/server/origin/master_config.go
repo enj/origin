@@ -32,6 +32,7 @@ import (
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	rbacauthorizer "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 
+	authorizationexternalinformer "github.com/openshift/client-go/authorization/informers/externalversions"
 	routeinformer "github.com/openshift/client-go/route/informers/externalversions"
 	userinformer "github.com/openshift/client-go/user/informers/externalversions"
 	appinformer "github.com/openshift/origin/pkg/apps/generated/informers/internalversion"
@@ -112,6 +113,7 @@ type InformerAccess interface {
 	GetExternalKubeInformers() kinformers.SharedInformerFactory
 	GetAppInformers() appinformer.SharedInformerFactory
 	GetAuthorizationInformers() authorizationinformer.SharedInformerFactory
+	GetExternalAuthorizationInformers() authorizationexternalinformer.SharedInformerFactory
 	GetBuildInformers() buildinformer.SharedInformerFactory
 	GetImageInformers() imageinformer.SharedInformerFactory
 	GetNetworkInformers() networkinformer.SharedInformerFactory
