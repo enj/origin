@@ -210,14 +210,14 @@ func (o *ResourceOptions) Complete(f kcmdutil.Factory, c *cobra.Command) error {
 		}
 	}
 
-	clientConfig, err := f.ToRESTConfig()
+	// use the factory's caching discovery client
+	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(clientConfig)
-	if err != nil {
-		return err
-	}
+	// but invalidate its cache to force it to have the latest data
+	discoveryClient.Invalidate()
+	// so that the REST mapper will never use stale discovery data
 	mapper, err := f.ToRESTMapper()
 	if err != nil {
 		return err
