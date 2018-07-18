@@ -1,5 +1,5 @@
-hash: 91748cede774246187f6a8627e0a335015261f8e28708731a279c6ce205d9254
-updated: 2018-07-10T15:41:29.920958699-04:00
+hash: d342fe97249ad014bf7a5234562c1abab230139acaf9d3312ae21d23ac9c4ac5
+updated: 2018-07-17T11:26:55.422894244-04:00
 imports:
 - name: github.com/davecgh/go-spew
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
@@ -49,10 +49,12 @@ imports:
 - name: github.com/modern-go/reflect2
   version: 05fbef0ca5da472bbf96c9322b84a53edc03c9fd
 - name: github.com/openshift/api
-  version: 04a26bf3b8d69c390642c5803fe4cfdb899112aa
+  version: 15e50c4c5bb127a694b72676f9cd83542d8b8413
+  repo: https://github.com/enj/api.git
   subpackages:
   - apps/v1
   - authorization/v1
+  - authorization/v1alpha1
   - build/v1
   - config/v1
   - image/docker10
