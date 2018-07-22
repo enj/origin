@@ -22,6 +22,7 @@ import (
 	"net/url"
 
 	dockerterm "github.com/docker/docker/pkg/term"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -322,7 +323,24 @@ func (p *ExecOptions) Run() error {
 			TTY:       t.Raw,
 		}, legacyscheme.ParameterCodec)
 
-		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
+		hax := restClient.Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name("localhost").
+			Suffix("exec").
+			Suffix(pod.Namespace).
+			Suffix(pod.Name).
+			Suffix(containerName).
+			Param(api.ExecStdinParam, "1").
+			Param(api.ExecStdoutParam, "1").
+			Param(api.ExecTTYParam, "1")
+		for _, c := range p.Command {
+			hax.Param(api.ExecCommandParam, c)
+		}
+
+		glog.Errorf("hax req: %s", hax.URL().String())
+
+		return p.Executor.Execute("GET", hax.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {
