@@ -84,7 +84,11 @@ func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 
 		// valid persisted user
 		if err == nil {
-			return obj, nil
+			// copy persisted user
+			persistedUser := obj.(*userapi.User).DeepCopy()
+			// and mutate it to include the complete list of groups from the request context
+			persistedUser.Groups = virtualUser.Groups
+			return persistedUser, nil
 		}
 
 		// server is broken
