@@ -4,16 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
-	"strconv"
-
 	"k8s.io/apiserver/pkg/authentication/user"
+
+	authapi "github.com/openshift/origin/pkg/oauthserver/api"
 )
 
-const UserNameKey = "user.name"
-const UserUIDKey = "user.uid"
-const ExpiresKey = "expires"
+const (
+	// TODO drop the the two user key fields in a later release
+	// once we no longer need to worry about mixed master scenarios
+	UserNameKey = "user.name"
+	UserUIDKey  = "user.uid"
+
+	ExpiresKey = "expires"
+
+	IdentityMetadataNameKey = "identity.metadata.name"
+)
 
 type Authenticator struct {
 	store  Store
@@ -35,7 +43,9 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, err
 	}
 
-	expiresObj, ok := session.Values()[ExpiresKey]
+	values := session.Values()
+
+	expiresObj, ok := values[ExpiresKey]
 	if !ok {
 		return nil, false, nil
 	}
@@ -43,7 +53,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 	if !ok {
 		return nil, false, errors.New("expires on session is not a string")
 	}
-	if expiresString == "" {
+	if len(expiresString) == 0 {
 		return nil, false, nil
 	}
 	expires, err := strconv.ParseInt(expiresString, 10, 64)
@@ -54,7 +64,25 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	nameObj, ok := session.Values()[UserNameKey]
+	// if we reference an identity metadata object, use it as the
+	// source of truth and ignore the remaining fields of the cookie
+	if identityMetadataNameObj, ok := values[IdentityMetadataNameKey]; ok {
+		identityMetadataName, ok := identityMetadataNameObj.(string)
+		if !ok {
+			return nil, false, errors.New("identity.metadata.name on session is not a string")
+		}
+		if len(identityMetadataName) == 0 {
+			return nil, false, nil
+		}
+		// TODO use client to get identity metadata to fill this object
+		user := &user.DefaultInfo{
+			Name: "name", // TODO fix
+			UID:  "uid",  // TODO fix
+		}
+		return authapi.NewDefaultUserIdentityMetadata(user, identityMetadataName), true, nil
+	}
+
+	nameObj, ok := values[UserNameKey]
 	if !ok {
 		return nil, false, nil
 	}
@@ -62,11 +90,11 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 	if !ok {
 		return nil, false, errors.New("user.name on session is not a string")
 	}
-	if name == "" {
+	if len(name) == 0 {
 		return nil, false, nil
 	}
 
-	uidObj, ok := session.Values()[UserUIDKey]
+	uidObj, ok := values[UserUIDKey]
 	if !ok {
 		return nil, false, nil
 	}
@@ -87,11 +115,17 @@ func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w 
 	if err != nil {
 		return false, err
 	}
+
 	values := session.Values()
 	values[UserNameKey] = user.GetName()
 	values[UserUIDKey] = user.GetUID()
 	values[ExpiresKey] = strconv.FormatInt(time.Now().Add(time.Duration(a.maxAge)*time.Second).Unix(), 10)
-	// TODO: should we save groups, scope, and extra in the session as well?
+
+	// TODO when the user keys are dropped, this interface check will become required
+	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
+		values[IdentityMetadataNameKey] = userIdentityMetadata.GetIdentityMetadataName()
+	}
+
 	return false, a.store.Save(w, req)
 }
 
@@ -100,8 +134,12 @@ func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *htt
 	if err != nil {
 		return err
 	}
-	session.Values()[UserNameKey] = ""
-	session.Values()[UserUIDKey] = ""
-	session.Values()[ExpiresKey] = ""
+
+	values := session.Values()
+	values[UserNameKey] = ""
+	values[UserUIDKey] = ""
+	values[ExpiresKey] = ""
+	values[IdentityMetadataNameKey] = ""
+
 	return a.store.Save(w, req)
 }
