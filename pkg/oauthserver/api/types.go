@@ -15,6 +15,13 @@ const (
 	IdentityPreferredUsernameKey = "preferred_username"
 )
 
+var (
+	_ UserIdentityInfo = &DefaultUserIdentityInfo{}
+
+	_ user.Info            = &DefaultUserIdentityMetadata{}
+	_ UserIdentityMetadata = &DefaultUserIdentityMetadata{}
+)
+
 // UserIdentityInfo contains information about an identity.  Identities are distinct from users.  An authentication server of
 // some kind (like oauth for example) describes an identity.  Our system controls the users mapped to this identity.
 type UserIdentityInfo interface {
@@ -24,6 +31,9 @@ type UserIdentityInfo interface {
 	GetProviderName() string
 	// GetProviderUserName uniquely identifies this particular identity for this provider.  It is NOT guaranteed to be unique across providers
 	GetProviderUserName() string
+	// GetProviderGroups returns the groups associated with the user for this provider.
+	// It is NOT guaranteed to be stable across different authentication requests for the same provider.
+	GetProviderGroups() []string
 	// GetExtra is a map to allow providers to add additional fields that they understand
 	GetExtra() map[string]string
 }
@@ -33,6 +43,12 @@ type UserIdentityMapper interface {
 	// UserFor takes an identity, ignores the passed identity.Provider, forces the provider value to some other value and then creates the mapping.
 	// It returns the corresponding user.Info
 	UserFor(identityInfo UserIdentityInfo) (user.Info, error)
+}
+
+// UserIdentityMetadata is an extension to user.Info that contains a reference to an identity metadata object.
+// This object can be used to enrich later authentication flows with data such as the user's group membership from the identity provider.
+type UserIdentityMetadata interface {
+	GetIdentityMetadataName() string
 }
 
 type Client interface {
@@ -52,6 +68,7 @@ type Grant struct {
 type DefaultUserIdentityInfo struct {
 	ProviderName     string
 	ProviderUserName string
+	ProviderGroups   []string
 	Extra            map[string]string
 }
 
@@ -76,6 +93,10 @@ func (i *DefaultUserIdentityInfo) GetProviderUserName() string {
 	return i.ProviderUserName
 }
 
+func (i *DefaultUserIdentityInfo) GetProviderGroups() []string {
+	return i.ProviderGroups
+}
+
 func (i *DefaultUserIdentityInfo) GetExtra() map[string]string {
 	return i.Extra
 }
@@ -87,4 +108,20 @@ type ProviderInfo struct {
 	Name string
 	// URL to login using this identity provider
 	URL string
+}
+
+type DefaultUserIdentityMetadata struct {
+	user.Info
+	IdentityMetadataName string
+}
+
+func (i *DefaultUserIdentityMetadata) GetIdentityMetadataName() string {
+	return i.IdentityMetadataName
+}
+
+func NewDefaultUserIdentityMetadata(u user.Info, identityMetadataName string) *DefaultUserIdentityMetadata {
+	return &DefaultUserIdentityMetadata{
+		Info:                 u,
+		IdentityMetadataName: identityMetadataName,
+	}
 }
