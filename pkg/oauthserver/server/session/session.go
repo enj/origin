@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/context"
@@ -10,10 +11,11 @@ import (
 
 type store struct {
 	store sessions.Store
+	name  string
 }
 
-func NewStore(secure bool, secrets ...string) Store {
-	values := [][]byte{}
+func NewStore(secure bool, name string, secrets ...string) Store {
+	values := make([][]byte, 0, len(secrets))
 	for _, secret := range secrets {
 		values = append(values, []byte(secret))
 	}
@@ -21,15 +23,18 @@ func NewStore(secure bool, secrets ...string) Store {
 	cookie.Options.MaxAge = 0
 	cookie.Options.HttpOnly = true
 	cookie.Options.Secure = secure
-	return store{cookie}
+	return store{store: cookie, name: name}
 }
 
-func (s store) Get(req *http.Request, name string) (Session, error) {
-	session, err := s.store.Get(req, name)
-	if err != nil && err.Error() == securecookie.ErrMacInvalid.Error() {
-		err = nil
+func (s store) Get(req *http.Request) (Values, error) {
+	session, err := s.store.Get(req, s.name)
+	if err != nil && err.Error() != securecookie.ErrMacInvalid.Error() {
+		return nil, err
 	}
-	return sessionWrapper{session}, err
+	if session == nil || session.Values == nil {
+		return nil, errors.New("unable to get cookie session")
+	}
+	return session.Values, nil
 }
 
 func (s store) Save(w http.ResponseWriter, req *http.Request) error {
@@ -38,15 +43,4 @@ func (s store) Save(w http.ResponseWriter, req *http.Request) error {
 
 func (s store) Wrap(h http.Handler) http.Handler {
 	return context.ClearHandler(h)
-}
-
-type sessionWrapper struct {
-	session *sessions.Session
-}
-
-func (s sessionWrapper) Values() map[interface{}]interface{} {
-	if s.session == nil {
-		return map[interface{}]interface{}{}
-	}
-	return s.session.Values
 }
