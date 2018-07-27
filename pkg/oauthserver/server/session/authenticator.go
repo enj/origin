@@ -1,7 +1,6 @@
 package session
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,14 +12,12 @@ import (
 )
 
 const (
-	// TODO drop the the two user key fields in a later release
-	// once we no longer need to worry about mixed master scenarios
 	UserNameKey = "user.name"
 	UserUIDKey  = "user.uid"
 
 	ExpiresKey = "expires"
 
-	IdentityMetadataNameKey = "identity.metadata.name"
+	IdentityMetadataNameKey = "identity.metadata.name" // TODO maybe use a smaller name to make cookie smaller?
 )
 
 type Authenticator struct {
@@ -45,16 +42,9 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 
 	values := session.Values()
 
-	expiresObj, ok := values[ExpiresKey]
-	if !ok {
-		return nil, false, nil
-	}
-	expiresString, ok := expiresObj.(string)
-	if !ok {
-		return nil, false, errors.New("expires on session is not a string")
-	}
-	if len(expiresString) == 0 {
-		return nil, false, nil
+	expiresString, ok, err := getString(ExpiresKey, values)
+	if !ok || err != nil {
+		return nil, false, err
 	}
 	expires, err := strconv.ParseInt(expiresString, 10, 64)
 	if err != nil {
@@ -64,16 +54,15 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
+	// check if we reference an identity metadata object
+	identityMetadataName, ok, err := getString(IdentityMetadataNameKey, values)
+	if err != nil {
+		return nil, false, err
+	}
+
 	// if we reference an identity metadata object, use it as the
 	// source of truth and ignore the remaining fields of the cookie
-	if identityMetadataNameObj, ok := values[IdentityMetadataNameKey]; ok {
-		identityMetadataName, ok := identityMetadataNameObj.(string)
-		if !ok {
-			return nil, false, errors.New("identity.metadata.name on session is not a string")
-		}
-		if len(identityMetadataName) == 0 {
-			return nil, false, nil
-		}
+	if ok {
 		// TODO use client to get identity metadata to fill this object
 		user := &user.DefaultInfo{
 			Name: "name", // TODO fix
@@ -82,27 +71,18 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return authapi.NewDefaultUserIdentityMetadata(user, identityMetadataName), true, nil
 	}
 
-	nameObj, ok := values[UserNameKey]
-	if !ok {
-		return nil, false, nil
-	}
-	name, ok := nameObj.(string)
-	if !ok {
-		return nil, false, errors.New("user.name on session is not a string")
-	}
-	if len(name) == 0 {
-		return nil, false, nil
+	// otherwise fallback to name and UID
+	name, ok, err := getString(UserNameKey, values)
+	if !ok || err != nil {
+		return nil, false, err
 	}
 
-	uidObj, ok := values[UserUIDKey]
-	if !ok {
-		return nil, false, nil
+	uid, _, err := getString(UserUIDKey, values)
+	// Ignore ok to tolerate empty string UIDs in the session
+	// TODO in what valid flow is UID empty?
+	if err != nil {
+		return nil, false, err
 	}
-	uid, ok := uidObj.(string)
-	if !ok {
-		return nil, false, errors.New("user.uid on session is not a string")
-	}
-	// Tolerate empty string UIDs in the session
 
 	return &user.DefaultInfo{
 		Name: name,
@@ -117,13 +97,22 @@ func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w 
 	}
 
 	values := session.Values()
-	values[UserNameKey] = user.GetName()
-	values[UserUIDKey] = user.GetUID()
+
+	// we always need to store an expiration time for the cookie
 	values[ExpiresKey] = strconv.FormatInt(time.Now().Add(time.Duration(a.maxAge)*time.Second).Unix(), 10)
 
-	// TODO when the user keys are dropped, this interface check will become required
+	// store name and UID to handle the case where we have no identity metadata
+	// or when we may have old masters that do not know about identity metadata
+	values[UserNameKey] = user.GetName()
+	values[UserUIDKey] = user.GetUID()
+
+	// check if we need have optional identity metadata (for storing a reference to group information)
 	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
 		values[IdentityMetadataNameKey] = userIdentityMetadata.GetIdentityMetadataName()
+		// TODO maybe do this once we no longer have mixed master scenarios to worry about
+		// unset name and UID since identity metadata is authoritative
+		// values[UserNameKey] = ""
+		// values[UserUIDKey] = ""
 	}
 
 	return false, a.store.Save(w, req)
@@ -142,4 +131,16 @@ func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *htt
 	values[IdentityMetadataNameKey] = ""
 
 	return a.store.Save(w, req)
+}
+
+func getString(key string, values map[interface{}]interface{}) (string, bool, error) {
+	obj, ok := values[key]
+	if !ok {
+		return "", false, nil
+	}
+	str, ok := obj.(string)
+	if !ok {
+		return "", false, fmt.Errorf("%s on session is not a string", key)
+	}
+	return str, len(str) != 0, nil
 }

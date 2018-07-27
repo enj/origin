@@ -16,9 +16,13 @@ func (p *groupsMapper) UserFor(identityInfo authapi.UserIdentityInfo) (kuser.Inf
 	if err != nil {
 		return nil, err
 	}
-	// always create identity metadata even if there are no groups (for use in cookie session)
+	// if there are no groups we do not need to waste resources on identity metadata objects
+	// this does mean that flows that use the cookie session must always store the user and UID
+	// in the cookie as they cannot rely on there always being an identity metadata object
 	groups := identityInfo.GetProviderGroups()
-	_ = groups // TODO remove
+	if len(groups) == 0 {
+		return user, nil
+	}
 	// TODO use identity metadata API client to store groups, needs to handle conflicts/already exists like provision.go
 	identityMetadataName := "<hash>"
 	return authapi.NewDefaultUserIdentityMetadata(user, identityMetadataName), nil
