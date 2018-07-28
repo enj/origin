@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gorilla/context"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 )
@@ -39,8 +38,4 @@ func (s store) Get(req *http.Request) (Values, error) {
 
 func (s store) Save(w http.ResponseWriter, req *http.Request) error {
 	return sessions.Save(req, w)
-}
-
-func (s store) Wrap(h http.Handler) http.Handler {
-	return context.ClearHandler(h)
 }

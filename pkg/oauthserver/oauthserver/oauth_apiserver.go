@@ -43,15 +43,13 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 	genericConfig.LoopbackClientConfig = userClientConfig
 
 	var sessionAuth *session.Authenticator
-	var sessionHandlerWrapper handlerWrapper
 	if oauthConfig.SessionConfig != nil {
 		secure := isHTTPS(oauthConfig.MasterPublicURL)
-		auth, wrapper, err := buildSessionAuth(secure, oauthConfig.SessionConfig)
+		auth, err := buildSessionAuth(secure, oauthConfig.SessionConfig)
 		if err != nil {
 			return nil, err
 		}
 		sessionAuth = auth
-		sessionHandlerWrapper = wrapper
 	}
 
 	userClient, err := userclient.NewForConfig(userClientConfig)
@@ -80,7 +78,6 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 			OAuthAuthorizeTokenClient:      oauthClient.OAuthAuthorizeTokens(),
 			OAuthClientClient:              oauthClient.OAuthClients(),
 			OAuthClientAuthorizationClient: oauthClient.OAuthClientAuthorizations(),
-			HandlerWrapper:                 sessionHandlerWrapper,
 		},
 	}
 	genericConfig.BuildHandlerChainFunc = ret.buildHandlerChainForOAuth
@@ -88,13 +85,13 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 	return ret, nil
 }
 
-func buildSessionAuth(secure bool, config *configapi.SessionConfig) (*session.Authenticator, handlerWrapper, error) {
+func buildSessionAuth(secure bool, config *configapi.SessionConfig) (*session.Authenticator, error) {
 	secrets, err := getSessionSecrets(config.SessionSecretsFile)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	sessionStore := session.NewStore(secure, config.SessionName, secrets...)
-	return session.NewAuthenticator(sessionStore, config.SessionMaxAgeSeconds), sessionStore, nil
+	return session.NewAuthenticator(sessionStore, config.SessionMaxAgeSeconds), nil
 }
 
 func getSessionSecrets(filename string) ([]string, error) {
@@ -155,8 +152,6 @@ type ExtraOAuthConfig struct {
 	OAuthClientAuthorizationClient oauthclient.OAuthClientAuthorizationInterface
 
 	SessionAuth *session.Authenticator
-
-	HandlerWrapper handlerWrapper
 }
 
 type OAuthServerConfig struct {
@@ -232,7 +227,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 	go func() {
 		wait.PollUntil(1*time.Second, func() (done bool, err error) {
 			webConsoleClient := oauthapi.OAuthClient{
-				ObjectMeta:            metav1.ObjectMeta{Name: OpenShiftWebConsoleClientID},
+				ObjectMeta:            metav1.ObjectMeta{Name: openShiftWebConsoleClientID},
 				Secret:                "",
 				RespondWithChallenges: false,
 				RedirectURIs:          c.ExtraOAuthConfig.AssetPublicAddresses,
@@ -244,7 +239,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 			}
 
 			browserClient := oauthapi.OAuthClient{
-				ObjectMeta:            metav1.ObjectMeta{Name: OpenShiftBrowserClientID},
+				ObjectMeta:            metav1.ObjectMeta{Name: openShiftBrowserClientID},
 				Secret:                uuid.New(),
 				RespondWithChallenges: false,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
@@ -256,7 +251,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 			}
 
 			cliClient := oauthapi.OAuthClient{
-				ObjectMeta:            metav1.ObjectMeta{Name: OpenShiftCLIClientID},
+				ObjectMeta:            metav1.ObjectMeta{Name: openShiftCLIClientID},
 				Secret:                "",
 				RespondWithChallenges: true,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenImplicitURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
