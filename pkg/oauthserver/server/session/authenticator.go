@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/authentication/user"
+
+	authapi "github.com/openshift/origin/pkg/oauthserver/api"
 )
 
 const (
@@ -13,6 +15,8 @@ const (
 
 	// expKey is stored as an int64 unix time
 	expKey = "exp"
+
+	identityMetadataNameKey = "identity.metadata.name" // TODO maybe use a smaller name to make cookie smaller?
 )
 
 type Authenticator struct {
@@ -49,28 +53,51 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	return &user.DefaultInfo{
+	u := &user.DefaultInfo{
 		Name: name,
 		UID:  uid,
-	}, true, nil
+	}
+
+	// check if we reference an identity metadata object
+	identityMetadataName, ok, err := values.GetString(identityMetadataNameKey)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// just use the name and uid when we do not reference an identity metadata object
+	if !ok {
+		return u, true, nil
+	}
+
+	// use the identity metadata object that we reference
+	return authapi.NewDefaultUserIdentityMetadata(u, identityMetadataName), true, nil
 }
 
 func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w http.ResponseWriter, req *http.Request) (bool, error) {
-	return false, a.put(w, user.GetName(), user.GetUID(), time.Now().Add(a.maxAge).Unix())
+	// assume no identity metadata by default
+	identityMetadata := ""
+	// check if we have optional identity metadata (for storing a reference to group information)
+	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
+		identityMetadata = userIdentityMetadata.GetIdentityMetadataName()
+	}
+
+	return false, a.put(w, user.GetName(), user.GetUID(), identityMetadata, time.Now().Add(a.maxAge).Unix())
 }
 
 func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *http.Request) error {
 	// zero out all fields
-	return a.put(w, "", "", 0)
+	return a.put(w, "", "", "", 0)
 }
 
-func (a *Authenticator) put(w http.ResponseWriter, name, uid string, expires int64) error {
+func (a *Authenticator) put(w http.ResponseWriter, name, uid, identityMetadata string, expires int64) error {
 	values := Values{}
 
 	values[userNameKey] = name
 	values[userUIDKey] = uid
 
 	values[expKey] = expires
+
+	values[identityMetadataNameKey] = identityMetadata
 
 	return a.store.Put(w, values)
 }
