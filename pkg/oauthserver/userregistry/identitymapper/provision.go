@@ -103,9 +103,10 @@ func (p *provisioningIdentityMapper) createIdentityAndMapping(ctx context.Contex
 	}
 
 	return &kuser.DefaultInfo{
-		Name:   persistedUser.Name,
-		UID:    string(persistedUser.UID),
-		Groups: persistedUser.Groups,
+		Name: persistedUser.Name,
+		UID:  string(persistedUser.UID),
+		// UserFor should only set name and UID, all other values are ignored
+		// Groups: persistedUser.Groups,
 	}, nil
 }
 
@@ -126,9 +127,10 @@ func (p *provisioningIdentityMapper) getMapping(ctx context.Context, identity *u
 		return nil, kerrs.NewNotFound(userapi.Resource("useridentitymapping"), identity.Name)
 	}
 	return &kuser.DefaultInfo{
-		Name:   u.Name,
-		UID:    string(u.UID),
-		Groups: u.Groups,
+		Name: u.Name,
+		UID:  string(u.UID),
+		// UserFor should only set name and UID, all other values are ignored
+		// Groups: u.Groups,
 	}, nil
 }
 
