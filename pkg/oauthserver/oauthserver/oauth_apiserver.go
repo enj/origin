@@ -1,13 +1,12 @@
 package oauthserver
 
 import (
-	"crypto/sha256"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/pborman/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -115,13 +114,27 @@ func getSessionSecrets(filename string) ([][]byte, error) {
 		}
 	} else {
 		// Generate random signing and encryption secrets if none are specified in config
-		auth := sha256.Sum256([]byte(uuid.NewRandom()))
-		enc := sha256.Sum256([]byte(uuid.NewRandom()))
-		secrets = append(secrets, auth[:])
-		secrets = append(secrets, enc[:])
+		secrets = append(secrets, randomBytes(32))
+		secrets = append(secrets, randomBytes(32))
 	}
 
 	return secrets, nil
+}
+
+func randomBytes(size int) []byte {
+	b := make([]byte, size)
+	if _, err := rand.Read(b); err != nil {
+		panic(err) // rand should never fail
+	}
+	return b
+}
+
+func randomString(size int) string {
+	// each byte (8 bits) gives us 4/3 base64 (6 bits) characters
+	// we account for that conversion and add one to handle truncation
+	b64size := size*3/4 + 1
+	// trim down to the original requested size since we added one above
+	return base64.RawURLEncoding.EncodeToString(randomBytes(b64size))[:size]
 }
 
 // isHTTPS returns true if the given URL is a valid https URL
@@ -243,7 +256,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 
 			browserClient := oauthapi.OAuthClient{
 				ObjectMeta:            metav1.ObjectMeta{Name: openShiftBrowserClientID},
-				Secret:                uuid.New(),
+				Secret:                randomString(64),
 				RespondWithChallenges: false,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
 				GrantMethod:           oauthapi.GrantHandlerAuto,
