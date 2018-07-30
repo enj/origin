@@ -13,8 +13,6 @@ import (
 	"github.com/RangelReale/osin"
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
-	"github.com/gorilla/context"
-
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	knet "k8s.io/apimachinery/pkg/util/net"
@@ -115,22 +113,34 @@ func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error
 	grantChecker := registry.NewClientAuthorizationGrantChecker(c.ExtraOAuthConfig.OAuthClientAuthorizationClient)
 	grantHandler := c.getGrantHandler(mux, authRequestHandler, combinedOAuthClientGetter, c.ExtraOAuthConfig.OAuthClientAuthorizationClient)
 
+	var authorizeHandler osinserver.AuthorizeHandler = osinserver.AuthorizeHandlers{
+		handlers.NewAuthorizeAuthenticator(
+			authRequestHandler,
+			authHandler,
+			errorPageHandler,
+		),
+		handlers.NewGrantCheck(
+			grantChecker,
+			grantHandler,
+			errorPageHandler,
+		),
+		authFinalizer,
+	}
+
+	if c.ExtraOAuthConfig.SessionAuth != nil {
+		origAuthorizeHandler := authorizeHandler
+		authorizeHandler = osinserver.AuthorizeHandlerFunc(
+			func(ar *osin.AuthorizeRequest, resp *osin.Response, w http.ResponseWriter) (bool, error) {
+				defer c.ExtraOAuthConfig.SessionAuth.Clear(ar.HttpRequest)
+				return origAuthorizeHandler.HandleAuthorize(ar, resp, w)
+			},
+		)
+	}
+
 	server := osinserver.New(
 		config,
 		storage,
-		osinserver.AuthorizeHandlers{
-			handlers.NewAuthorizeAuthenticator(
-				authRequestHandler,
-				authHandler,
-				errorPageHandler,
-			),
-			handlers.NewGrantCheck(
-				grantChecker,
-				grantHandler,
-				errorPageHandler,
-			),
-			authFinalizer,
-		},
+		authorizeHandler,
 		osinserver.AccessHandlers{
 			handlers.NewDenyAccessAuthenticator(),
 		},
@@ -290,7 +300,6 @@ func (c *OAuthServerConfig) getAuthenticationFinalizer() osinserver.AuthorizeHan
 			if err := c.ExtraOAuthConfig.SessionAuth.InvalidateAuthentication(w, ar.HttpRequest); err != nil {
 				glog.V(5).Infof("error invaliding cookie session: %v", err)
 			}
-			context.Clear(ar.HttpRequest)
 			return false, nil
 		})
 	}

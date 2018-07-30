@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/gorilla/context"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 )
@@ -22,10 +23,10 @@ func NewStore(secure bool, name string, secrets ...string) Store {
 	cookie.Options.MaxAge = 0
 	cookie.Options.HttpOnly = true
 	cookie.Options.Secure = secure
-	return store{store: cookie, name: name}
+	return &store{store: cookie, name: name}
 }
 
-func (s store) Get(req *http.Request) (Values, error) {
+func (s *store) Get(req *http.Request) (Values, error) {
 	session, err := s.store.Get(req, s.name)
 	if err != nil && err.Error() != securecookie.ErrMacInvalid.Error() {
 		return nil, err
@@ -36,6 +37,10 @@ func (s store) Get(req *http.Request) (Values, error) {
 	return session.Values, nil
 }
 
-func (s store) Save(w http.ResponseWriter, req *http.Request) error {
+func (s *store) Save(w http.ResponseWriter, req *http.Request) error {
 	return sessions.Save(req, w)
+}
+
+func (s *store) Clear(req *http.Request) {
+	context.Clear(req)
 }

@@ -90,3 +90,7 @@ func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *htt
 
 	return a.store.Save(w, req)
 }
+
+func (a *Authenticator) Clear(req *http.Request) {
+	a.store.Clear(req)
+}

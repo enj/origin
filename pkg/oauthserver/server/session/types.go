@@ -8,6 +8,7 @@ import (
 type Store interface {
 	Get(*http.Request) (Values, error)
 	Save(http.ResponseWriter, *http.Request) error
+	Clear(*http.Request)
 }
 
 type Values map[interface{}]interface{}
