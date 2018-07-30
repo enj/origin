@@ -10,8 +10,9 @@ import (
 type store struct {
 	// name of the cookie used for session data
 	name string
-	// do not use store's Get method, it mucks with global state
+	// do not use store's Get method, it mucks with global state for caching purposes
 	// decoding a single small cookie multiple times is not the end of the world
+	// currently we do not have any single request paths that decode the cookie multiple times
 	store sessions.Store
 }
 

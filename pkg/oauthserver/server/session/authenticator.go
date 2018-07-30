@@ -13,8 +13,10 @@ const (
 	userNameKey = "user.name"
 	userUIDKey  = "user.uid"
 
-	// TODO use expKey for int storage instead of string
-	expKey     = "exp"
+	// expKey is stored as an int64 unix time
+	expKey = "exp"
+	// expiresKey is the string representation of expKey
+	// TODO drop in a release when mixed masters are no longer an issue
 	expiresKey = "expires"
 )
 
@@ -36,24 +38,35 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, err
 	}
 
-	expiresString, ok, err := values.Get(expiresKey)
-	if !ok || err != nil {
+	expires, ok, err := values.GetInt64(expKey)
+	// TODO in a release when mixed masters are no longer an issue, replace with:
+	// if !ok || err != nil {
+	if err != nil {
 		return nil, false, err
 	}
-	expires, err := strconv.ParseInt(expiresString, 10, 64)
-	if err != nil {
-		return nil, false, fmt.Errorf("error parsing expires timestamp: %v", err)
+
+	// TODO drop this logic in a release when mixed masters are no longer an issue
+	if !ok {
+		expiresString, ok, err := values.GetString(expiresKey)
+		if !ok || err != nil {
+			return nil, false, err
+		}
+		expires, err = strconv.ParseInt(expiresString, 10, 64)
+		if err != nil {
+			return nil, false, fmt.Errorf("error parsing expires timestamp: %v", err)
+		}
 	}
+
 	if expires < time.Now().Unix() {
 		return nil, false, nil
 	}
 
-	name, ok, err := values.Get(userNameKey)
+	name, ok, err := values.GetString(userNameKey)
 	if !ok || err != nil {
 		return nil, false, err
 	}
 
-	uid, _, err := values.Get(userUIDKey)
+	uid, _, err := values.GetString(userUIDKey)
 	// Ignore ok to tolerate empty string UIDs in the session
 	// TODO in what valid flow is UID empty?
 	if err != nil {
@@ -67,28 +80,28 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 }
 
 func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w http.ResponseWriter, req *http.Request) (bool, error) {
-	values, err := a.store.Get(req)
-	if err != nil {
-		return false, err
-	}
-
-	values[userNameKey] = user.GetName()
-	values[userUIDKey] = user.GetUID()
-	values[expiresKey] = strconv.FormatInt(time.Now().Add(a.maxAge).Unix(), 10)
-
-	// TODO: should we save groups, scope, and extra in the session as well?
-	return false, a.store.Put(w, values)
+	return false, a.put(w, user.GetName(), user.GetUID(), time.Now().Add(a.maxAge).Unix())
 }
 
 func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *http.Request) error {
-	values, err := a.store.Get(req)
-	if err != nil {
-		return err
-	}
+	// zero out all fields
+	return a.put(w, "", "", 0)
+}
 
-	values[userNameKey] = ""
-	values[userUIDKey] = ""
-	values[expiresKey] = ""
+func (a *Authenticator) put(w http.ResponseWriter, name, uid string, expires int64) error {
+	values := Values{}
+
+	values[userNameKey] = name
+	values[userUIDKey] = uid
+
+	values[expKey] = expires
+
+	// TODO drop this logic in a release when mixed masters are no longer an issue
+	if expires == 0 {
+		values[expiresKey] = ""
+	} else {
+		values[expiresKey] = strconv.FormatInt(expires, 10)
+	}
 
 	return a.store.Put(w, values)
 }
