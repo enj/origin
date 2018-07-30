@@ -13,7 +13,6 @@ import (
 	"github.com/RangelReale/osin"
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
-	"github.com/gorilla/context"
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,12 +90,12 @@ func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error
 
 	errorPageHandler, err := c.getErrorHandler()
 	if err != nil {
-		glog.Fatal(err)
+		return nil, err
 	}
 
 	authRequestHandler, authHandler, authFinalizer, err := c.getAuthorizeAuthenticationHandlers(mux, errorPageHandler)
 	if err != nil {
-		glog.Fatal(err)
+		return nil, err
 	}
 
 	tokentimeout := int32(0)
@@ -113,7 +112,10 @@ func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error
 	}
 
 	grantChecker := registry.NewClientAuthorizationGrantChecker(c.ExtraOAuthConfig.OAuthClientAuthorizationClient)
-	grantHandler := c.getGrantHandler(mux, authRequestHandler, combinedOAuthClientGetter, c.ExtraOAuthConfig.OAuthClientAuthorizationClient)
+	grantHandler, err := c.getGrantHandler(mux, authRequestHandler, combinedOAuthClientGetter, c.ExtraOAuthConfig.OAuthClientAuthorizationClient)
+	if err != nil {
+		return nil, err
+	}
 
 	server := osinserver.New(
 		config,
@@ -264,10 +266,10 @@ func (c *OAuthServerConfig) getAuthorizeAuthenticationHandlers(mux oauthserver.M
 }
 
 // getGrantHandler returns the object that handles approving or rejecting grant requests
-func (c *OAuthServerConfig) getGrantHandler(mux oauthserver.Mux, auth authenticator.Request, clientregistry clientregistry.Getter, authregistry oauthclient.OAuthClientAuthorizationInterface) handlers.GrantHandler {
+func (c *OAuthServerConfig) getGrantHandler(mux oauthserver.Mux, auth authenticator.Request, clientregistry clientregistry.Getter, authregistry oauthclient.OAuthClientAuthorizationInterface) (handlers.GrantHandler, error) {
 	// check that the global default strategy is something we honor
 	if !configapi.ValidGrantHandlerTypes.Has(string(c.ExtraOAuthConfig.Options.GrantConfig.Method)) {
-		glog.Fatalf("No grant handler found that matches %v.  The OAuth server cannot start!", c.ExtraOAuthConfig.Options.GrantConfig.Method)
+		return nil, fmt.Errorf("No grant handler found that matches %v.  The OAuth server cannot start!", c.ExtraOAuthConfig.Options.GrantConfig.Method)
 	}
 
 	// Since any OAuth client could require prompting, we will unconditionally
@@ -279,7 +281,7 @@ func (c *OAuthServerConfig) getGrantHandler(mux oauthserver.Mux, auth authentica
 	return handlers.NewPerClientGrant(
 		handlers.NewRedirectGrant(openShiftApproveSubpath),
 		oauthapi.GrantHandlerType(c.ExtraOAuthConfig.Options.GrantConfig.Method),
-	)
+	), nil
 }
 
 // getAuthenticationFinalizer returns an authentication finalizer which is called just prior to writing a response to an authorization request
@@ -290,7 +292,8 @@ func (c *OAuthServerConfig) getAuthenticationFinalizer() osinserver.AuthorizeHan
 			if err := c.ExtraOAuthConfig.SessionAuth.InvalidateAuthentication(w, ar.HttpRequest); err != nil {
 				glog.V(5).Infof("error invaliding cookie session: %v", err)
 			}
-			context.Clear(ar.HttpRequest)
+			// do not fail the OAuth flow if we cannot invalidate the cookie
+			// it will expire on its own regardless
 			return false, nil
 		})
 	}

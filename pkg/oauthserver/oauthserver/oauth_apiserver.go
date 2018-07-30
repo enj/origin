@@ -1,7 +1,7 @@
 package oauthserver
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -90,13 +90,13 @@ func buildSessionAuth(secure bool, config *configapi.SessionConfig) (*session.Au
 	if err != nil {
 		return nil, err
 	}
-	sessionStore := session.NewStore(secure, config.SessionName, secrets...)
+	sessionStore := session.NewStore(config.SessionName, secure, secrets...)
 	return session.NewAuthenticator(sessionStore, config.SessionMaxAgeSeconds), nil
 }
 
-func getSessionSecrets(filename string) ([]string, error) {
+func getSessionSecrets(filename string) ([][]byte, error) {
 	// Build secrets list
-	secrets := []string{}
+	var secrets [][]byte
 
 	if len(filename) != 0 {
 		sessionSecrets, err := latest.ReadSessionSecrets(filename)
@@ -109,13 +109,16 @@ func getSessionSecrets(filename string) ([]string, error) {
 		}
 
 		for _, s := range sessionSecrets.Secrets {
-			secrets = append(secrets, s.Authentication)
-			secrets = append(secrets, s.Encryption)
+			// TODO make these length independent
+			secrets = append(secrets, []byte(s.Authentication))
+			secrets = append(secrets, []byte(s.Encryption))
 		}
 	} else {
 		// Generate random signing and encryption secrets if none are specified in config
-		secrets = append(secrets, fmt.Sprintf("%x", md5.Sum([]byte(uuid.NewRandom().String()))))
-		secrets = append(secrets, fmt.Sprintf("%x", md5.Sum([]byte(uuid.NewRandom().String()))))
+		auth := sha256.Sum256([]byte(uuid.NewRandom()))
+		enc := sha256.Sum256([]byte(uuid.NewRandom()))
+		secrets = append(secrets, auth[:])
+		secrets = append(secrets, enc[:])
 	}
 
 	return secrets, nil

@@ -10,10 +10,12 @@ import (
 )
 
 const (
-	UserNameKey = "user.name"
-	UserUIDKey  = "user.uid"
+	userNameKey = "user.name"
+	userUIDKey  = "user.uid"
 
-	ExpiresKey = "expires"
+	// TODO use expKey for int storage instead of string
+	expKey     = "exp"
+	expiresKey = "expires"
 )
 
 type Authenticator struct {
@@ -34,7 +36,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, err
 	}
 
-	expiresString, ok, err := values.Get(ExpiresKey)
+	expiresString, ok, err := values.Get(expiresKey)
 	if !ok || err != nil {
 		return nil, false, err
 	}
@@ -46,12 +48,12 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	name, ok, err := values.Get(UserNameKey)
+	name, ok, err := values.Get(userNameKey)
 	if !ok || err != nil {
 		return nil, false, err
 	}
 
-	uid, _, err := values.Get(UserUIDKey)
+	uid, _, err := values.Get(userUIDKey)
 	// Ignore ok to tolerate empty string UIDs in the session
 	// TODO in what valid flow is UID empty?
 	if err != nil {
@@ -70,12 +72,12 @@ func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w 
 		return false, err
 	}
 
-	values[UserNameKey] = user.GetName()
-	values[UserUIDKey] = user.GetUID()
-	values[ExpiresKey] = strconv.FormatInt(time.Now().Add(a.maxAge).Unix(), 10)
+	values[userNameKey] = user.GetName()
+	values[userUIDKey] = user.GetUID()
+	values[expiresKey] = strconv.FormatInt(time.Now().Add(a.maxAge).Unix(), 10)
 
 	// TODO: should we save groups, scope, and extra in the session as well?
-	return false, a.store.Save(w, req)
+	return false, a.store.Put(w, values)
 }
 
 func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *http.Request) error {
@@ -84,9 +86,9 @@ func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *htt
 		return err
 	}
 
-	values[UserNameKey] = ""
-	values[UserUIDKey] = ""
-	values[ExpiresKey] = ""
+	values[userNameKey] = ""
+	values[userUIDKey] = ""
+	values[expiresKey] = ""
 
-	return a.store.Save(w, req)
+	return a.store.Put(w, values)
 }

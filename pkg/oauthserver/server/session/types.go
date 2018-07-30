@@ -5,9 +5,12 @@ import (
 	"net/http"
 )
 
+// Store abstracts HTTP session storage of Values
 type Store interface {
-	Get(*http.Request) (Values, error)
-	Save(http.ResponseWriter, *http.Request) error
+	// Get the Values associated with the given request
+	Get(r *http.Request) (Values, error)
+	// Put writes the given Values to the response
+	Put(w http.ResponseWriter, v Values) error
 }
 
 type Values map[interface{}]interface{}
@@ -19,7 +22,9 @@ func (v Values) Get(key string) (string, bool, error) {
 	}
 	str, ok := obj.(string)
 	if !ok {
-		return "", false, fmt.Errorf("%s on session is not a string", key)
+		return "", false, fmt.Errorf("%s on store is not a string", key)
 	}
 	return str, len(str) != 0, nil
 }
+
+// TODO: GetInt
