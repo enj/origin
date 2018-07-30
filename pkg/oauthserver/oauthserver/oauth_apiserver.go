@@ -1,13 +1,12 @@
 package oauthserver
 
 import (
-	"crypto/md5"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/pborman/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,15 +42,13 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 	genericConfig.LoopbackClientConfig = userClientConfig
 
 	var sessionAuth *session.Authenticator
-	var sessionHandlerWrapper handlerWrapper
 	if oauthConfig.SessionConfig != nil {
 		secure := isHTTPS(oauthConfig.MasterPublicURL)
-		auth, wrapper, err := buildSessionAuth(secure, oauthConfig.SessionConfig)
+		auth, err := buildSessionAuth(secure, oauthConfig.SessionConfig)
 		if err != nil {
 			return nil, err
 		}
 		sessionAuth = auth
-		sessionHandlerWrapper = wrapper
 	}
 
 	userClient, err := userclient.NewForConfig(userClientConfig)
@@ -80,7 +77,6 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 			OAuthAuthorizeTokenClient:      oauthClient.OAuthAuthorizeTokens(),
 			OAuthClientClient:              oauthClient.OAuthClients(),
 			OAuthClientAuthorizationClient: oauthClient.OAuthClientAuthorizations(),
-			HandlerWrapper:                 sessionHandlerWrapper,
 		},
 	}
 	genericConfig.BuildHandlerChainFunc = ret.buildHandlerChainForOAuth
@@ -88,18 +84,18 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 	return ret, nil
 }
 
-func buildSessionAuth(secure bool, config *configapi.SessionConfig) (*session.Authenticator, handlerWrapper, error) {
+func buildSessionAuth(secure bool, config *configapi.SessionConfig) (*session.Authenticator, error) {
 	secrets, err := getSessionSecrets(config.SessionSecretsFile)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	sessionStore := session.NewStore(secure, secrets...)
-	return session.NewAuthenticator(sessionStore, config.SessionName, int(config.SessionMaxAgeSeconds)), sessionStore, nil
+	sessionStore := session.NewStore(config.SessionName, secure, secrets...)
+	return session.NewAuthenticator(sessionStore, config.SessionMaxAgeSeconds), nil
 }
 
-func getSessionSecrets(filename string) ([]string, error) {
+func getSessionSecrets(filename string) ([][]byte, error) {
 	// Build secrets list
-	secrets := []string{}
+	var secrets [][]byte
 
 	if len(filename) != 0 {
 		sessionSecrets, err := latest.ReadSessionSecrets(filename)
@@ -112,16 +108,33 @@ func getSessionSecrets(filename string) ([]string, error) {
 		}
 
 		for _, s := range sessionSecrets.Secrets {
-			secrets = append(secrets, s.Authentication)
-			secrets = append(secrets, s.Encryption)
+			// TODO make these length independent
+			secrets = append(secrets, []byte(s.Authentication))
+			secrets = append(secrets, []byte(s.Encryption))
 		}
 	} else {
 		// Generate random signing and encryption secrets if none are specified in config
-		secrets = append(secrets, fmt.Sprintf("%x", md5.Sum([]byte(uuid.NewRandom().String()))))
-		secrets = append(secrets, fmt.Sprintf("%x", md5.Sum([]byte(uuid.NewRandom().String()))))
+		secrets = append(secrets, randomBytes(64))
+		secrets = append(secrets, randomBytes(32))
 	}
 
 	return secrets, nil
+}
+
+func randomBytes(size int) []byte {
+	b := make([]byte, size)
+	if _, err := rand.Read(b); err != nil {
+		panic(err) // rand should never fail
+	}
+	return b
+}
+
+func randomString(size int) string {
+	// each byte (8 bits) gives us 4/3 base64 (6 bits) characters
+	// we account for that conversion and add one to handle truncation
+	b64size := base64.RawURLEncoding.DecodedLen(size) + 1
+	// trim down to the original requested size since we added one above
+	return base64.RawURLEncoding.EncodeToString(randomBytes(b64size))[:size]
 }
 
 // isHTTPS returns true if the given URL is a valid https URL
@@ -155,8 +168,6 @@ type ExtraOAuthConfig struct {
 	OAuthClientAuthorizationClient oauthclient.OAuthClientAuthorizationInterface
 
 	SessionAuth *session.Authenticator
-
-	HandlerWrapper handlerWrapper
 }
 
 type OAuthServerConfig struct {
@@ -232,7 +243,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 	go func() {
 		wait.PollUntil(1*time.Second, func() (done bool, err error) {
 			webConsoleClient := oauthapi.OAuthClient{
-				ObjectMeta:            metav1.ObjectMeta{Name: OpenShiftWebConsoleClientID},
+				ObjectMeta:            metav1.ObjectMeta{Name: openShiftWebConsoleClientID},
 				Secret:                "",
 				RespondWithChallenges: false,
 				RedirectURIs:          c.ExtraOAuthConfig.AssetPublicAddresses,
@@ -244,8 +255,8 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 			}
 
 			browserClient := oauthapi.OAuthClient{
-				ObjectMeta:            metav1.ObjectMeta{Name: OpenShiftBrowserClientID},
-				Secret:                uuid.New(),
+				ObjectMeta:            metav1.ObjectMeta{Name: openShiftBrowserClientID},
+				Secret:                randomString(64),
 				RespondWithChallenges: false,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
 				GrantMethod:           oauthapi.GrantHandlerAuto,
@@ -256,7 +267,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 			}
 
 			cliClient := oauthapi.OAuthClient{
-				ObjectMeta:            metav1.ObjectMeta{Name: OpenShiftCLIClientID},
+				ObjectMeta:            metav1.ObjectMeta{Name: openShiftCLIClientID},
 				Secret:                "",
 				RespondWithChallenges: true,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenImplicitURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
