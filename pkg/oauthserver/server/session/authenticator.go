@@ -65,24 +65,6 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	// check if we reference an identity metadata object
-	identityMetadataName, ok, err := values.GetString(identityMetadataNameKey)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// if we reference an identity metadata object, use it as the
-	// source of truth and ignore the remaining fields of the cookie
-	if ok {
-		// TODO use client to get identity metadata to fill this object
-		user := &user.DefaultInfo{
-			Name: "name", // TODO fix
-			UID:  "uid",  // TODO fix
-		}
-		return authapi.NewDefaultUserIdentityMetadata(user, identityMetadataName), true, nil
-	}
-
-	// otherwise fallback to name and UID
 	name, ok, err := values.GetString(userNameKey)
 	if !ok || err != nil {
 		return nil, false, err
@@ -95,33 +77,35 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, err
 	}
 
-	return &user.DefaultInfo{
+	u := &user.DefaultInfo{
 		Name: name,
 		UID:  uid,
-	}, true, nil
+	}
+
+	// check if we reference an identity metadata object
+	identityMetadataName, ok, err := values.GetString(identityMetadataNameKey)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// if we reference an identity metadata object, use it
+	if ok {
+		return authapi.NewDefaultUserIdentityMetadata(u, identityMetadataName), true, nil
+	}
+
+	// otherwise just use the name and uid
+	return u, true, nil
 }
 
 func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w http.ResponseWriter, req *http.Request) (bool, error) {
-	// we always need to store an expiration time for the cookie
-	expires := time.Now().Add(a.maxAge).Unix()
-
-	// store name and UID to handle the case where we have no identity metadata
-	// or when we may have old masters that do not know about identity metadata
-	name := user.GetName()
-	uid := user.GetUID()
-
-	// assume not identity metadata by default
+	// assume no identity metadata by default
 	identityMetadata := ""
-	// check if we need have optional identity metadata (for storing a reference to group information)
+	// check if we have optional identity metadata (for storing a reference to group information)
 	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
 		identityMetadata = userIdentityMetadata.GetIdentityMetadataName()
-		// TODO maybe do this once we no longer have mixed master scenarios to worry about
-		// unset name and UID since identity metadata is authoritative
-		// name = ""
-		// uid = ""
 	}
 
-	return false, a.put(w, name, uid, identityMetadata, expires)
+	return false, a.put(w, user.GetName(), user.GetUID(), identityMetadata, time.Now().Add(a.maxAge).Unix())
 }
 
 func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *http.Request) error {
