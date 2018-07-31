@@ -17,6 +17,8 @@ func NewUserConversion() *UserConversion {
 	return &UserConversion{}
 }
 
+const hack = "mo.was.here"
+
 func (s *UserConversion) ConvertToAuthorizeToken(user interface{}, token *oapi.OAuthAuthorizeToken) error {
 	info, ok := user.(kuser.Info)
 	if !ok {
@@ -28,7 +30,10 @@ func (s *UserConversion) ConvertToAuthorizeToken(user interface{}, token *oapi.O
 	}
 	token.UserUID = info.GetUID()
 	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
-		_ = userIdentityMetadata.GetIdentityMetadataName() // TODO replace with:
+		if token.Annotations == nil {
+			token.Annotations = map[string]string{}
+		}
+		token.Annotations[hack] = userIdentityMetadata.GetIdentityMetadataName() // TODO replace with:
 		// token.IdentityMetadataName = userIdentityMetadata.GetIdentityMetadataName()
 	}
 	return nil
@@ -45,7 +50,10 @@ func (s *UserConversion) ConvertToAccessToken(user interface{}, token *oapi.OAut
 	}
 	token.UserUID = info.GetUID()
 	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
-		_ = userIdentityMetadata.GetIdentityMetadataName() // TODO replace with:
+		if token.Annotations == nil {
+			token.Annotations = map[string]string{}
+		}
+		token.Annotations[hack] = userIdentityMetadata.GetIdentityMetadataName() // TODO replace with:
 		// token.IdentityMetadataName = userIdentityMetadata.GetIdentityMetadataName()
 
 		// TODO get+update identity metadata, set expiresIn to zero
@@ -65,10 +73,10 @@ func (s *UserConversion) ConvertFromAuthorizeToken(token *oapi.OAuthAuthorizeTok
 	}
 	// TODO change to:
 	// if len(token.IdentityMetadataName) == 0 {
-	if true {
+	if len(token.Annotations[hack]) == 0 {
 		return user, nil
 	}
-	return authapi.NewDefaultUserIdentityMetadata(user, "replace with -> token.IdentityMetadataName"), nil
+	return authapi.NewDefaultUserIdentityMetadata(user, token.Annotations[hack]), nil
 }
 
 func (s *UserConversion) ConvertFromAccessToken(token *oapi.OAuthAccessToken) (interface{}, error) {
@@ -81,8 +89,8 @@ func (s *UserConversion) ConvertFromAccessToken(token *oapi.OAuthAccessToken) (i
 	}
 	// TODO change to:
 	// if len(token.IdentityMetadataName) == 0 {
-	if true {
+	if len(token.Annotations[hack]) == 0 {
 		return user, nil
 	}
-	return authapi.NewDefaultUserIdentityMetadata(user, "replace with -> token.IdentityMetadataName"), nil
+	return authapi.NewDefaultUserIdentityMetadata(user, token.Annotations[hack]), nil
 }
