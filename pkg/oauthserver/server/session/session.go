@@ -27,8 +27,11 @@ func NewStore(name string, secure bool, secrets ...[]byte) Store {
 func (s *store) Get(r *http.Request) (Values, error) {
 	// always use New to avoid global state
 	session, err := s.store.New(r, s.name)
-	// ignore cookie decoding errors (this could occur from poorly handling key rotation)
-	if err != nil && err.Error() != securecookie.ErrMacInvalid.Error() {
+	if err != nil {
+		// ignore cookie decoding errors (this could occur from poorly handling key rotation)
+		if err == securecookie.ErrMacInvalid {
+			return Values{}, nil
+		}
 		return nil, err
 	}
 	// session and Values are guaranteed to never be nil per the interface and underlying code
