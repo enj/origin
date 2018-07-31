@@ -53,7 +53,8 @@ func randomGroup() string {
 	// choose a separator based on a coin flip
 	sep := "-" // one that is OK
 	if rand.Intn(2) == 0 {
-		sep = ":" // and one that is filtered out
+		sep = ":"  // and one that is filtered out
+		sep = "__" // to pass validation
 	}
 	// randomly pick one of five possible groups with the given separator
 	return fmt.Sprintf("group%s%d", sep, rand.Intn(5))

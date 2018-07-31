@@ -55,5 +55,5 @@ func NewIdentityUserMapper(identities userclient.IdentityInterface, users usercl
 		return nil, fmt.Errorf("unsupported mapping method %q", method)
 	}
 
-	return &groupsMapper{delegate: mapper}, nil
+	return &groupsMapper{delegate: mapper, hack: users}, nil
 }
