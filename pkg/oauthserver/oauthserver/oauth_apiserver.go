@@ -132,7 +132,7 @@ func randomBytes(size int) []byte {
 func randomString(size int) string {
 	// each byte (8 bits) gives us 4/3 base64 (6 bits) characters
 	// we account for that conversion and add one to handle truncation
-	b64size := size*3/4 + 1
+	b64size := base64.RawURLEncoding.DecodedLen(size) + 1
 	// trim down to the original requested size since we added one above
 	return base64.RawURLEncoding.EncodeToString(randomBytes(b64size))[:size]
 }

@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/openshift/origin/pkg/cmd/server/apis/config"
@@ -93,5 +94,17 @@ func TestGetValidSessionSecretsFile(t *testing.T) {
 	}
 	if !reflect.DeepEqual(readSecrets, expectedSecrets) {
 		t.Errorf("Unexpected %v, got %v", expectedSecrets, readSecrets)
+	}
+}
+
+func Test_randomString(t *testing.T) {
+	for size := 0; size < 1<<10+1; size++ {
+		size := size // capture range variable
+		t.Run(strconv.FormatInt(int64(size), 10), func(t *testing.T) {
+			t.Parallel()
+			if got := randomString(size); len(got) != size {
+				t.Errorf("randomString() -> len=%v, want len=%v, diff=%v", len(got), size, len(got)-size)
+			}
+		})
 	}
 }
