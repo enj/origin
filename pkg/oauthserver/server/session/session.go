@@ -3,7 +3,6 @@ package session
 import (
 	"net/http"
 
-	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 )
 
@@ -24,18 +23,22 @@ func NewStore(name string, secure bool, secrets ...[]byte) Store {
 	return &store{name: name, store: cookie}
 }
 
-func (s *store) Get(r *http.Request) (Values, error) {
+func (s *store) Get(r *http.Request) Values {
 	// always use New to avoid global state
 	session, err := s.store.New(r, s.name)
 	if err != nil {
-		// ignore cookie decoding errors (this could occur from poorly handling key rotation)
-		if err == securecookie.ErrMacInvalid {
-			return Values{}, nil
-		}
-		return nil, err
+		// ignore all errors, this could occur from poorly handling key rotation.
+		// depending on how keys are incorrectly rotated,
+		// verification or decryption can fail with various different errors.
+		// even with a malicious actor trying to mess with the cookie,
+		// there does not seem to be much that we gain from erroring
+		// instead of just ignoring the junk data and returning empty Values.
+		// empty Values means the user has to reauthenticate instead of getting stuck
+		// on an error page until their cookie expires or is removed.
+		// we leak less state information using this approach.
+		return Values{}
 	}
-	// session and Values are guaranteed to never be nil per the interface and underlying code
-	return session.Values, nil
+	return session.Values
 }
 
 func (s *store) Put(w http.ResponseWriter, v Values) error {

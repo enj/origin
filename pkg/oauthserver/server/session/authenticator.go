@@ -37,10 +37,7 @@ func NewAuthenticator(store Store, maxAge int32) *Authenticator {
 }
 
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	values, err := a.store.Get(req)
-	if err != nil {
-		return nil, false, err
-	}
+	values := a.store.Get(req)
 
 	expires, ok, err := values.GetInt64(expKey)
 	// TODO in a release when mixed masters are no longer an issue, replace with:

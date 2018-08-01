@@ -8,7 +8,7 @@ import (
 // Store abstracts HTTP session storage of Values
 type Store interface {
 	// Get and decode the Values associated with the given request
-	Get(r *http.Request) (Values, error)
+	Get(r *http.Request) Values
 	// Put encodes and writes the given Values to the response
 	Put(w http.ResponseWriter, v Values) error
 }
