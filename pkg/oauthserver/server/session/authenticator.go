@@ -85,13 +85,13 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, err
 	}
 
-	// if we reference an identity metadata object, use it
-	if ok {
-		return authapi.NewDefaultUserIdentityMetadata(u, identityMetadataName), true, nil
+	// just use the name and uid when we do not reference an identity metadata object
+	if !ok {
+		return u, true, nil
 	}
 
-	// otherwise just use the name and uid
-	return u, true, nil
+	// use the identity metadata object that we reference
+	return authapi.NewDefaultUserIdentityMetadata(u, identityMetadataName), true, nil
 }
 
 func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w http.ResponseWriter, req *http.Request) (bool, error) {
