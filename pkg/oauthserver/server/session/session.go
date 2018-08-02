@@ -36,6 +36,7 @@ func (s *store) Get(r *http.Request) Values {
 		// empty Values means the user has to reauthenticate instead of getting stuck
 		// on an error page until their cookie expires or is removed.
 		// we leak less state information using this approach.
+		// TODO log
 		return Values{}
 	}
 	return session.Values
