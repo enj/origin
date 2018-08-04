@@ -3,12 +3,13 @@ package storage
 import (
 	"fmt"
 	"io"
-	"runtime"
+	goruntime "runtime"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"golang.org/x/time/rate"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -196,7 +197,7 @@ func NewCmdMigrateAPIStorage(name, fullName string, f kcmdutil.Factory, in io.Re
 
 	// opt-in to allow parallel execution since we know this command is goroutine safe
 	// storage migration is IO bound so we make sure that we have enough workers to saturate the rate limiter
-	options.Workers = 32 * runtime.NumCPU()
+	options.Workers = 32 * goruntime.NumCPU()
 	// expose a flag to allow rate limiting the workers based on network bandwidth
 	flags.IntVar(&options.bandwidth, "bandwidth", 10,
 		"Average network bandwidth measured in megabits per second (Mbps) to use during storage migration.  Zero means no limit.  This flag is alpha and may change in the future.")
@@ -231,10 +232,7 @@ func (o *MigrateAPIStorageOptions) Complete(f kcmdutil.Factory, c *cobra.Command
 		func(req *rest.Request) {
 			req.Throttle(always)
 		},
-	).
-		// we use info.Client to directly fetch objects
-		// this is just documentation, it does not really change anything because we fetch and decode lists of all objects regardless
-		RequireObject(false)
+	)
 
 	// bandwidth < 0 means error
 	// bandwidth == 0 means "no limit", we use a nil check to minimize overhead
@@ -267,22 +265,11 @@ func (o MigrateAPIStorageOptions) Run() error {
 // if the input type cannot be saved. It returns migrate.ErrRecalculate if migration should be re-run
 // on the provided object.
 func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Reporter) error {
-	switch info.Object.(type) {
-	// TODO: add any custom mutations necessary
-	default:
-		// load the body and save it back, without transformation to avoid losing fields
-		r := info.Client.Get().
-			Resource(info.Mapping.Resource.Resource).
-			NamespaceIfScoped(info.Namespace, info.Mapping.Scope.Name() == meta.RESTScopeNameNamespace).
-			Name(info.Name)
-		get := r.Do()
-		data, err := get.Raw()
+	switch oldObject := info.Object.(type) {
+	case *unstructured.Unstructured:
+		data, err := oldObject.MarshalJSON()
 		if err != nil {
-			// since we have an error, processing the body is safe because we are not going
-			// to send it back to the server.  Thus we can safely call Result.Error().
-			// This is required because we want to make sure we pass an errors.APIStatus so
-			// that DefaultRetriable can correctly determine if the error is safe to retry.
-			return migrate.DefaultRetriable(info, get.Error())
+			return migrate.DefaultRetriable(info, err)
 		}
 
 		// a nil limiter means "no limit"
@@ -298,10 +285,10 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 				// this is a slight overestimate since every retry attempt will still try to account for
 				// the initial list operation.  this should not be an issue since retries are not that common
 				// and the rate limiting is best effort anyway.  going slightly slower is acceptable.
-				latency := o.limiter.take(3 * len(data))
+				latency := o.limiter.take(2 * len(data))
 				// mimic rest.Request.tryThrottle logging logic
 				if latency > longThrottleLatency {
-					glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", r.URL().String())
+					glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", oldObject.GetSelfLink())
 				}
 			}()
 		}
@@ -315,20 +302,17 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 			return migrate.DefaultRetriable(info, err)
 		}
 
-		if oldObject, err := get.Get(); err == nil {
-			info.Refresh(oldObject, true)
-			oldVersion := info.ResourceVersion
-			if object, err := update.Get(); err == nil {
-				info.Refresh(object, true)
-				if info.ResourceVersion == oldVersion {
-					return migrate.ErrUnchanged
-				}
-			} else {
-				glog.V(4).Infof("unable to calculate resource version: %v", err)
+		oldVersion := oldObject.GetResourceVersion()
+		if object, err := update.Get(); err == nil {
+			info.Refresh(object, true)
+			if info.ResourceVersion == oldVersion {
+				return migrate.ErrUnchanged
 			}
 		} else {
 			glog.V(4).Infof("unable to calculate resource version: %v", err)
 		}
+	default:
+		return fmt.Errorf("invalid type %T passed to storage migration: %v", oldObject, oldObject)
 	}
 	return nil
 }
