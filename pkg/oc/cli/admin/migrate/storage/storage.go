@@ -9,11 +9,11 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"golang.org/x/time/rate"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -81,6 +81,8 @@ type MigrateAPIStorageOptions struct {
 	bandwidth int
 	// used to enforce bandwidth value
 	limiter *tokenLimiter
+
+	client dynamic.Interface
 }
 
 // NewCmdMigrateAPIStorage implements a MigrateStorage command
@@ -246,6 +248,23 @@ func (o *MigrateAPIStorageOptions) Complete(f kcmdutil.Factory, c *cobra.Command
 		}
 	}
 
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	// TODO
+	clientConfigCopy := rest.CopyConfig(clientConfig)
+	clientConfigCopy.Burst = 1 << 24
+	clientConfigCopy.QPS = 1 << 24
+
+	client, err := dynamic.NewForConfig(clientConfigCopy)
+	if err != nil {
+		return err
+	}
+
+	o.client = client
+
 	return nil
 }
 
@@ -267,16 +286,18 @@ func (o MigrateAPIStorageOptions) Run() error {
 func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Reporter) error {
 	switch oldObject := info.Object.(type) {
 	case *unstructured.Unstructured:
-		data, err := oldObject.MarshalJSON()
-		if err != nil {
-			return migrate.DefaultRetriable(info, err)
-		}
-
 		// a nil limiter means "no limit"
 		if o.limiter != nil {
 			// we rate limit after performing all operations to make us less sensitive to conflicts
 			// use a defer to make sure we always rate limit after a successful GET even if the PUT fails
 			defer func() {
+
+				data, err := oldObject.MarshalJSON()
+				if err != nil {
+					glog.Errorf("%#v", err)
+					//return migrate.DefaultRetriable(info, err)
+				}
+
 				// we have to wait until after the GET to determine how much data we will PUT
 				// thus we need to double the amount to account for both operations
 				// we also need to account for the initial list operation which is roughly another GET per object
@@ -293,23 +314,15 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 			}()
 		}
 
-		update := info.Client.Put().
-			Resource(info.Mapping.Resource.Resource).
-			NamespaceIfScoped(info.Namespace, info.Mapping.Scope.Name() == meta.RESTScopeNameNamespace).
-			Name(info.Name).Body(data).
-			Do()
-		if err := update.Error(); err != nil {
+		newObject, err := o.client.
+			Resource(info.Mapping.Resource).
+			Namespace(info.Namespace).
+			Update(oldObject)
+		if err != nil {
 			return migrate.DefaultRetriable(info, err)
 		}
-
-		oldVersion := oldObject.GetResourceVersion()
-		if object, err := update.Get(); err == nil {
-			info.Refresh(object, true)
-			if info.ResourceVersion == oldVersion {
-				return migrate.ErrUnchanged
-			}
-		} else {
-			glog.V(4).Infof("unable to calculate resource version: %v", err)
+		if newObject.GetResourceVersion() == oldObject.GetResourceVersion() {
+			return migrate.ErrUnchanged
 		}
 	default:
 		return fmt.Errorf("invalid type %T passed to storage migration: %v", oldObject, oldObject)
