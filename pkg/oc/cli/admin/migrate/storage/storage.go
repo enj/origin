@@ -297,6 +297,7 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 			defer func() {
 				// we need to approximate how many bytes this object was on the wire
 				// the simplest way to do that is to encode it back into bytes
+				// this is wasteful but we are trying to artificially slow down the worker anyway
 				var dataLen int
 				if data, err := oldObject.MarshalJSON(); err != nil {
 					// this should never happen
@@ -318,7 +319,7 @@ func (o *MigrateAPIStorageOptions) save(info *resource.Info, reporter migrate.Re
 				latency := o.limiter.take(2 * dataLen)
 				// mimic rest.Request.tryThrottle logging logic
 				if latency > longThrottleLatency {
-					glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "GET", oldObject.GetSelfLink())
+					glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, "PUT", oldObject.GetSelfLink())
 				}
 			}()
 		}
