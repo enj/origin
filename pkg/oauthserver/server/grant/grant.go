@@ -144,13 +144,6 @@ func (l *Grant) handleForm(user user.Info, w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	csrf, err := l.csrf.Generate(w, req)
-	if err != nil {
-		glog.Errorf("Unable to generate CSRF token: %v", err)
-		l.failed("Could not generate CSRF token", w, req)
-		return
-	}
-
 	grantedScopeNames := []string{}
 	grantedScopes := []Scope{}
 	requestedScopes := []Scope{}
@@ -186,7 +179,7 @@ func (l *Grant) handleForm(user user.Info, w http.ResponseWriter, req *http.Requ
 		},
 		Values: GrantFormFields{
 			Then:        then,
-			CSRF:        csrf,
+			CSRF:        l.csrf.Generate(w, req),
 			ClientID:    client.Name,
 			UserName:    user.GetName(),
 			Scopes:      requestedScopes,

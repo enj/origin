@@ -3,7 +3,7 @@ package csrf
 import (
 	"net/http"
 
-	"github.com/pborman/uuid"
+	"github.com/openshift/origin/pkg/oauthserver"
 )
 
 type cookieCsrf struct {
@@ -28,15 +28,15 @@ func NewCookieCSRF(name, path, domain string, secure, httponly bool) CSRF {
 }
 
 // Generate implements the CSRF interface
-func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) (string, error) {
+func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
 	cookie, err := req.Cookie(c.name)
 	if err == nil && len(cookie.Value) > 0 {
-		return cookie.Value, nil
+		return cookie.Value
 	}
 
 	cookie = &http.Cookie{
 		Name:     c.name,
-		Value:    uuid.NewUUID().String(),
+		Value:    oauthserver.Random256BitString(),
 		Path:     c.path,
 		Domain:   c.domain,
 		Secure:   c.secure,
@@ -44,7 +44,7 @@ func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) (string,
 	}
 	http.SetCookie(w, cookie)
 
-	return cookie.Value, nil
+	return cookie.Value
 }
 
 // Check implements the CSRF interface

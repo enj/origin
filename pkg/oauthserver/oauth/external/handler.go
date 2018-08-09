@@ -244,16 +244,12 @@ func (d *defaultState) Generate(w http.ResponseWriter, req *http.Request) (strin
 		return "", errors.New("Cannot generate state: request has no URL")
 	}
 
-	csrfToken, err := d.csrf.Generate(w, req)
-	if err != nil {
-		return "", err
-	}
-
 	state := url.Values{
-		"csrf": {csrfToken},
+		"csrf": {d.csrf.Generate(w, req)},
 		"then": {then},
 	}
-	return encodeState(state)
+
+	return encodeState(state), nil
 }
 
 func (d *defaultState) Check(state string, req *http.Request) (bool, error) {
@@ -350,8 +346,8 @@ func (d *defaultState) AuthenticationError(err error, w http.ResponseWriter, req
 }
 
 // URL-encode, then base-64 encode for OAuth providers that don't do a good job of treating the state param like an opaque value
-func encodeState(values url.Values) (string, error) {
-	return base64.URLEncoding.EncodeToString([]byte(values.Encode())), nil
+func encodeState(values url.Values) string {
+	return base64.URLEncoding.EncodeToString([]byte(values.Encode()))
 }
 
 func decodeState(state string) (url.Values, error) {

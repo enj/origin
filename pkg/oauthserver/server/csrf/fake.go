@@ -9,8 +9,8 @@ type FakeCSRF struct {
 }
 
 // Generate implements the CSRF interface
-func (c *FakeCSRF) Generate(w http.ResponseWriter, req *http.Request) (string, error) {
-	return c.Token, c.Err
+func (c *FakeCSRF) Generate(w http.ResponseWriter, req *http.Request) string {
+	return c.Token
 }
 
 // Check implements the CSRF interface

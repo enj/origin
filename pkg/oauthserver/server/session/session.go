@@ -3,6 +3,7 @@ package session
 import (
 	"net/http"
 
+	"github.com/golang/glog"
 	"github.com/gorilla/sessions"
 )
 
@@ -36,7 +37,11 @@ func (s *store) Get(r *http.Request) Values {
 		// empty Values means the user has to reauthenticate instead of getting stuck
 		// on an error page until their cookie expires or is removed.
 		// we leak less state information using this approach.
-		// TODO log
+
+		// log the error in case we ever need to know that it is occurring
+		// we do not log the request as that could leak sensitive information such as the cookie
+		glog.V(4).Infof("failed to decode secure session cookie %s: %v", s.name, err)
+
 		return Values{}
 	}
 	return session.Values

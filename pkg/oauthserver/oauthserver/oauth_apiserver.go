@@ -1,8 +1,6 @@
 package oauthserver
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,6 +27,7 @@ import (
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/oauth/urls"
+	"github.com/openshift/origin/pkg/oauthserver"
 	"github.com/openshift/origin/pkg/oauthserver/server/session"
 )
 
@@ -43,6 +42,7 @@ func NewOAuthServerConfig(oauthConfig configapi.OAuthConfig, userClientConfig *r
 
 	var sessionAuth *session.Authenticator
 	if oauthConfig.SessionConfig != nil {
+		// TODO we really need to enforce HTTPS always
 		secure := isHTTPS(oauthConfig.MasterPublicURL)
 		auth, err := buildSessionAuth(secure, oauthConfig.SessionConfig)
 		if err != nil {
@@ -114,27 +114,11 @@ func getSessionSecrets(filename string) ([][]byte, error) {
 		}
 	} else {
 		// Generate random signing and encryption secrets if none are specified in config
-		secrets = append(secrets, randomBytes(64))
-		secrets = append(secrets, randomBytes(32))
+		secrets = append(secrets, oauthserver.RandomBytes(512/8))
+		secrets = append(secrets, oauthserver.RandomBytes(256/8))
 	}
 
 	return secrets, nil
-}
-
-func randomBytes(size int) []byte {
-	b := make([]byte, size)
-	if _, err := rand.Read(b); err != nil {
-		panic(err) // rand should never fail
-	}
-	return b
-}
-
-func randomString(size int) string {
-	// each byte (8 bits) gives us 4/3 base64 (6 bits) characters
-	// we account for that conversion and add one to handle truncation
-	b64size := base64.RawURLEncoding.DecodedLen(size) + 1
-	// trim down to the original requested size since we added one above
-	return base64.RawURLEncoding.EncodeToString(randomBytes(b64size))[:size]
 }
 
 // isHTTPS returns true if the given URL is a valid https URL
@@ -256,7 +240,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 
 			browserClient := oauthapi.OAuthClient{
 				ObjectMeta:            metav1.ObjectMeta{Name: openShiftBrowserClientID},
-				Secret:                randomString(64),
+				Secret:                oauthserver.Random256BitString(),
 				RespondWithChallenges: false,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
 				GrantMethod:           oauthapi.GrantHandlerAuto,

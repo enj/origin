@@ -60,12 +60,7 @@ func TestCookieGenerate(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		token, err := csrf.Generate(w, req)
-
-		if err != nil {
-			t.Errorf("%s: Unexpected error: %v", k, err)
-			continue
-		}
+		token := csrf.Generate(w, req)
 
 		if len(testCase.ExpectToken) != 0 && token != testCase.ExpectToken {
 			t.Errorf("%s: Unexpected token %s, got %s", k, testCase.ExpectToken, token)

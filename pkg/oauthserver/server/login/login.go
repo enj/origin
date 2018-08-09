@@ -154,11 +154,7 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	csrf, err := l.csrf.Generate(w, req)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to generate CSRF token: %v", err))
-	}
-	form.Values.CSRF = csrf
+	form.Values.CSRF = l.csrf.Generate(w, req)
 
 	l.render.Render(form, w, req)
 }
