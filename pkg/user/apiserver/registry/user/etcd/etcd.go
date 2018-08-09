@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -63,9 +64,10 @@ func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 			return nil, kerrs.NewForbidden(usergroup.Resource("user"), "~", errors.New("requests to ~ must be authenticated"))
 		}
 		name = user.GetName()
+		contextGroups := sets.NewString(user.GetGroups()...).List() // sort and deduplicate
 
 		// build a virtual user object using the context data
-		virtualUser := &userapi.User{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(user.GetUID())}, Groups: user.GetGroups()}
+		virtualUser := &userapi.User{ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(user.GetUID())}, Groups: contextGroups}
 
 		if reasons := validation.ValidateUserName(name, false); len(reasons) != 0 {
 			// The user the authentication layer has identified cannot be a valid persisted user
