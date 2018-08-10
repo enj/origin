@@ -1,7 +1,6 @@
 package session
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -35,40 +34,36 @@ func NewAuthenticator(store Store, maxAge int32) *Authenticator {
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	values := a.store.Get(req)
 
-	expires, ok, err := values.GetInt64(expKey)
-	// TODO in a release when mixed masters are no longer an issue, replace with:
-	// if !ok || err != nil {
-	if err != nil {
-		return nil, false, err
-	}
+	expires, ok := values.GetInt64(expKey)
 
 	// TODO drop this logic in a release when mixed masters are no longer an issue
 	if !ok {
-		expiresString, ok, err := values.GetString(expiresKey)
-		if !ok || err != nil {
-			return nil, false, err
+		// TODO replace with:
+		// return nil, false, nil
+
+		expiresString, ok := values.GetString(expiresKey)
+		if !ok {
+			return nil, false, nil
 		}
-		expires, err = strconv.ParseInt(expiresString, 10, 64)
+		expiresParse, err := strconv.ParseInt(expiresString, 10, 64)
 		if err != nil {
-			return nil, false, fmt.Errorf("error parsing expires timestamp: %v", err)
+			return nil, false, nil
 		}
+		expires = expiresParse
 	}
 
 	if expires < time.Now().Unix() {
 		return nil, false, nil
 	}
 
-	name, ok, err := values.GetString(userNameKey)
-	if !ok || err != nil {
-		return nil, false, err
+	name, ok := values.GetString(userNameKey)
+	if !ok {
+		return nil, false, nil
 	}
 
-	uid, _, err := values.GetString(userUIDKey)
 	// Ignore ok to tolerate empty string UIDs in the session
 	// TODO in what valid flow is UID empty?
-	if err != nil {
-		return nil, false, err
-	}
+	uid, _ := values.GetString(userUIDKey)
 
 	return &user.DefaultInfo{
 		Name: name,
