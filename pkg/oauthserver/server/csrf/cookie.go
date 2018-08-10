@@ -46,22 +46,15 @@ func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
 }
 
 // Check implements the CSRF interface
-func (c *cookieCsrf) Check(req *http.Request, value string) (bool, error) {
+func (c *cookieCsrf) Check(req *http.Request, value string) bool {
 	if len(value) == 0 {
-		return false, nil
+		return false
 	}
 
 	cookie, err := req.Cookie(c.name)
-	if err == http.ErrNoCookie {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
+	if err != nil { // the only error returned here is ErrNoCookie
+		return false
 	}
 
-	if cookie.Value != value {
-		return false, nil
-	}
-
-	return true, nil
+	return cookie.Value == value
 }

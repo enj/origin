@@ -158,14 +158,7 @@ func TestCookieCheck(t *testing.T) {
 			req.AddCookie(testCase.ExistingCookie)
 		}
 
-		ok, err := csrf.Check(req, testCase.Token)
-
-		if err != nil {
-			t.Errorf("%s: Unexpected error: %v", k, err)
-			continue
-		}
-
-		if ok != testCase.ExpectCheck {
+		if ok := csrf.Check(req, testCase.Token); ok != testCase.ExpectCheck {
 			t.Errorf("%s: Expected check to return %v, returned %v", k, testCase.ExpectCheck, ok)
 			continue
 		}

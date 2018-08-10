@@ -196,8 +196,8 @@ func (l *Grant) handleForm(user user.Info, w http.ResponseWriter, req *http.Requ
 }
 
 func (l *Grant) handleGrant(user user.Info, w http.ResponseWriter, req *http.Request) {
-	if ok, err := l.csrf.Check(req, req.PostFormValue(csrfParam)); !ok || err != nil {
-		glog.Errorf("Unable to check CSRF token: %v", err)
+	if ok := l.csrf.Check(req, req.PostFormValue(csrfParam)); !ok {
+		glog.V(4).Infof("Invalid CSRF token: %s", req.PostFormValue(csrfParam))
 		l.failed("Invalid CSRF token", w, req)
 		return
 	}
@@ -275,7 +275,7 @@ func (l *Grant) handleGrant(user user.Info, w http.ResponseWriter, req *http.Req
 		return
 	}
 	q := url.Query()
-	q.Set("scope", scopes)
+	q.Set(scopeParam, scopes)
 	url.RawQuery = q.Encode()
 	w.Header().Set("Location", url.String())
 	w.WriteHeader(http.StatusFound)
@@ -288,7 +288,7 @@ func (l *Grant) failed(reason string, w http.ResponseWriter, req *http.Request) 
 	l.render.Render(form, w, req)
 }
 func (l *Grant) redirect(reason string, w http.ResponseWriter, req *http.Request) {
-	then := req.FormValue("then")
+	then := req.FormValue(thenParam)
 
 	// TODO: validate then
 	if len(then) == 0 {

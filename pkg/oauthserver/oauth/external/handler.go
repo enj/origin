@@ -9,6 +9,7 @@ import (
 
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
+
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 
@@ -257,19 +258,13 @@ func (d *defaultState) Check(state string, req *http.Request) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	csrf := values.Get("csrf")
 
-	ok, err := d.csrf.Check(req, csrf)
-	if err != nil {
-		return false, err
-	}
-	if !ok {
-		return false, fmt.Errorf("State did not contain a valid CSRF token")
+	if ok := d.csrf.Check(req, values.Get("csrf")); !ok {
+		return false, fmt.Errorf("state did not contain a valid CSRF token")
 	}
 
-	then := values.Get("then")
-	if then == "" {
-		return false, errors.New("State did not contain a redirect")
+	if then := values.Get("then"); len(then) == 0 {
+		return false, errors.New("state did not contain a redirect")
 	}
 
 	return true, nil
@@ -283,7 +278,7 @@ func (d *defaultState) AuthenticationSucceeded(user user.Info, state string, w h
 
 	then := values.Get("then")
 	if len(then) == 0 {
-		return false, errors.New("No redirect given")
+		return false, errors.New("no redirect given")
 	}
 
 	http.Redirect(w, req, then, http.StatusFound)

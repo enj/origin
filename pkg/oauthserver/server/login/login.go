@@ -27,6 +27,7 @@ const (
 	csrfParam     = "csrf"
 	usernameParam = "username"
 	passwordParam = "password"
+	reasonParam   = "reason"
 
 	// these can be used by custom templates, and should not be changed
 	// these error codes are specific to the login flow.
@@ -138,14 +139,14 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, req *http.Request) {
 			Password: passwordParam,
 		},
 	}
-	if then := req.URL.Query().Get("then"); isServerRelativeURL(then) {
+	if then := req.URL.Query().Get(thenParam); isServerRelativeURL(then) {
 		form.Values.Then = then
 	} else {
 		http.Redirect(w, req, "/", http.StatusFound)
 		return
 	}
 
-	form.ErrorCode = req.URL.Query().Get("reason")
+	form.ErrorCode = req.URL.Query().Get(reasonParam)
 	if len(form.ErrorCode) > 0 {
 		if msg, hasMsg := errorMessages[form.ErrorCode]; hasMsg {
 			form.Error = msg
@@ -160,22 +161,22 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, req *http.Request) {
 }
 
 func (l *Login) handleLogin(w http.ResponseWriter, req *http.Request) {
-	if ok, err := l.csrf.Check(req, req.FormValue("csrf")); !ok || err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to check CSRF token: %v", err))
+	if ok := l.csrf.Check(req, req.FormValue(csrfParam)); !ok {
+		glog.V(4).Infof("Invalid CSRF token: %s", req.FormValue(csrfParam))
 		failed(errorCodeTokenExpired, w, req)
 		return
 	}
-	then := req.FormValue("then")
+	then := req.FormValue(thenParam)
 	if !isServerRelativeURL(then) {
 		http.Redirect(w, req, "/", http.StatusFound)
 		return
 	}
-	username, password := req.FormValue("username"), req.FormValue("password")
-	if username == "" {
+	username, password := req.FormValue(usernameParam), req.FormValue(passwordParam)
+	if len(username) == 0 {
 		failed(errorCodeUserRequired, w, req)
 		return
 	}
-	var result string = metrics.SuccessResult
+	result := metrics.SuccessResult
 	defer func() {
 		metrics.RecordFormPasswordAuth(result)
 	}()
