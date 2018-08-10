@@ -7,23 +7,21 @@ import (
 )
 
 type cookieCsrf struct {
-	name     string
-	path     string
-	domain   string
-	secure   bool
-	httponly bool
+	name   string
+	path   string
+	domain string
+	secure bool
 }
 
 // NewCookieCSRF stores random CSRF tokens in a cookie created with the given options.
 // Empty CSRF tokens or tokens that do not match the value of the cookie on the request
 // are rejected.
-func NewCookieCSRF(name, path, domain string, secure, httponly bool) CSRF {
+func NewCookieCSRF(name, path, domain string, secure bool) CSRF {
 	return &cookieCsrf{
-		name:     name,
-		path:     path,
-		domain:   domain,
-		secure:   secure,
-		httponly: httponly,
+		name:   name,
+		path:   path,
+		domain: domain,
+		secure: secure,
 	}
 }
 
@@ -40,7 +38,7 @@ func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
 		Path:     c.path,
 		Domain:   c.domain,
 		Secure:   c.secure,
-		HttpOnly: c.httponly,
+		HttpOnly: true,
 	}
 	http.SetCookie(w, cookie)
 
