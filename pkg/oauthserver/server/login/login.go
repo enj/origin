@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/golang/glog"
@@ -20,6 +19,7 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/server/csrf"
 	"github.com/openshift/origin/pkg/oauthserver/server/errorpage"
 	"github.com/openshift/origin/pkg/oauthserver/server/headers"
+	"github.com/openshift/origin/pkg/oauthserver/server/redirect"
 )
 
 const (
@@ -110,17 +110,6 @@ func (l *Login) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func isServerRelativeURL(then string) bool {
-	if len(then) == 0 {
-		return false
-	}
-	u, err := url.Parse(then)
-	if err != nil {
-		return false
-	}
-	return len(u.Scheme) == 0 && len(u.Host) == 0 && strings.HasPrefix(u.Path, "/")
-}
-
 func (l *Login) handleLoginForm(w http.ResponseWriter, req *http.Request) {
 	uri, err := getBaseURL(req)
 	if err != nil {
@@ -139,7 +128,7 @@ func (l *Login) handleLoginForm(w http.ResponseWriter, req *http.Request) {
 			Password: passwordParam,
 		},
 	}
-	if then := req.URL.Query().Get(thenParam); isServerRelativeURL(then) {
+	if then := req.URL.Query().Get(thenParam); redirect.IsServerRelativeURL(then) {
 		form.Values.Then = then
 	} else {
 		http.Redirect(w, req, "/", http.StatusFound)
@@ -167,7 +156,7 @@ func (l *Login) handleLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	then := req.FormValue(thenParam)
-	if !isServerRelativeURL(then) {
+	if !redirect.IsServerRelativeURL(then) {
 		http.Redirect(w, req, "/", http.StatusFound)
 		return
 	}

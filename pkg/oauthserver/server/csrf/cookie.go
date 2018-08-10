@@ -28,7 +28,7 @@ func NewCookieCSRF(name, path, domain string, secure bool) CSRF {
 // Generate implements the CSRF interface
 func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
 	cookie, err := req.Cookie(c.name)
-	if err == nil && len(cookie.Value) > 0 {
+	if err == nil && len(cookie.Value) > 0 { // TODO does the stickiness of the cookie make sense?
 		return cookie.Value
 	}
 

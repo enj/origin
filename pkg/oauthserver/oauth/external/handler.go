@@ -236,7 +236,7 @@ type RedirectorState interface {
 }
 
 func CSRFRedirectingState(csrf csrf.CSRF) RedirectorState {
-	return &defaultState{csrf}
+	return &defaultState{csrf: csrf}
 }
 
 func (d *defaultState) Generate(w http.ResponseWriter, req *http.Request) (string, error) {

@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/api"
 	"github.com/openshift/origin/pkg/oauthserver/server/csrf"
 	"github.com/openshift/origin/pkg/oauthserver/server/headers"
+	"github.com/openshift/origin/pkg/oauthserver/server/redirect"
 )
 
 const (
@@ -290,11 +291,11 @@ func (l *Grant) failed(reason string, w http.ResponseWriter, req *http.Request) 
 func (l *Grant) redirect(reason string, w http.ResponseWriter, req *http.Request) {
 	then := req.FormValue(thenParam)
 
-	// TODO: validate then
-	if len(then) == 0 {
+	if !redirect.IsServerRelativeURL(then) {
 		l.failed(reason, w, req)
 		return
 	}
+
 	w.Header().Set("Location", then)
 	w.WriteHeader(http.StatusFound)
 }
