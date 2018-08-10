@@ -3,7 +3,7 @@ package csrf
 import (
 	"net/http"
 
-	"github.com/openshift/origin/pkg/oauthserver"
+	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 )
 
 type cookieCsrf struct {
@@ -34,7 +34,7 @@ func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
 
 	cookie = &http.Cookie{
 		Name:     c.name,
-		Value:    oauthserver.Random256BitString(),
+		Value:    crypto.Random256BitString(),
 		Path:     c.path,
 		Domain:   c.domain,
 		Secure:   c.secure,

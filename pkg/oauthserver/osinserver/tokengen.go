@@ -5,7 +5,7 @@ import (
 
 	"github.com/RangelReale/osin"
 
-	"github.com/openshift/origin/pkg/oauthserver"
+	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 )
 
 var (
@@ -16,7 +16,7 @@ var (
 func randomToken() string {
 	for {
 		// guaranteed to have no / characters and no trailing ='s
-		token := oauthserver.Random256BitString()
+		token := crypto.Random256BitString()
 
 		// Don't generate tokens with leading dashes... they're hard to use on the command line
 		if strings.HasPrefix(token, "-") {

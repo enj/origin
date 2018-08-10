@@ -27,7 +27,7 @@ import (
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/oauth/urls"
-	"github.com/openshift/origin/pkg/oauthserver"
+	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 	"github.com/openshift/origin/pkg/oauthserver/server/session"
 )
 
@@ -114,8 +114,8 @@ func getSessionSecrets(filename string) ([][]byte, error) {
 		}
 	} else {
 		// Generate random signing and encryption secrets if none are specified in config
-		secrets = append(secrets, oauthserver.RandomBytes(512/8))
-		secrets = append(secrets, oauthserver.RandomBytes(256/8))
+		secrets = append(secrets, crypto.RandomBytes(512/8))
+		secrets = append(secrets, crypto.RandomBytes(256/8))
 	}
 
 	return secrets, nil
@@ -240,7 +240,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 
 			browserClient := oauthapi.OAuthClient{
 				ObjectMeta:            metav1.ObjectMeta{Name: openShiftBrowserClientID},
-				Secret:                oauthserver.Random256BitString(),
+				Secret:                crypto.Random256BitString(),
 				RespondWithChallenges: false,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
 				GrantMethod:           oauthapi.GrantHandlerAuto,

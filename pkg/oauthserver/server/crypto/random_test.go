@@ -1,4 +1,4 @@
-package oauthserver
+package crypto
 
 import (
 	"strconv"
