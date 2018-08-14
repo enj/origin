@@ -34,7 +34,7 @@ func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
 
 	cookie = &http.Cookie{
 		Name:     c.name,
-		Value:    crypto.Random256BitString(),
+		Value:    crypto.Random256BitsString(),
 		Path:     c.path,
 		Domain:   c.domain,
 		Secure:   c.secure,
@@ -56,5 +56,5 @@ func (c *cookieCsrf) Check(req *http.Request, value string) bool {
 		return false
 	}
 
-	return cookie.Value == value
+	return crypto.IsEqualConstantTime(cookie.Value, value)
 }

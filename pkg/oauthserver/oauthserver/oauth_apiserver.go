@@ -1,6 +1,7 @@
 package oauthserver
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -114,8 +115,12 @@ func getSessionSecrets(filename string) ([][]byte, error) {
 		}
 	} else {
 		// Generate random signing and encryption secrets if none are specified in config
-		secrets = append(secrets, crypto.RandomBytes(512/8))
-		secrets = append(secrets, crypto.RandomBytes(256/8))
+		const (
+			sha256KeyLenBits = sha256.BlockSize * 8 // max key size with HMAC SHA256
+			aes256KeyLenBits = 256                  // max key size with AES (AES-256)
+		)
+		secrets = append(secrets, crypto.RandomBits(sha256KeyLenBits))
+		secrets = append(secrets, crypto.RandomBits(aes256KeyLenBits))
 	}
 
 	return secrets, nil
@@ -240,7 +245,7 @@ func (c *OAuthServerConfig) StartOAuthClientsBootstrapping(context genericapiser
 
 			browserClient := oauthapi.OAuthClient{
 				ObjectMeta:            metav1.ObjectMeta{Name: openShiftBrowserClientID},
-				Secret:                crypto.Random256BitString(),
+				Secret:                crypto.Random256BitsString(),
 				RespondWithChallenges: false,
 				RedirectURIs:          []string{urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)},
 				GrantMethod:           oauthapi.GrantHandlerAuto,

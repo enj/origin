@@ -5,7 +5,15 @@ import (
 	"encoding/base64"
 )
 
-func RandomBytes(size int) []byte {
+const bitsInByte = 8
+
+// RandomBits returns a random byte slice with at least the requested bits of entropy.
+// Callers should avoid using a value less than 256 unless they have a very good reason.
+func RandomBits(bits int) []byte {
+	size := bits / bitsInByte
+	if bits%bitsInByte != 0 {
+		size++
+	}
 	b := make([]byte, size)
 	if _, err := rand.Read(b); err != nil {
 		panic(err) // rand should never fail
@@ -13,17 +21,16 @@ func RandomBytes(size int) []byte {
 	return b
 }
 
-// RandomString uses RawURLEncoding to ensure we do not get / characters or trailing ='s
-func RandomString(size int) string {
-	// each byte (8 bits) gives us 4/3 base64 (6 bits) characters
-	// we account for that conversion and add one to handle truncation
-	b64size := base64.RawURLEncoding.DecodedLen(size) + 1
-	// trim down to the original requested size since we added one above
-	return base64.RawURLEncoding.EncodeToString(RandomBytes(b64size))[:size]
+// RandomBitsString returns a random string with at least the requested bits of entropy.
+// It uses RawURLEncoding to ensure we do not get / characters or trailing ='s.
+func RandomBitsString(bits int) string {
+	return base64.RawURLEncoding.EncodeToString(RandomBits(bits))
 }
 
-// Random256BitString uses RandomString with the appropriate length needed for 256 bits of entropy
-func Random256BitString() string {
+// Random256BitsString is a convenience function for calling RandomBitsString(256).
+// Callers that need a random string should use this function unless they have a
+// very good reason to need a different amount of entropy.
+func Random256BitsString() string {
 	// 32 bytes (256 bits) = 43 base64-encoded characters
-	return RandomString(base64.RawURLEncoding.EncodedLen(256 / 8))
+	return RandomBitsString(256)
 }

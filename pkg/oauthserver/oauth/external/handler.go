@@ -242,7 +242,7 @@ func CSRFRedirectingState(csrf csrf.CSRF) RedirectorState {
 func (d *defaultState) Generate(w http.ResponseWriter, req *http.Request) (string, error) {
 	then := req.URL.String()
 	if len(then) == 0 {
-		return "", errors.New("Cannot generate state: request has no URL")
+		return "", errors.New("cannot generate state: request has no URL")
 	}
 
 	state := url.Values{

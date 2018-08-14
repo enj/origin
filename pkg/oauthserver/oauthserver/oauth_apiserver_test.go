@@ -79,7 +79,7 @@ func TestGetValidSessionSecretsFile(t *testing.T) {
 			{Authentication: "a2", Encryption: "e2"},
 		},
 	}
-	expectedSecrets := []string{"a1", "e1", "a2", "e2"}
+	expectedSecrets := [][]byte{[]byte("a1"), []byte("e1"), []byte("a2"), []byte("e2")}
 
 	yaml, err := latest.WriteYAML(secrets)
 	if err != nil {
@@ -87,20 +87,11 @@ func TestGetValidSessionSecretsFile(t *testing.T) {
 	}
 	ioutil.WriteFile(tmpfile.Name(), []byte(yaml), os.FileMode(0600))
 
-	rawSecrets, err := getSessionSecrets(tmpfile.Name())
+	readSecrets, err := getSessionSecrets(tmpfile.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	readSecrets := toStringSlice(rawSecrets)
 	if !reflect.DeepEqual(readSecrets, expectedSecrets) {
 		t.Errorf("Unexpected %v, got %v", expectedSecrets, readSecrets)
 	}
-}
-
-func toStringSlice(data [][]byte) []string {
-	s := make([]string, len(data), len(data))
-	for i, b := range data {
-		s[i] = string(b)
-	}
-	return s
 }
