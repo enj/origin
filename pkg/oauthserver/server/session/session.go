@@ -18,7 +18,9 @@ type store struct {
 
 func NewStore(name string, secure bool, secrets ...[]byte) Store {
 	cookie := sessions.NewCookieStore(secrets...)
-	cookie.Options.MaxAge = 0 // we encode expiration information into the cookie data to avoid browser bugs
+	// we encode expiration information into the cookie data to avoid browser bugs
+	// since we do not set the Expires or Max-Age attributes, all cookies created by this store are session cookies
+	cookie.Options.MaxAge = 0
 	cookie.Options.HttpOnly = true
 	cookie.Options.Secure = secure
 	return &store{name: name, store: cookie}

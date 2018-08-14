@@ -27,11 +27,14 @@ func NewCookieCSRF(name, path, domain string, secure bool) CSRF {
 
 // Generate implements the CSRF interface
 func (c *cookieCsrf) Generate(w http.ResponseWriter, req *http.Request) string {
+	// reuse the session cookie if we already have one
+	// this makes us more tolerant of multiple clicks against the login page
 	cookie, err := req.Cookie(c.name)
-	if err == nil && len(cookie.Value) > 0 { // TODO does the stickiness of the cookie make sense?
+	if err == nil && len(cookie.Value) > 0 {
 		return cookie.Value
 	}
 
+	// do not set Expires or MaxAge to make this a session cookie
 	cookie = &http.Cookie{
 		Name:     c.name,
 		Value:    crypto.Random256BitsString(),

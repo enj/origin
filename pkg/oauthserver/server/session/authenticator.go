@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -24,10 +26,10 @@ type Authenticator struct {
 	maxAge time.Duration
 }
 
-func NewAuthenticator(store Store, maxAge int32) *Authenticator {
+func NewAuthenticator(store Store, maxAge time.Duration) *Authenticator {
 	return &Authenticator{
 		store:  store,
-		maxAge: time.Duration(maxAge) * time.Second,
+		maxAge: maxAge,
 	}
 }
 
@@ -47,6 +49,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		}
 		expiresParse, err := strconv.ParseInt(expiresString, 10, 64)
 		if err != nil {
+			glog.Errorf("error parsing expires timestamp: %v", err)
 			return nil, false, nil
 		}
 		expires = expiresParse
