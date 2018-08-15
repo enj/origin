@@ -30,12 +30,7 @@ func (p *lookupIdentityMapper) UserFor(info authapi.UserIdentityInfo) (kuser.Inf
 		return nil, NewLookupError(info, err)
 	}
 
-	return &kuser.DefaultInfo{
-		Name: u.Name,
-		UID:  string(u.UID),
-		// UserFor should only set name and UID, all other values are ignored
-		// Groups: u.Groups,
-	}, nil
+	return userToInfo(u), nil
 }
 
 type lookupError struct {
