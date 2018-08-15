@@ -5,59 +5,64 @@ import (
 
 	kuser "k8s.io/apiserver/pkg/authentication/user"
 
-	oapi "github.com/openshift/api/oauth/v1"
+	oauthapi "github.com/openshift/api/oauth/v1"
 )
 
-type UserConversion struct{}
+type UserConversion interface {
+	ConvertToAuthorizeToken(interface{}, *oauthapi.OAuthAuthorizeToken) error
+	ConvertToAccessToken(interface{}, *oauthapi.OAuthAccessToken) error
+	ConvertFromAuthorizeToken(*oauthapi.OAuthAuthorizeToken) (kuser.Info, error)
+	ConvertFromAccessToken(*oauthapi.OAuthAccessToken) (kuser.Info, error)
+}
+
+type userConversion struct{}
 
 // NewUserConversion creates an object that can convert the user.Info object to and from
 // an oauth access/authorize token object.
-func NewUserConversion() *UserConversion {
-	return &UserConversion{}
+func NewUserConversion() UserConversion {
+	return &userConversion{}
 }
 
-func (s *UserConversion) ConvertToAuthorizeToken(user interface{}, token *oapi.OAuthAuthorizeToken) error {
+func (s *userConversion) ConvertToAuthorizeToken(user interface{}, token *oauthapi.OAuthAuthorizeToken) (err error) {
+	token.UserName, token.UserUID, err = s.convertFromUser(user)
+	return err
+}
+
+func (s *userConversion) ConvertToAccessToken(user interface{}, token *oauthapi.OAuthAccessToken) (err error) {
+	token.UserName, token.UserUID, err = s.convertFromUser(user)
+	return err
+}
+
+func (s *userConversion) ConvertFromAuthorizeToken(token *oauthapi.OAuthAuthorizeToken) (kuser.Info, error) {
+	return s.convertFromToken(token.UserName, token.UserUID)
+}
+
+func (s *userConversion) ConvertFromAccessToken(token *oauthapi.OAuthAccessToken) (kuser.Info, error) {
+	return s.convertFromToken(token.UserName, token.UserUID)
+}
+
+func (s *userConversion) convertFromUser(user interface{}) (name, uid string, err error) {
 	info, ok := user.(kuser.Info)
 	if !ok {
-		return errors.New("did not receive user.Info")
+		return "", "", errors.New("did not receive user.Info") // should be impossible
 	}
-	token.UserName = info.GetName()
-	if token.UserName == "" {
-		return errors.New("user name is empty")
+
+	name = info.GetName()
+	uid = info.GetUID()
+	if len(name) == 0 || len(uid) == 0 {
+		return "", "", errors.New("user.Info has no user name or UID") // should be impossible
 	}
-	token.UserUID = info.GetUID()
-	return nil
+
+	return name, uid, nil
 }
 
-func (s *UserConversion) ConvertToAccessToken(user interface{}, token *oapi.OAuthAccessToken) error {
-	info, ok := user.(kuser.Info)
-	if !ok {
-		return errors.New("did not receive user.Info")
+func (s *userConversion) convertFromToken(name, uid string) (kuser.Info, error) {
+	if len(name) == 0 || len(uid) == 0 {
+		return nil, errors.New("token has no user name or UID stored") // should be impossible
 	}
-	token.UserName = info.GetName()
-	if token.UserName == "" {
-		return errors.New("user name is empty")
-	}
-	token.UserUID = info.GetUID()
-	return nil
-}
 
-func (s *UserConversion) ConvertFromAuthorizeToken(token *oapi.OAuthAuthorizeToken) (interface{}, error) {
-	if token.UserName == "" {
-		return nil, errors.New("token has no user name stored")
-	}
 	return &kuser.DefaultInfo{
-		Name: token.UserName,
-		UID:  token.UserUID,
-	}, nil
-}
-
-func (s *UserConversion) ConvertFromAccessToken(token *oapi.OAuthAccessToken) (interface{}, error) {
-	if token.UserName == "" {
-		return nil, errors.New("token has no user name stored")
-	}
-	return &kuser.DefaultInfo{
-		Name: token.UserName,
-		UID:  token.UserUID,
+		Name: name,
+		UID:  uid,
 	}, nil
 }

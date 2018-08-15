@@ -40,7 +40,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 
 	// TODO drop this logic in a release when mixed masters are no longer an issue
 	if !ok {
-		// TODO replace with:
+		// TODO replace with (in a release when mixed masters are no longer an issue):
 		// return nil, false, nil
 
 		expiresString, ok := values.GetString(expiresKey)
@@ -64,9 +64,10 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return nil, false, nil
 	}
 
-	// Ignore ok to tolerate empty string UIDs in the session
-	// TODO in what valid flow is UID empty?
-	uid, _ := values.GetString(userUIDKey)
+	uid, ok := values.GetString(userUIDKey)
+	if !ok {
+		return nil, false, nil
+	}
 
 	return &user.DefaultInfo{
 		Name: name,
