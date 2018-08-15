@@ -5,13 +5,11 @@ import (
 	"encoding/base64"
 )
 
-const bitsInByte = 8
-
 // RandomBits returns a random byte slice with at least the requested bits of entropy.
 // Callers should avoid using a value less than 256 unless they have a very good reason.
 func RandomBits(bits int) []byte {
-	size := bits / bitsInByte
-	if bits%bitsInByte != 0 {
+	size := bits / 8
+	if bits%8 != 0 {
 		size++
 	}
 	b := make([]byte, size)

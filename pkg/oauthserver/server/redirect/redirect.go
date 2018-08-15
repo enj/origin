@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// IsServerRelativeURL is used to prevent open redirect issues
 func IsServerRelativeURL(then string) bool {
 	if len(then) == 0 {
 		return false
