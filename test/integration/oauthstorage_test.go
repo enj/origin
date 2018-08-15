@@ -10,6 +10,7 @@ import (
 	"golang.org/x/oauth2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kuser "k8s.io/apiserver/pkg/authentication/user"
 
 	oauthapi "github.com/openshift/api/oauth/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
@@ -20,29 +21,27 @@ import (
 )
 
 type testUser struct {
-	UserName string
-	UserUID  string
-	Err      error
+	user kuser.Info
 }
 
 func (u *testUser) ConvertToAuthorizeToken(_ interface{}, token *oauthapi.OAuthAuthorizeToken) error {
-	token.UserName = u.UserName
-	token.UserUID = u.UserUID
-	return u.Err
+	token.UserName = u.user.GetName()
+	token.UserUID = u.user.GetUID()
+	return nil
 }
 
 func (u *testUser) ConvertToAccessToken(_ interface{}, token *oauthapi.OAuthAccessToken) error {
-	token.UserName = u.UserName
-	token.UserUID = u.UserUID
-	return u.Err
+	token.UserName = u.user.GetName()
+	token.UserUID = u.user.GetUID()
+	return nil
 }
 
-func (u *testUser) ConvertFromAuthorizeToken(*oauthapi.OAuthAuthorizeToken) (interface{}, error) {
-	return u.UserName, u.Err
+func (u *testUser) ConvertFromAuthorizeToken(*oauthapi.OAuthAuthorizeToken) (kuser.Info, error) {
+	return u.user, nil
 }
 
-func (u *testUser) ConvertFromAccessToken(*oauthapi.OAuthAccessToken) (interface{}, error) {
-	return u.UserName, u.Err
+func (u *testUser) ConvertFromAccessToken(*oauthapi.OAuthAccessToken) (kuser.Info, error) {
+	return u.user, nil
 }
 
 func TestOAuthStorage(t *testing.T) {
@@ -66,7 +65,7 @@ func TestOAuthStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	user := &testUser{UserName: "test", UserUID: "1"}
+	user := &testUser{user: &kuser.DefaultInfo{Name: "test", UID: "1"}}
 	storage := registrystorage.New(oauthClient.OAuthAccessTokens(), oauthClient.OAuthAuthorizeTokens(), oauthClient.OAuthClients(), user, 0)
 
 	oauthServer := osinserver.New(
@@ -152,9 +151,9 @@ func TestOAuthStorage(t *testing.T) {
 	}
 	url := config.AuthCodeURL("")
 	client := http.Client{ /*CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			t.Logf("redirect (%d): to %s, %#v", len(via), req.URL, req)
-			return nil
-		}*/}
+		t.Logf("redirect (%d): to %s, %#v", len(via), req.URL, req)
+		return nil
+	}*/}
 
 	resp, err := client.Get(url)
 	if err != nil {
