@@ -1,4 +1,4 @@
-package registry
+package registry_test // prevent import cycle
 
 import (
 	"net/http"
@@ -16,6 +16,7 @@ import (
 	oauthfake "github.com/openshift/client-go/oauth/clientset/versioned/fake"
 	"github.com/openshift/origin/pkg/oauthserver/api"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/handlers"
+	"github.com/openshift/origin/pkg/oauthserver/oauth/registry"
 	"github.com/openshift/origin/pkg/oauthserver/osinserver"
 	"github.com/openshift/origin/pkg/oauthserver/osinserver/registrystorage"
 )
@@ -280,7 +281,7 @@ func TestRegistryAndServer(t *testing.T) {
 			objs = append(objs, testCase.ClientAuth)
 		}
 		fakeOAuthClient := oauthfake.NewSimpleClientset(objs...)
-		storage := registrystorage.New(fakeOAuthClient.Oauth().OAuthAccessTokens(), fakeOAuthClient.Oauth().OAuthAuthorizeTokens(), fakeOAuthClient.Oauth().OAuthClients(), NewUserConversion(), 0)
+		storage := registrystorage.New(fakeOAuthClient.Oauth().OAuthAccessTokens(), fakeOAuthClient.Oauth().OAuthAuthorizeTokens(), fakeOAuthClient.Oauth().OAuthClients(), registry.NewUserConversion(), 0)
 		config := osinserver.NewDefaultServerConfig()
 
 		h.AuthorizeHandler = osinserver.AuthorizeHandlers{
@@ -290,7 +291,7 @@ func TestRegistryAndServer(t *testing.T) {
 				h,
 			),
 			handlers.NewGrantCheck(
-				NewClientAuthorizationGrantChecker(fakeOAuthClient.Oauth().OAuthClientAuthorizations()),
+				registry.NewClientAuthorizationGrantChecker(fakeOAuthClient.Oauth().OAuthClientAuthorizations()),
 				h,
 				h,
 			),
