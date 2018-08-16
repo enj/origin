@@ -15,24 +15,18 @@ import (
 	"github.com/openshift/origin/pkg/oauth/scope"
 	"github.com/openshift/origin/pkg/oauthserver/api"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/handlers"
+	"github.com/openshift/origin/pkg/oauthserver/oauth/registry"
 )
-
-type UserConversion interface {
-	ConvertToAuthorizeToken(interface{}, *oauthapi.OAuthAuthorizeToken) error
-	ConvertToAccessToken(interface{}, *oauthapi.OAuthAccessToken) error
-	ConvertFromAuthorizeToken(*oauthapi.OAuthAuthorizeToken) (interface{}, error)
-	ConvertFromAccessToken(*oauthapi.OAuthAccessToken) (interface{}, error)
-}
 
 type storage struct {
 	accesstoken    oauthclient.OAuthAccessTokenInterface
 	authorizetoken oauthclient.OAuthAuthorizeTokenInterface
 	client         api.OAuthClientGetter
-	user           UserConversion
+	user           registry.UserConversion
 	tokentimeout   int32
 }
 
-func New(access oauthclient.OAuthAccessTokenInterface, authorize oauthclient.OAuthAuthorizeTokenInterface, client api.OAuthClientGetter, user UserConversion, tokentimeout int32) osin.Storage {
+func New(access oauthclient.OAuthAccessTokenInterface, authorize oauthclient.OAuthAuthorizeTokenInterface, client api.OAuthClientGetter, user registry.UserConversion, tokentimeout int32) osin.Storage {
 	return &storage{
 		accesstoken:    access,
 		authorizetoken: authorize,
