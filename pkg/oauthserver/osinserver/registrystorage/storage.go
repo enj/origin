@@ -6,6 +6,7 @@ import (
 
 	"github.com/RangelReale/osin"
 	"github.com/golang/glog"
+
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -17,27 +18,20 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/oauth/handlers"
 )
 
-type UserConversion interface {
-	ConvertToAuthorizeToken(interface{}, *oauthapi.OAuthAuthorizeToken) error
-	ConvertToAccessToken(interface{}, *oauthapi.OAuthAccessToken) error
-	ConvertFromAuthorizeToken(*oauthapi.OAuthAuthorizeToken) (interface{}, error)
-	ConvertFromAccessToken(*oauthapi.OAuthAccessToken) (interface{}, error)
-}
-
 type storage struct {
 	accesstoken    oauthclient.OAuthAccessTokenInterface
 	authorizetoken oauthclient.OAuthAuthorizeTokenInterface
 	client         api.OAuthClientGetter
-	user           UserConversion
+	user           *userConversion
 	tokentimeout   int32
 }
 
-func New(access oauthclient.OAuthAccessTokenInterface, authorize oauthclient.OAuthAuthorizeTokenInterface, client api.OAuthClientGetter, user UserConversion, tokentimeout int32) osin.Storage {
+func New(access oauthclient.OAuthAccessTokenInterface, authorize oauthclient.OAuthAuthorizeTokenInterface, client api.OAuthClientGetter, tokentimeout int32) osin.Storage {
 	return &storage{
 		accesstoken:    access,
 		authorizetoken: authorize,
 		client:         client,
-		user:           user,
+		user:           &userConversion{},
 		tokentimeout:   tokentimeout,
 	}
 }
@@ -205,14 +199,14 @@ func (s *storage) convertToAuthorizeToken(data *osin.AuthorizeData) (*oauthapi.O
 		RedirectURI:         data.RedirectUri,
 		State:               data.State,
 	}
-	if err := s.user.ConvertToAuthorizeToken(data.UserData, token); err != nil {
+	if err := s.user.convertToAuthorizeToken(data.UserData, token); err != nil {
 		return nil, err
 	}
 	return token, nil
 }
 
 func (s *storage) convertFromAuthorizeToken(authorize *oauthapi.OAuthAuthorizeToken) (*osin.AuthorizeData, error) {
-	user, err := s.user.ConvertFromAuthorizeToken(authorize)
+	user, err := s.user.convertFromAuthorizeToken(authorize)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +248,7 @@ func (s *storage) convertToAccessToken(data *osin.AccessData) (*oauthapi.OAuthAc
 	if data.AuthorizeData != nil {
 		token.AuthorizeToken = data.AuthorizeData.Code
 	}
-	if err := s.user.ConvertToAccessToken(data.UserData, token); err != nil {
+	if err := s.user.convertToAccessToken(data.UserData, token); err != nil {
 		return nil, err
 	}
 
@@ -270,7 +264,7 @@ func (s *storage) convertToAccessToken(data *osin.AccessData) (*oauthapi.OAuthAc
 }
 
 func (s *storage) convertFromAccessToken(access *oauthapi.OAuthAccessToken) (*osin.AccessData, error) {
-	user, err := s.user.ConvertFromAccessToken(access)
+	user, err := s.user.convertFromAccessToken(access)
 	if err != nil {
 		return nil, err
 	}
