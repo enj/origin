@@ -16,7 +16,9 @@ const (
 	// expKey is stored as an int64 unix time
 	expKey = "exp"
 
-	identityMetadataNameKey = "identity.metadata.name" // TODO maybe use a smaller name to make cookie smaller?
+	// identityMetadataNameKey is used to optionally store the name of an IdentityMetadata object
+	// which contains group information that can be too large to store in a cookie directly
+	identityMetadataNameKey = "metadata"
 )
 
 type Authenticator struct {
@@ -59,18 +61,19 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 	}
 
 	// check if we reference an identity metadata object
-	identityMetadataName, ok, err := values.GetString(identityMetadataNameKey)
-	if err != nil {
-		return nil, false, err
-	}
+	identityMetadataName, ok := values.GetString(identityMetadataNameKey)
 
 	// just use the name and uid when we do not reference an identity metadata object
 	if !ok {
 		return u, true, nil
 	}
 
+	_ = identityMetadataName // get it
+	// TODO use identity metadata API client to store groups, needs to handle conflicts/already exists like provision.go
+	// ignore all errors probably
+
 	// use the identity metadata object that we reference
-	return authapi.NewDefaultUserIdentityMetadata(u, identityMetadataName), true, nil
+	return authapi.NewDefaultUserIdentityMetadata(u, "idpName", []string{"idpGroups"}), true, nil
 }
 
 func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w http.ResponseWriter, req *http.Request) (bool, error) {
@@ -78,7 +81,11 @@ func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w 
 	identityMetadata := ""
 	// check if we have optional identity metadata (for storing a reference to group information)
 	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
-		identityMetadata = userIdentityMetadata.GetIdentityMetadataName()
+		idpName := userIdentityMetadata.GetIdentityProviderName()
+		idpGroups := userIdentityMetadata.GetIdentityProviderGroups()
+		_ = idpName // create the object
+		_ = idpGroups
+		identityMetadata = "uuid"
 	}
 
 	return false, a.put(w, user.GetName(), user.GetUID(), identityMetadata, time.Now().Add(a.maxAge).Unix())
