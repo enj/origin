@@ -8,7 +8,6 @@ import (
 
 type groupsMapper struct {
 	delegate authapi.UserIdentityMapper
-	// TODO add identity metadata API client
 }
 
 func (p *groupsMapper) UserFor(identityInfo authapi.UserIdentityInfo) (kuser.Info, error) {
@@ -23,7 +22,5 @@ func (p *groupsMapper) UserFor(identityInfo authapi.UserIdentityInfo) (kuser.Inf
 	if len(groups) == 0 {
 		return user, nil
 	}
-	// TODO use identity metadata API client to store groups, needs to handle conflicts/already exists like provision.go
-	identityMetadataName := "<hash>"
-	return authapi.NewDefaultUserIdentityMetadata(user, identityMetadataName), nil
+	return authapi.NewDefaultUserIdentityMetadata(user, identityInfo.GetProviderName(), groups), nil
 }

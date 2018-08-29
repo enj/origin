@@ -51,7 +51,8 @@ type UserIdentityMapper interface {
 // UserIdentityMetadata is an extension to user.Info that contains a reference to an identity metadata object.
 // This object can be used to enrich later authentication flows with data such as the user's group membership from the identity provider.
 type UserIdentityMetadata interface {
-	GetIdentityMetadataName() string
+	GetIdentityProviderName() string
+	GetIdentityProviderGroups() []string
 }
 
 type Client interface {
@@ -121,16 +122,22 @@ type OAuthClientGetter interface {
 
 type DefaultUserIdentityMetadata struct {
 	user.Info
-	IdentityMetadataName string
+	IdentityProviderName   string
+	IdentityProviderGroups []string
 }
 
-func (i *DefaultUserIdentityMetadata) GetIdentityMetadataName() string {
-	return i.IdentityMetadataName
+func (i *DefaultUserIdentityMetadata) GetIdentityProviderName() string {
+	return i.IdentityProviderName
 }
 
-func NewDefaultUserIdentityMetadata(u user.Info, identityMetadataName string) *DefaultUserIdentityMetadata {
+func (i *DefaultUserIdentityMetadata) GetIdentityProviderGroups() []string {
+	return i.IdentityProviderGroups
+}
+
+func NewDefaultUserIdentityMetadata(u user.Info, identityProviderName string, identityProviderGroups []string) *DefaultUserIdentityMetadata {
 	return &DefaultUserIdentityMetadata{
-		Info:                 u,
-		IdentityMetadataName: identityMetadataName,
+		Info:                   u,
+		IdentityProviderName:   identityProviderName,
+		IdentityProviderGroups: identityProviderGroups,
 	}
 }
