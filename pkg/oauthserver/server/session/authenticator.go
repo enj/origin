@@ -101,7 +101,7 @@ func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w 
 		idpName := userIdentityMetadata.GetIdentityProviderName()
 		metadata, err := a.identityMetadata.Create(&userv1.IdentityMetadata{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: idpName + ":" + name + ":" + uid, // let the server generate something unique
+				GenerateName: idpName + ":" + name + ":" + uid + ":", // let the server generate something unique
 			},
 			ProviderName:   idpName,
 			ProviderGroups: userIdentityMetadata.GetIdentityProviderGroups(),
