@@ -4,8 +4,12 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 
+	userv1 "github.com/openshift/api/user/v1"
+	userclient "github.com/openshift/client-go/user/clientset/versioned/typed/user/v1"
 	authapi "github.com/openshift/origin/pkg/oauthserver/api"
 )
 
@@ -22,14 +26,18 @@ const (
 )
 
 type Authenticator struct {
-	store  Store
-	maxAge time.Duration
+	store            Store
+	maxAge           time.Duration
+	expiresIn        int64
+	identityMetadata userclient.IdentityMetadataInterface
 }
 
-func NewAuthenticator(store Store, maxAge time.Duration) *Authenticator {
+func NewAuthenticator(store Store, maxAge time.Duration, identityMetadata userclient.IdentityMetadataInterface) *Authenticator {
 	return &Authenticator{
-		store:  store,
-		maxAge: maxAge,
+		store:            store,
+		maxAge:           maxAge,
+		expiresIn:        int64(maxAge / time.Second),
+		identityMetadata: identityMetadata,
 	}
 }
 
@@ -68,27 +76,44 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		return u, true, nil
 	}
 
-	_ = identityMetadataName // get it
-	// TODO use identity metadata API client to store groups, needs to handle conflicts/already exists like provision.go
-	// ignore all errors probably
+	// fetch the referenced identity metadata object
+	metadata, err := a.identityMetadata.Get(identityMetadataName, metav1.GetOptions{})
+	if err != nil {
+		// if the object does not exist, it probably expired and was deleted, no need to fail
+		if errors.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
 
-	// use the identity metadata object that we reference
-	return authapi.NewDefaultUserIdentityMetadata(u, "idpName", []string{"idpGroups"}), true, nil
+	// use the data from the identity metadata object that we reference
+	return authapi.NewDefaultUserIdentityMetadata(u, metadata.ProviderName, metadata.ProviderGroups), true, nil
 }
 
 func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w http.ResponseWriter, req *http.Request) (bool, error) {
-	// assume no identity metadata by default
+	name := user.GetName()
+	uid := user.GetUID()
+
+	// assume we do not need to create an identity metadata by default
 	identityMetadata := ""
-	// check if we have optional identity metadata (for storing a reference to group information)
+	// check if we need to store group information
 	if userIdentityMetadata, ok := user.(authapi.UserIdentityMetadata); ok {
 		idpName := userIdentityMetadata.GetIdentityProviderName()
-		idpGroups := userIdentityMetadata.GetIdentityProviderGroups()
-		_ = idpName // create the object
-		_ = idpGroups
-		identityMetadata = "uuid"
+		metadata, err := a.identityMetadata.Create(&userv1.IdentityMetadata{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: idpName + ":" + name + ":" + uid, // let the server generate something unique
+			},
+			ProviderName:   idpName,
+			ProviderGroups: userIdentityMetadata.GetIdentityProviderGroups(),
+			ExpiresIn:      a.expiresIn,
+		})
+		if err != nil {
+			return false, err
+		}
+		identityMetadata = metadata.Name
 	}
 
-	return false, a.put(w, user.GetName(), user.GetUID(), identityMetadata, time.Now().Add(a.maxAge).Unix())
+	return false, a.put(w, name, uid, identityMetadata, time.Now().Add(a.maxAge).Unix())
 }
 
 func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, req *http.Request) error {

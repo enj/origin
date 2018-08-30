@@ -200,14 +200,14 @@ func (s *storage) convertToAuthorizeToken(data *osin.AuthorizeData) (*oauthapi.O
 		State:               data.State,
 	}
 	var err error
-	if token.UserName, token.UserUID, _, _, err = convertFromUser(data.UserData); err != nil { // TODO
+	if token.UserName, token.UserUID, token.ProviderName, token.ProviderGroups, err = convertFromUser(data.UserData); err != nil {
 		return nil, err
 	}
 	return token, nil
 }
 
 func (s *storage) convertFromAuthorizeToken(authorize *oauthapi.OAuthAuthorizeToken) (*osin.AuthorizeData, error) {
-	user, err := convertFromToken(authorize.UserName, authorize.UserUID, "", nil) // TODO
+	user, err := convertFromToken(authorize.UserName, authorize.UserUID, authorize.ProviderName, authorize.ProviderGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (s *storage) convertToAccessToken(data *osin.AccessData) (*oauthapi.OAuthAc
 		token.AuthorizeToken = data.AuthorizeData.Code
 	}
 	var err error
-	if token.UserName, token.UserUID, _, _, err = convertFromUser(data.UserData); err != nil { // TODO
+	if token.UserName, token.UserUID, token.ProviderName, token.ProviderGroups, err = convertFromUser(data.UserData); err != nil {
 		return nil, err
 	}
 
@@ -266,7 +266,7 @@ func (s *storage) convertToAccessToken(data *osin.AccessData) (*oauthapi.OAuthAc
 }
 
 func (s *storage) convertFromAccessToken(access *oauthapi.OAuthAccessToken) (*osin.AccessData, error) {
-	user, err := convertFromToken(access.UserName, access.UserUID, "", nil) // TODO
+	user, err := convertFromToken(access.UserName, access.UserUID, access.ProviderName, access.ProviderGroups)
 	if err != nil {
 		return nil, err
 	}
