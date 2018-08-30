@@ -41,9 +41,6 @@ func (a *tokenAuthenticator) AuthenticateToken(name string) (kuser.Info, bool, e
 		return nil, false, err
 	}
 
-	// TODO lookup identity metadata object here
-	// probably pass it to the validator to confirm user + UID matches
-
 	if err := a.validators.Validate(token, user); err != nil {
 		return nil, false, err
 	}
@@ -52,11 +49,14 @@ func (a *tokenAuthenticator) AuthenticateToken(name string) (kuser.Info, bool, e
 	if err != nil {
 		return nil, false, err
 	}
-	groupNames := make([]string, 0, len(groups)+len(user.Groups)) // TODO make this larger per identity metadata groups (after processing them)
+	groupNames := make([]string, 0, len(groups)+len(user.Groups)+len(token.ProviderGroups))
 	for _, group := range groups {
 		groupNames = append(groupNames, group.Name)
 	}
 	groupNames = append(groupNames, user.Groups...)
+	groupNames = append(groupNames, token.ProviderGroups...)
+	// TODO needs IDP prefixing, should move out the entire group logic from here
+	// TODO make this larger per identity metadata groups (after processing them)
 	// append identity metadata groups AFTER filtering them for :, adding IDP prefix, handling IDP mapping
 	// the processed group list can be cached since the object is immutable
 	// could be an index built on top of an informer that fallback to live lookups
