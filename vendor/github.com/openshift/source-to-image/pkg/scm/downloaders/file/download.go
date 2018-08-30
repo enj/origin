@@ -40,7 +40,6 @@ func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 		return nil, RecursiveCopyError{error: fmt.Errorf("recursive copy requested, source directory %q contains the target directory %q", copySrc, config.WorkingSourceDir)}
 	}
 	if copySrc != config.WorkingSourceDir {
-		f.KeepSymlinks(config.KeepSymlinks)
 		err := f.CopyContents(copySrc, config.WorkingSourceDir)
 		if err != nil {
 			return nil, err
