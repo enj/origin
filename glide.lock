@@ -1,5 +1,5 @@
 hash: 46c61dcb002e3c96c5ec4c41fa92d57d17649434d46379080474fd2b21b26324
-updated: 2018-08-30T15:17:40.90450984-04:00
+updated: 2018-08-30T16:54:47.307009225-04:00
 imports:
 - name: bitbucket.org/ww/goautoneg
   version: 75cd24fc2f2c2a2088577d12123ddee5f54e0675
@@ -819,7 +819,7 @@ imports:
   - go-selinux
   - go-selinux/label
 - name: github.com/openshift/api
-  version: 490adc47914f904e633ab13c6600dfa3455f48ec
+  version: bf8132bfff3dd0e618cd0c352c6aa8e5617dedb3
   repo: https://github.com/enj/api.git
   subpackages:
   - apps
@@ -858,7 +858,7 @@ imports:
   - webconsole
   - webconsole/v1
 - name: github.com/openshift/client-go
-  version: a22b159bf45abf57a619405b2e442af5d6f78906
+  version: a01e138b4d1853188c32bd2b82bdb8a69cb14baa
   repo: https://github.com/enj/client-go.git
   subpackages:
   - apps/clientset/versioned
@@ -999,7 +999,7 @@ imports:
   - pkg/controller/servingcert
   - pkg/controller/servingcert/cryptoextensions
 - name: github.com/openshift/source-to-image
-  version: d2e7686fb703feed3185da07f77aaafb4721459b
+  version: ac6dc9858fa90b751686436fea9a951f183c79bb
   subpackages:
   - pkg/api
   - pkg/api/constants

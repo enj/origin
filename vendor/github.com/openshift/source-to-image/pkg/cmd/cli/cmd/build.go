@@ -196,7 +196,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().StringVarP(&(cfg.AssembleUser), "assemble-user", "", "", "Specify the user to run assemble with")
 	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
 	buildCmd.Flags().StringVarP(&(cfg.ExcludeRegExp), "exclude", "", tar.DefaultExclusionPattern.String(), "Regular expression for selecting files from the source tree to exclude from the build, where the default excludes the '.git' directory (see https://golang.org/pkg/regexp for syntax, but note that \"\" will be interpreted as allow all files and exclude no files)")
-	buildCmd.Flags().StringVar(&(cfg.ImageScriptsDir), "image-scripts-dir", "/usr/libexec/s2i", "Specify the absolute path of the directory containing the assemble and run scripts within the builder image")
+	buildCmd.Flags().StringVar(&(cfg.ImageScriptsURL), "image-scripts-url", "image:///usr/libexec/s2i", "Specify a URL containing the default assemble and run scripts for the builder image")
 	buildCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble, assemble-runtime and run scripts")
 	buildCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "DEPRECATED: Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .s2ifile")
@@ -214,5 +214,6 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().VarP(&(cfg.RuntimeArtifacts), "runtime-artifact", "a", "Specify a file or directory to be copied from the builder to the runtime image")
 	buildCmd.Flags().StringVar(&(networkMode), "network", "", "Specify the default Docker Network name to be used in build process")
 	buildCmd.Flags().StringVarP(&(cfg.AsDockerfile), "as-dockerfile", "", "", "EXPERIMENTAL: Output a Dockerfile to this path instead of building a new image")
+	buildCmd.Flags().BoolVarP(&(cfg.KeepSymlinks), "keep-symlinks", "", false, "When using '--copy', copy symlinks as symlinks. Default behavior is to follow symlinks and copy files by content")
 	return buildCmd
 }
