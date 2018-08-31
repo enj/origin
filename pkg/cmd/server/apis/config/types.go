@@ -926,7 +926,6 @@ type IdentityProvider struct {
 	Provider runtime.Object
 	// GroupsPrefix is prepended to all groups asserted by this provider.
 	// If unspecified, defaults to the provider name + ":"
-	// TODO validation disallow system: as a prefix
 	GroupsPrefix *string
 }
 
