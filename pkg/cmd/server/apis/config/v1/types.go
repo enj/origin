@@ -852,7 +852,7 @@ type IdentityProvider struct {
 	Provider runtime.RawExtension `json:"provider"`
 	// GroupsPrefix is prepended to all groups asserted by this provider.
 	// If unspecified, defaults to the provider name + ":"
-	GroupsPrefix *string `json:"groupsPrefix,omitempty"`
+	GroupsPrefix *string `json:"groupsPrefix"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
