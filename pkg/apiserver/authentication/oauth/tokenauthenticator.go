@@ -17,11 +17,11 @@ var errLookup = errors.New("token lookup failed")
 type tokenAuthenticator struct {
 	tokens      oauthclient.OAuthAccessTokenInterface
 	users       userclient.UserInterface
-	groupMapper UserToGroupMapper
+	groupMapper GroupMapper
 	validators  OAuthTokenValidator
 }
 
-func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper UserToGroupMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
+func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper GroupMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
 	return &tokenAuthenticator{
 		tokens:      tokens,
 		users:       users,
@@ -45,26 +45,15 @@ func (a *tokenAuthenticator) AuthenticateToken(name string) (kuser.Info, bool, e
 		return nil, false, err
 	}
 
-	groups, err := a.groupMapper.GroupsFor(user.Name)
+	groups, err := a.groupMapper.GroupsFor(token, user)
 	if err != nil {
 		return nil, false, err
 	}
-	groupNames := make([]string, 0, len(groups)+len(user.Groups)+len(token.ProviderGroups))
-	for _, group := range groups {
-		groupNames = append(groupNames, group.Name)
-	}
-	groupNames = append(groupNames, user.Groups...)
-	groupNames = append(groupNames, token.ProviderGroups...)
-	// TODO needs IDP prefixing, should move out the entire group logic from here
-	// TODO make this larger per identity metadata groups (after processing them)
-	// append identity metadata groups AFTER filtering them for :, adding IDP prefix, handling IDP mapping
-	// the processed group list can be cached since the object is immutable
-	// could be an index built on top of an informer that fallback to live lookups
 
 	return &kuser.DefaultInfo{
 		Name:   user.Name,
 		UID:    string(user.UID),
-		Groups: groupNames,
+		Groups: groups,
 		Extra: map[string][]string{
 			authorizationapi.ScopesKey: token.Scopes,
 		},

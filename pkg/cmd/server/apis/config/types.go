@@ -924,6 +924,10 @@ type IdentityProvider struct {
 	MappingMethod string
 	// Provider contains the information about how to set up a specific identity provider
 	Provider runtime.Object
+	// GroupsPrefix is prepended to all groups asserted by this provider.
+	// If unspecified, defaults to the provider name + ":"
+	// TODO validation disallow system: as a prefix
+	GroupsPrefix *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -214,14 +214,8 @@ func ValidateIdentityMetadata(metadata *userapi.IdentityMetadata) field.ErrorLis
 		allErrs = append(allErrs, field.Invalid(providerNamePath, metadata.ProviderName, strings.Join(reasons, ", ")))
 	}
 
-	providerGroupsPath := field.NewPath("providerGroups")
 	if len(metadata.ProviderGroups) == 0 {
-		allErrs = append(allErrs, field.Required(providerGroupsPath, ""))
-	}
-	for i, group := range metadata.ProviderGroups {
-		if len(group) == 0 {
-			allErrs = append(allErrs, field.Required(providerGroupsPath.Index(i), "every specified group must not be empty"))
-		}
+		allErrs = append(allErrs, field.Required(field.NewPath("providerGroups"), ""))
 	}
 
 	if metadata.ExpiresIn <= 0 {
