@@ -211,13 +211,27 @@ func ValidateIdentityProvider(identityProvider configapi.IdentityProvider, fldPa
 		}
 	}
 
+	validationResults.AddErrors(ValidateGroupsPrefix(identityProvider, fldPath)...)
+
+	return validationResults
+}
+
+func ValidateGroupsPrefix(identityProvider configapi.IdentityProvider, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
 	if groupsPrefix := identityProvider.GroupsPrefix; groupsPrefix != nil {
-		if strings.HasPrefix(*groupsPrefix, "system:") { // TODO is there anything else we need to prevent?
-			validationResults.AddErrors(field.Invalid(fldPath.Child("groupsPrefix"), *groupsPrefix, "must not start with system:"))
+		groupsPrefixPath := fldPath.Child("groupsPrefix")
+		groupsPrefixValue := *groupsPrefix
+
+		if strings.HasPrefix(groupsPrefixValue, "system:") { // TODO is there anything else we need to prevent?
+			allErrs = append(allErrs, field.Invalid(groupsPrefixPath, groupsPrefixValue, "must not start with system:"))
+		}
+		if !configapi.IsGroupsIdentityProvider(identityProvider.Provider) {
+			allErrs = append(allErrs, field.Invalid(groupsPrefixPath, groupsPrefixValue, fmt.Sprintf("%T does not support groups", identityProvider.Provider)))
 		}
 	}
 
-	return validationResults
+	return allErrs
 }
 
 func ValidateLDAPIdentityProvider(provider *configapi.LDAPPasswordIdentityProvider, fldPath *field.Path) common.ValidationResults {
