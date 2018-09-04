@@ -17,11 +17,11 @@ var errLookup = errors.New("token lookup failed")
 type tokenAuthenticator struct {
 	tokens      oauthclient.OAuthAccessTokenInterface
 	users       userclient.UserInterface
-	groupMapper UserToGroupMapper
+	groupMapper GroupMapper
 	validators  OAuthTokenValidator
 }
 
-func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper UserToGroupMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
+func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper GroupMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
 	return &tokenAuthenticator{
 		tokens:      tokens,
 		users:       users,
@@ -45,20 +45,15 @@ func (a *tokenAuthenticator) AuthenticateToken(name string) (kuser.Info, bool, e
 		return nil, false, err
 	}
 
-	groups, err := a.groupMapper.GroupsFor(user.Name)
+	groups, err := a.groupMapper.GroupsFor(token, user)
 	if err != nil {
 		return nil, false, err
 	}
-	groupNames := make([]string, 0, len(groups)+len(user.Groups))
-	for _, group := range groups {
-		groupNames = append(groupNames, group.Name)
-	}
-	groupNames = append(groupNames, user.Groups...)
 
 	return &kuser.DefaultInfo{
 		Name:   user.Name,
 		UID:    string(user.UID),
-		Groups: groupNames,
+		Groups: groups,
 		Extra: map[string][]string{
 			authorizationapi.ScopesKey: token.Scopes,
 		},
