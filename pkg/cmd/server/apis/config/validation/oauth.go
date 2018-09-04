@@ -211,24 +211,16 @@ func ValidateIdentityProvider(identityProvider configapi.IdentityProvider, fldPa
 		}
 	}
 
-	validationResults.AddErrors(ValidateGroupsPrefix(identityProvider, fldPath)...)
+	validationResults.AddErrors(ValidateLocalGroups(identityProvider, fldPath)...)
 
 	return validationResults
 }
 
-func ValidateGroupsPrefix(identityProvider configapi.IdentityProvider, fldPath *field.Path) field.ErrorList {
+func ValidateLocalGroups(identityProvider configapi.IdentityProvider, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if groupsPrefix := identityProvider.GroupsPrefix; groupsPrefix != nil {
-		groupsPrefixPath := fldPath.Child("groupsPrefix")
-		groupsPrefixValue := *groupsPrefix
-
-		if strings.HasPrefix(groupsPrefixValue, "system:") { // TODO is there anything else we need to prevent?
-			allErrs = append(allErrs, field.Invalid(groupsPrefixPath, groupsPrefixValue, "must not start with system:"))
-		}
-		if !configapi.IsGroupsIdentityProvider(identityProvider.Provider) {
-			allErrs = append(allErrs, field.Invalid(groupsPrefixPath, groupsPrefixValue, fmt.Sprintf("%T does not support groups", identityProvider.Provider)))
-		}
+	if identityProvider.LocalGroups && !configapi.IsGroupsIdentityProvider(identityProvider.Provider) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("localGroups"), identityProvider.LocalGroups, fmt.Sprintf("%T does not support groups", identityProvider.Provider)))
 	}
 
 	return allErrs

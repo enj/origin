@@ -1,6 +1,8 @@
 package oauth
 
 import (
+	"fmt"
+
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	userapi "github.com/openshift/api/user/v1"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config"
@@ -11,8 +13,14 @@ import (
 func NewGroupMapper(groupCache *usercache.GroupCache, identityProviders []config.IdentityProvider) GroupMapper {
 	idpGroupsPrefix := map[string]string{}
 	for _, identityProvider := range identityProviders {
-		if groupsPrefix := identityProvider.GroupsPrefix; groupsPrefix != nil {
-			idpGroupsPrefix[identityProvider.Name] = *groupsPrefix
+		providerName := identityProvider.Name
+		if identityProvider.LocalGroups {
+			idpGroupsPrefix[providerName] = "" // no prefix since we are told not to "scope" these groups
+		} else {
+			// build a prefix based on the name of the IDP (IDP names are unique)
+			// we use a / so that we are guaranteed to never conflict with builtin
+			// groups like system:masters and group+user API objects
+			idpGroupsPrefix[providerName] = providerName + "/"
 		}
 	}
 	return &groupMapper{
@@ -27,6 +35,13 @@ type groupMapper struct {
 }
 
 func (g *groupMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.User) ([]string, error) {
+	// groups from the token have an optional prefix so that groups from different IDPs can be distinguished
+	prefix, err := g.getPrefix(token)
+	if err != nil {
+		// this should only ever error if someone changes the name of an IDP, which breaks all associated identities+users
+		return nil, err
+	}
+
 	groups, err := g.groupCache.GroupsFor(user.Name)
 	if err != nil {
 		// this should only ever error if the index is not set up correctly (which means someone broke the wiring of the server)
@@ -45,8 +60,6 @@ func (g *groupMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.U
 	// thus we need to drop invalid groups here
 	// since we do not drop any group data that we receive from the IDP,
 	// we could relax our requirements here if needed in the future
-	// these groups also have an optional prefix to allow easily distinguishing groups from different IDPs
-	prefix := g.getPrefix(token)
 	for _, group := range token.ProviderGroups {
 		// TODO possibly support mappings:
 		// map group -> other group name based on some configuration
@@ -61,21 +74,17 @@ func (g *groupMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.U
 	return groupNames, nil
 }
 
-func (g *groupMapper) getPrefix(token *oauthv1.OAuthAccessToken) string {
+func (g *groupMapper) getPrefix(token *oauthv1.OAuthAccessToken) (string, error) {
 	providerName := token.ProviderName
 	prefix, ok := g.idpGroupsPrefix[providerName]
 	if !ok {
-		// if there is no provider specific override, we provide a default one.
-		// we do the defaulting here instead of NewGroupMapper since the IDP config
-		// is not guaranteed to be consistent over the lifetime of a token.
-		// we use a / so that we are guaranteed to never conflict with builtin
-		// groups like system:masters and group+user API objects
-		return providerName + "/"
+		// do not leak any information about the token's metadata.name field
+		return "", fmt.Errorf("token for user %q has unknown provider %q", token.UserName, providerName)
 	}
-	return prefix
+	return prefix, nil
 }
 
 func isValidGroupName(name string) bool {
-	// TODO probably need to copy the validation logic here
+	// TODO we may need to copy the validation logic here based on import restrictions
 	return len(name) > 0 && len(validation.ValidateGroupName(name, false)) == 0
 }

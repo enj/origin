@@ -850,9 +850,10 @@ type IdentityProvider struct {
 	MappingMethod string `json:"mappingMethod"`
 	// Provider contains the information about how to set up a specific identity provider
 	Provider runtime.RawExtension `json:"provider"`
-	// GroupsPrefix is prepended to all groups asserted by this provider.
-	// If unspecified, defaults to the provider name + ":"
-	GroupsPrefix *string `json:"groupsPrefix"`
+	// LocalGroups determines if groups asserted by this provider should be prepended.
+	// If false, all groups asserted by this provider are prepended with the provider's name + "/"
+	// If true, all valid groups are used as-is without any modification.
+	LocalGroups bool `json:"localGroups"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
