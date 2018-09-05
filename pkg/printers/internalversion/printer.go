@@ -57,6 +57,7 @@ var (
 
 	userColumns                = []string{"NAME", "UID", "FULL NAME", "IDENTITIES"}
 	identityColumns            = []string{"NAME", "IDP NAME", "IDP USER NAME", "USER NAME", "USER UID"}
+	identityMetadataColumns    = []string{"NAME", "IDP NAME", "IDP GROUPS", "EXPIRES"}
 	userIdentityMappingColumns = []string{"NAME", "IDENTITY", "USER NAME", "USER UID"}
 	groupColumns               = []string{"NAME", "USERS"}
 
@@ -135,6 +136,8 @@ func AddHandlers(p kprinters.PrintHandler) {
 	p.Handler(userColumns, nil, printUserList)
 	p.Handler(identityColumns, nil, printIdentity)
 	p.Handler(identityColumns, nil, printIdentityList)
+	p.Handler(identityMetadataColumns, nil, printIdentityMetadata)
+	p.Handler(identityMetadataColumns, nil, printIdentityMetadataList)
 	p.Handler(userIdentityMappingColumns, nil, printUserIdentityMapping)
 	p.Handler(groupColumns, nil, printGroup)
 	p.Handler(groupColumns, nil, printGroupList)
@@ -908,10 +911,7 @@ func printOAuthClientAuthorizationList(list *oauthapi.OAuthClientAuthorizationLi
 func printOAuthAccessToken(token *oauthapi.OAuthAccessToken, w io.Writer, opts kprinters.PrintOptions) error {
 	name := formatResourceName(opts.Kind, token.Name, opts.WithKind)
 	created := token.CreationTimestamp
-	expires := "never"
-	if token.ExpiresIn > 0 {
-		expires = created.Add(time.Duration(token.ExpiresIn) * time.Second).String()
-	}
+	expires := expiresStr(created, token.ExpiresIn)
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", name, token.UserName, token.ClientName, created, expires, token.RedirectURI, strings.Join(token.Scopes, ","))
 	return err
 }
@@ -928,7 +928,7 @@ func printOAuthAccessTokenList(list *oauthapi.OAuthAccessTokenList, w io.Writer,
 func printOAuthAuthorizeToken(token *oauthapi.OAuthAuthorizeToken, w io.Writer, opts kprinters.PrintOptions) error {
 	name := formatResourceName(opts.Kind, token.Name, opts.WithKind)
 	created := token.CreationTimestamp
-	expires := created.Add(time.Duration(token.ExpiresIn) * time.Second)
+	expires := expiresStr(created, token.ExpiresIn)
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", name, token.UserName, token.ClientName, created, expires, token.RedirectURI, strings.Join(token.Scopes, ","))
 	return err
 }
@@ -971,6 +971,23 @@ func printIdentity(identity *userapi.Identity, w io.Writer, opts kprinters.Print
 func printIdentityList(list *userapi.IdentityList, w io.Writer, opts kprinters.PrintOptions) error {
 	for _, item := range list.Items {
 		if err := printIdentity(&item, w, opts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printIdentityMetadata(metadata *userapi.IdentityMetadata, w io.Writer, opts kprinters.PrintOptions) error {
+	name := formatResourceName(opts.Kind, metadata.Name, opts.WithKind)
+	created := metadata.CreationTimestamp
+	expires := expiresStr(created, metadata.ExpiresIn)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, metadata.ProviderName, metadata.ProviderGroups, expires)
+	return err
+}
+
+func printIdentityMetadataList(list *userapi.IdentityMetadataList, w io.Writer, opts kprinters.PrintOptions) error {
+	for _, item := range list.Items {
+		if err := printIdentityMetadata(&item, w, opts); err != nil {
 			return err
 		}
 	}
@@ -1266,4 +1283,11 @@ func printSecurityContextConstraintsList(list *securityapi.SecurityContextConstr
 	}
 
 	return nil
+}
+
+func expiresStr(created metav1.Time, expiresIn int64) string {
+	if expiresIn <= 0 {
+		return "never"
+	}
+	return created.Add(time.Duration(expiresIn) * time.Second).String()
 }
