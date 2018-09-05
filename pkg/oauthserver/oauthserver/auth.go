@@ -644,6 +644,7 @@ func (c *OAuthServerConfig) getAuthenticationRequestHandler() (authenticator.Req
 					NameHeaders:              provider.NameHeaders,
 					EmailHeaders:             provider.EmailHeaders,
 					PreferredUsernameHeaders: provider.PreferredUsernameHeaders,
+					GroupsHeaders:            provider.GroupsHeaders,
 				}
 				authRequestHandler = headerrequest.NewAuthenticator(identityProvider.Name, authRequestConfig, identityMapper)
 
