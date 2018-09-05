@@ -2204,6 +2204,11 @@ func (in *RequestHeaderIdentityProvider) DeepCopyInto(out *RequestHeaderIdentity
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.GroupsHeaders != nil {
+		in, out := &in.GroupsHeaders, &out.GroupsHeaders
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
