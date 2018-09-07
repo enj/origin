@@ -115,11 +115,11 @@ func NewProvider(providerName string, transport http.RoundTripper, config Config
 	allClaims.Insert(config.NameClaims...)
 	allClaims.Insert(config.GroupsClaims...)
 
-	return provider{providerName: providerName, transport: transport, allClaims: allClaims, Config: config}, nil
+	return &provider{providerName: providerName, transport: transport, allClaims: allClaims, Config: config}, nil
 }
 
 // NewConfig implements external/interfaces/Provider.NewConfig
-func (p provider) NewConfig() (*osincli.ClientConfig, error) {
+func (p *provider) NewConfig() (*osincli.ClientConfig, error) {
 	config := &osincli.ClientConfig{
 		ClientId:                 p.ClientID,
 		ClientSecret:             p.ClientSecret,
@@ -132,19 +132,19 @@ func (p provider) NewConfig() (*osincli.ClientConfig, error) {
 	return config, nil
 }
 
-func (p provider) GetTransport() (http.RoundTripper, error) {
+func (p *provider) GetTransport() (http.RoundTripper, error) {
 	return p.transport, nil
 }
 
 // AddCustomParameters implements external/interfaces/Provider.AddCustomParameters
-func (p provider) AddCustomParameters(req *osincli.AuthorizeRequest) {
+func (p *provider) AddCustomParameters(req *osincli.AuthorizeRequest) {
 	for k, v := range p.ExtraAuthorizeParameters {
 		req.CustomParameters[k] = v
 	}
 }
 
 // GetUserIdentity implements external/interfaces/Provider.GetUserIdentity
-func (p provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentityInfo, bool, error) {
+func (p *provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentityInfo, bool, error) {
 	// Token response MUST include id_token
 	// http://openid.net/specs/openid-connect-core-1_0.html#TokenResponse
 	idToken, ok := getClaimValue(data.ResponseData, "id_token")
@@ -153,7 +153,7 @@ func (p provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentit
 	}
 
 	// id_token MUST be a valid JWT
-	idTokenClaims, err := decodeJWT(idToken, p.allClaims, p.transport)
+	idTokenClaims, err := p.decodeJWT(idToken, false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -179,7 +179,7 @@ func (p provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentit
 
 	// If we have a userinfo URL, use it to get more detailed claims
 	if len(p.UserInfoURL) != 0 {
-		userInfoClaims, err := fetchUserInfo(p.UserInfoURL, data.AccessToken, p.transport, p.allClaims)
+		userInfoClaims, err := p.fetchUserInfo(p.UserInfoURL, data.AccessToken)
 		if err != nil {
 			return nil, false, err
 		}
@@ -272,17 +272,17 @@ func appendIfNonEmpty(in []string, s string) []string {
 }
 
 // fetch and decode JSON from the given UserInfo URL
-func fetchUserInfo(url, accessToken string, transport http.RoundTripper, names sets.String) (map[string]interface{}, error) {
+func (p *provider) fetchUserInfo(url, accessToken string) (map[string]interface{}, error) {
 	// The UserInfo Claims MUST be returned as the members of a JSON object
 	// http://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
-	data, err := fetchURL(url, accessToken, transport)
+	data, err := p.fetchURL(url, accessToken)
 	if err != nil {
 		return nil, err
 	}
-	return getClaims(data, names, transport)
+	return p.getClaims(data, false)
 }
 
-func fetchURL(url, accessToken string, transport http.RoundTripper) ([]byte, error) {
+func (p *provider) fetchURL(url, accessToken string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -292,7 +292,7 @@ func fetchURL(url, accessToken string, transport http.RoundTripper) ([]byte, err
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	}
 
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: p.transport}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -308,7 +308,7 @@ func fetchURL(url, accessToken string, transport http.RoundTripper) ([]byte, err
 
 // Decode JWT
 // https://tools.ietf.org/html/rfc7519
-func decodeJWT(jwt string, names sets.String, transport http.RoundTripper) (map[string]interface{}, error) {
+func (p *provider) decodeJWT(jwt string, isEndpointJWT bool) (map[string]interface{}, error) {
 	jwtParts := strings.Split(jwt, ".")
 	if len(jwtParts) != 3 {
 		return nil, fmt.Errorf("invalid JSON Web Token: expected 3 parts, got %d", len(jwtParts))
@@ -327,10 +327,10 @@ func decodeJWT(jwt string, names sets.String, transport http.RoundTripper) (map[
 	}
 
 	// Parse JSON
-	return getClaims(decodedPayload, names, transport)
+	return p.getClaims(decodedPayload, isEndpointJWT)
 }
 
-func getClaims(data []byte, names sets.String, transport http.RoundTripper) (map[string]interface{}, error) {
+func (p *provider) getClaims(data []byte, isEndpointJWT bool) (map[string]interface{}, error) {
 	// data can contain secret information such as access tokens so make sure not to log it or include it in errors
 
 	var claims map[string]interface{}
@@ -338,8 +338,8 @@ func getClaims(data []byte, names sets.String, transport http.RoundTripper) (map
 		return nil, fmt.Errorf("error parsing standard claims: %v", err)
 	}
 
-	if _, ok := claims[claimNamesKey]; !ok || len(names) == 0 || transport == nil {
-		// no distributed claims
+	if _, ok := claims[claimNamesKey]; !ok || isEndpointJWT {
+		// no distributed claims or recursive call from fetchEndpoint
 		return claims, nil
 	}
 
@@ -356,7 +356,7 @@ func getClaims(data []byte, names sets.String, transport http.RoundTripper) (map
 		for name, src := range distClaims.Names {
 			// only make network calls for distributed claims we may care about
 			// and only fetch each source once
-			if names.Has(name) && !completedSources.Has(src) {
+			if p.allClaims.Has(name) && !completedSources.Has(src) {
 				ep, ok := distClaims.Sources[src]
 				if !ok {
 					// malformed distributed claim
@@ -367,7 +367,7 @@ func getClaims(data []byte, names sets.String, transport http.RoundTripper) (map
 					// ignore possibly aggregated claim
 					continue
 				}
-				srcClaims, err := fetchEndpoint(ep, transport)
+				srcClaims, err := p.fetchEndpoint(ep)
 				if err != nil {
 					glog.V(4).Infof("failed to fetch endpoint for claim %q with source %q: %v", name, src, err)
 					continue
@@ -384,15 +384,15 @@ func getClaims(data []byte, names sets.String, transport http.RoundTripper) (map
 	return claims, nil
 }
 
-func fetchEndpoint(ep endpoint, transport http.RoundTripper) (map[string]interface{}, error) {
-	jwtBytes, err := fetchURL(ep.URL, ep.AccessToken, transport)
+func (p *provider) fetchEndpoint(ep endpoint) (map[string]interface{}, error) {
+	jwtBytes, err := p.fetchURL(ep.URL, ep.AccessToken)
 	if err != nil {
 		return nil, err
 	}
-	// passing in nils here means just get the claims out of the JWT
+	// passing true for isEndpointJWT means just get the claims out of the JWT
 	// i.e. do not attempt to fetch any distributed claims or otherwise make network calls
 	// this prevents infinite recursion via decodeJWT -> getClaims -> fetchEndpoint -> decodeJWT
-	return decodeJWT(string(jwtBytes), nil, nil)
+	return p.decodeJWT(string(jwtBytes), true)
 }
 
 type distributedClaims struct {
