@@ -348,31 +348,38 @@ func getClaims(data []byte, names sets.String, transport http.RoundTripper) (map
 		return nil, fmt.Errorf("error parsing distributed claims: %v", err)
 	}
 
-	completedSources := sets.NewString()
-	for name, src := range distClaims.Names {
-		// only make network calls for distributed claims we may care about
-		// and only fetch each source once
-		if names.Has(name) && !completedSources.Has(src) {
-			ep, ok := distClaims.Sources[src]
-			if !ok {
-				// malformed distributed claim
-				return nil, fmt.Errorf("_claim_names %s contained a source %s not in _claims_sources", name, src)
+	// fetching distributed claims is not allowed to fail
+	// enforce that behavior by wrapping the logic in a func
+	// this is required so that we can work with broken OIDC implementations like Azure
+	func() {
+		completedSources := sets.NewString()
+		for name, src := range distClaims.Names {
+			// only make network calls for distributed claims we may care about
+			// and only fetch each source once
+			if names.Has(name) && !completedSources.Has(src) {
+				ep, ok := distClaims.Sources[src]
+				if !ok {
+					// malformed distributed claim
+					glog.V(4).Infof("_claim_names %q contained a source %q not in _claims_sources", name, src)
+					continue
+				}
+				if len(ep.URL) == 0 {
+					// ignore possibly aggregated claim
+					continue
+				}
+				srcClaims, err := fetchEndpoint(ep, transport)
+				if err != nil {
+					glog.V(4).Infof("failed to fetch endpoint for claim %q with source %q: %v", name, src, err)
+					continue
+				}
+				// merge new distributed claims
+				for k, v := range srcClaims {
+					claims[k] = v
+				}
+				completedSources.Insert(src)
 			}
-			if len(ep.URL) == 0 {
-				// ignore possibly aggregated claim
-				continue
-			}
-			srcClaims, err := fetchEndpoint(ep, transport)
-			if err != nil {
-				return nil, err
-			}
-			// merge new distributed claims
-			for k, v := range srcClaims {
-				claims[k] = v
-			}
-			completedSources.Insert(src)
 		}
-	}
+	}()
 
 	return claims, nil
 }
