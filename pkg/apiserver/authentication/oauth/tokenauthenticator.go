@@ -15,18 +15,18 @@ import (
 var errLookup = errors.New("token lookup failed")
 
 type tokenAuthenticator struct {
-	tokens      oauthclient.OAuthAccessTokenInterface
-	users       userclient.UserInterface
-	groupMapper GroupsMapper
-	validators  OAuthTokenValidator
+	tokens       oauthclient.OAuthAccessTokenInterface
+	users        userclient.UserInterface
+	groupsMapper GroupsMapper
+	validators   OAuthTokenValidator
 }
 
-func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper GroupsMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
+func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupsMapper GroupsMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
 	return &tokenAuthenticator{
-		tokens:      tokens,
-		users:       users,
-		groupMapper: groupMapper,
-		validators:  OAuthTokenValidators(validators),
+		tokens:       tokens,
+		users:        users,
+		groupsMapper: groupsMapper,
+		validators:   OAuthTokenValidators(validators),
 	}
 }
 
@@ -45,7 +45,7 @@ func (a *tokenAuthenticator) AuthenticateToken(name string) (kuser.Info, bool, e
 		return nil, false, err
 	}
 
-	groups, err := a.groupMapper.GroupsFor(token, user)
+	groups, err := a.groupsMapper.GroupsFor(token, user)
 	if err != nil {
 		return nil, false, err
 	}
