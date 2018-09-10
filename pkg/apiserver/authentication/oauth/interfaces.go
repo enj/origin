@@ -30,6 +30,6 @@ func (v OAuthTokenValidators) Validate(token *oauthv1.OAuthAccessToken, user *us
 	return nil
 }
 
-type GroupMapper interface {
+type GroupsMapper interface {
 	GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.User) (groups []string, err error)
 }

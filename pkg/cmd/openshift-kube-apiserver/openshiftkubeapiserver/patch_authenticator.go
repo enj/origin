@@ -115,8 +115,8 @@ func newAuthenticator(serviceAccountPublicKeyFiles []string, oauthConfig *config
 				return nil
 			}
 		}
-		groupMapper := oauth.NewGroupMapper(groupCache, oauthConfig.IdentityProviders)
-		oauthTokenAuthenticator := oauth.NewTokenAuthenticator(accessTokenGetter, userGetter, groupMapper, validators...)
+		groupsMapper := oauth.NewGroupsMapper(groupCache, oauthConfig.IdentityProviders)
+		oauthTokenAuthenticator := oauth.NewTokenAuthenticator(accessTokenGetter, userGetter, groupsMapper, validators...)
 		tokenAuthenticators = append(tokenAuthenticators,
 			// if you have an OAuth bearer token, you're a human (usually)
 			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}))

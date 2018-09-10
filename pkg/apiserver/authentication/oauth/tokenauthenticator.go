@@ -17,11 +17,11 @@ var errLookup = errors.New("token lookup failed")
 type tokenAuthenticator struct {
 	tokens      oauthclient.OAuthAccessTokenInterface
 	users       userclient.UserInterface
-	groupMapper GroupMapper
+	groupMapper GroupsMapper
 	validators  OAuthTokenValidator
 }
 
-func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper GroupMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
+func NewTokenAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, users userclient.UserInterface, groupMapper GroupsMapper, validators ...OAuthTokenValidator) kauthenticator.Token {
 	return &tokenAuthenticator{
 		tokens:      tokens,
 		users:       users,

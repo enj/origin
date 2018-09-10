@@ -10,7 +10,7 @@ import (
 	usercache "github.com/openshift/origin/pkg/user/cache"
 )
 
-func NewGroupMapper(groupCache *usercache.GroupCache, identityProviders []config.IdentityProvider) GroupMapper {
+func NewGroupsMapper(groupCache *usercache.GroupCache, identityProviders []config.IdentityProvider) GroupsMapper {
 	idpGroupsPrefix := map[string]string{
 		"": "", // prevents having to special case tokens that have no groups (and thus no provider name / prefix)
 	}
@@ -25,18 +25,18 @@ func NewGroupMapper(groupCache *usercache.GroupCache, identityProviders []config
 			idpGroupsPrefix[providerName] = providerName + "/"
 		}
 	}
-	return &groupMapper{
+	return &groupsMapper{
 		groupCache:      groupCache,
 		idpGroupsPrefix: idpGroupsPrefix,
 	}
 }
 
-type groupMapper struct {
+type groupsMapper struct {
 	idpGroupsPrefix map[string]string // IDP Name -> group prefix
 	groupCache      *usercache.GroupCache
 }
 
-func (g *groupMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.User) ([]string, error) {
+func (g *groupsMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.User) ([]string, error) {
 	// groups from the token have an optional prefix so that groups from different IDPs can be distinguished
 	prefix, err := g.getPrefix(token)
 	if err != nil {
@@ -76,7 +76,7 @@ func (g *groupMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.U
 	return groupNames, nil
 }
 
-func (g *groupMapper) getPrefix(token *oauthv1.OAuthAccessToken) (string, error) {
+func (g *groupsMapper) getPrefix(token *oauthv1.OAuthAccessToken) (string, error) {
 	providerName := token.ProviderName
 	prefix, ok := g.idpGroupsPrefix[providerName]
 	if !ok {

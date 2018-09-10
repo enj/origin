@@ -12,9 +12,9 @@ import (
 	userfake "github.com/openshift/client-go/user/clientset/versioned/fake"
 )
 
-type noopGroupMapper struct{}
+type noopGroupsMapper struct{}
 
-func (n noopGroupMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.User) ([]string, error) {
+func (n noopGroupsMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.User) ([]string, error) {
 	return nil, nil
 }
 
@@ -35,7 +35,7 @@ func TestAuthenticateTokenExpired(t *testing.T) {
 	)
 	fakeUserClient := userfake.NewSimpleClientset(&userapi.User{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "bar"}})
 
-	tokenAuthenticator := NewTokenAuthenticator(fakeOAuthClient.Oauth().OAuthAccessTokens(), fakeUserClient.UserV1().Users(), noopGroupMapper{}, NewExpirationValidator())
+	tokenAuthenticator := NewTokenAuthenticator(fakeOAuthClient.Oauth().OAuthAccessTokens(), fakeUserClient.UserV1().Users(), noopGroupsMapper{}, NewExpirationValidator())
 
 	for _, tokenName := range []string{"token1", "token2"} {
 		userInfo, found, err := tokenAuthenticator.AuthenticateToken(tokenName)
@@ -62,7 +62,7 @@ func TestAuthenticateTokenValidated(t *testing.T) {
 	)
 	fakeUserClient := userfake.NewSimpleClientset(&userapi.User{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "bar"}})
 
-	tokenAuthenticator := NewTokenAuthenticator(fakeOAuthClient.Oauth().OAuthAccessTokens(), fakeUserClient.UserV1().Users(), noopGroupMapper{}, NewExpirationValidator(), NewUIDValidator())
+	tokenAuthenticator := NewTokenAuthenticator(fakeOAuthClient.Oauth().OAuthAccessTokens(), fakeUserClient.UserV1().Users(), noopGroupsMapper{}, NewExpirationValidator(), NewUIDValidator())
 
 	userInfo, found, err := tokenAuthenticator.AuthenticateToken("token")
 	if !found {
