@@ -19,46 +19,46 @@ type strategy struct {
 	names.NameGenerator
 }
 
-var Strategy = strategy{ObjectTyper: legacyscheme.Scheme, NameGenerator: names.SimpleNameGenerator}
+var Strategy = &strategy{ObjectTyper: legacyscheme.Scheme, NameGenerator: names.SimpleNameGenerator}
 
-var _ rest.GarbageCollectionDeleteStrategy = strategy{}
+var _ rest.GarbageCollectionDeleteStrategy = &strategy{}
 
-func (strategy) DefaultGarbageCollectionPolicy(_ context.Context) rest.GarbageCollectionPolicy {
+func (*strategy) DefaultGarbageCollectionPolicy(_ context.Context) rest.GarbageCollectionPolicy {
 	return rest.Unsupported
 }
 
-func (strategy) NamespaceScoped() bool {
+func (*strategy) NamespaceScoped() bool {
 	return false
 }
 
-func (strategy) PrepareForCreate(_ context.Context, obj runtime.Object) {
+func (*strategy) PrepareForCreate(_ context.Context, obj runtime.Object) {
 	_ = obj.(*userapi.IdentityMetadata)
 }
 
-func (strategy) PrepareForUpdate(_ context.Context, obj, old runtime.Object) {
+func (*strategy) PrepareForUpdate(_ context.Context, obj, old runtime.Object) {
 	_ = obj.(*userapi.IdentityMetadata)
 	_ = old.(*userapi.IdentityMetadata)
 }
 
-func (strategy) Canonicalize(obj runtime.Object) {
+func (*strategy) Canonicalize(obj runtime.Object) {
 	metadata := obj.(*userapi.IdentityMetadata)
 	// sort and deduplicate
 	// this runs after validation so that error messages line up with the original data
 	metadata.ProviderGroups = sets.NewString(metadata.ProviderGroups...).List()
 }
 
-func (strategy) AllowCreateOnUpdate() bool {
+func (*strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) AllowUnconditionalUpdate() bool {
+func (*strategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
-func (strategy) Validate(_ context.Context, obj runtime.Object) field.ErrorList {
+func (*strategy) Validate(_ context.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateIdentityMetadata(obj.(*userapi.IdentityMetadata))
 }
 
-func (strategy) ValidateUpdate(_ context.Context, obj, old runtime.Object) field.ErrorList {
+func (*strategy) ValidateUpdate(_ context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateIdentityMetadataUpdate(obj.(*userapi.IdentityMetadata), old.(*userapi.IdentityMetadata))
 }
