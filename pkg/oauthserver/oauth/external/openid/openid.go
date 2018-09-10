@@ -343,45 +343,55 @@ func (p *provider) getClaims(data []byte, isEndpointJWT bool) (map[string]interf
 		return claims, nil
 	}
 
-	var distClaims distributedClaims
-	if err := json.Unmarshal(data, &distClaims); err != nil {
-		return nil, fmt.Errorf("error parsing distributed claims: %v", err)
-	}
-
 	// fetching distributed claims is not allowed to fail
-	// enforce that behavior by wrapping the logic in a func
+	// enforce that behavior by wrapping the logic in a func that does not return anything
 	// this is required so that we can work with broken OIDC implementations like Azure
-	func() {
-		completedSources := sets.NewString()
-		for name, src := range distClaims.Names {
-			// only make network calls for distributed claims we may care about
-			// and only fetch each source once
-			if p.allClaims.Has(name) && !completedSources.Has(src) {
-				ep, ok := distClaims.Sources[src]
-				if !ok {
-					// malformed distributed claim
-					glog.V(4).Infof("_claim_names %q contained a source %q not in _claims_sources", name, src)
-					continue
-				}
-				if len(ep.URL) == 0 {
-					// ignore possibly aggregated claim
-					continue
-				}
-				srcClaims, err := p.fetchEndpoint(ep)
-				if err != nil {
-					glog.V(4).Infof("failed to fetch endpoint for claim %q with source %q: %v", name, src, err)
-					continue
-				}
-				// merge new distributed claims
-				for k, v := range srcClaims {
-					claims[k] = v
-				}
-				completedSources.Insert(src)
+	p.fetchDistributedClaims(data,
+		func(srcClaims map[string]interface{}) {
+			// merge new distributed claims
+			for k, v := range srcClaims {
+				claims[k] = v
 			}
-		}
-	}()
+		})
 
 	return claims, nil
+}
+
+func (p *provider) fetchDistributedClaims(data []byte, merge func(map[string]interface{})) {
+	// decoding the same data twice is a bit wasteful, but distributed claims are rare and JWTs are small
+	var distClaims distributedClaims
+	if err := json.Unmarshal(data, &distClaims); err != nil {
+		// fetching distributed claims is not allowed to fail
+		// this should never happen since data should have already passed the initial json.Unmarshal
+		glog.V(5).Infof("error parsing distributed claims: %v", err)
+		return
+	}
+
+	completedSources := sets.NewString()
+	for name, src := range distClaims.Names {
+		// only make network calls for distributed claims we may care about
+		// and only fetch each source once
+		if p.allClaims.Has(name) && !completedSources.Has(src) {
+			ep, ok := distClaims.Sources[src]
+			if !ok {
+				// malformed distributed claim
+				glog.V(4).Infof("_claim_names %q contained a source %q not in _claims_sources", name, src)
+				continue
+			}
+			if len(ep.URL) == 0 {
+				// ignore possibly aggregated claim
+				continue
+			}
+			srcClaims, err := p.fetchEndpoint(ep)
+			if err != nil {
+				glog.V(4).Infof("failed to fetch endpoint for claim %q with source %q: %v", name, src, err)
+				continue
+			}
+			// merge new distributed claims
+			merge(srcClaims)
+			completedSources.Insert(src)
+		}
+	}
 }
 
 func (p *provider) fetchEndpoint(ep endpoint) (map[string]interface{}, error) {
