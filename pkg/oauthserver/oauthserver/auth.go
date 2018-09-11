@@ -512,6 +512,7 @@ func (c *OAuthServerConfig) getOAuthProvider(identityProvider configapi.Identity
 			PreferredUsernameClaims: provider.Claims.PreferredUsername,
 			EmailClaims:             provider.Claims.Email,
 			NameClaims:              provider.Claims.Name,
+			GroupsClaims:            provider.Claims.Groups,
 		}
 
 		return openid.NewProvider(identityProvider.Name, transport, config)
