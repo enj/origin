@@ -1,14 +1,11 @@
 package keystonepassword
 
 import (
-	"fmt"
 	"net/http"
-	"runtime/debug"
 
-	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -22,91 +19,84 @@ import (
 type keystonePasswordAuthenticator struct {
 	providerName        string
 	url                 string
-	client              *http.Client
 	domainName          string
+	client              *gophercloud.ServiceClient
 	identityMapper      authapi.UserIdentityMapper
 	useKeystoneIdentity bool
 }
 
 // New creates a new password authenticator that uses OpenStack keystone to authenticate a user by password
-// A custom transport can be provided (typically to customize TLS options like trusted roots or present a client certificate).
-// If no transport is provided, http.DefaultTransport is used
-func New(providerName string, url string, transport http.RoundTripper, domainName string, identityMapper authapi.UserIdentityMapper, useKeystoneIdentity bool) authenticator.Password {
-	if transport == nil {
-		transport = http.DefaultTransport
+func New(providerName, url, domainName string, transport http.RoundTripper, identityMapper authapi.UserIdentityMapper, useKeystoneIdentity bool) (authenticator.Password, error) {
+	// Call NewClient instead of AuthenticatedClient to pass in a custom transport
+	providerClient, err := openstack.NewClient(url)
+	if err != nil {
+		// should be impossible since validation catches these errors early
+		return nil, err
 	}
-	client := &http.Client{Transport: transport}
-	return &keystonePasswordAuthenticator{providerName, url, client, domainName, identityMapper, useKeystoneIdentity}
-}
+	providerClient.HTTPClient = http.Client{Transport: transport}
 
-// Authenticate user and return his Keystone ID
-func getUserIDv3(client *gophercloud.ProviderClient, options tokens3.AuthOptionsBuilder, eo gophercloud.EndpointOpts) (string, error) {
 	// Override the generated service endpoint with the one returned by the version endpoint.
-	v3Client, err := openstack.NewIdentityV3(client, eo)
+	serviceClient, err := openstack.NewIdentityV3(providerClient, gophercloud.EndpointOpts{})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// Issue new unscoped token
-	result := tokens3.Create(v3Client, options)
-	if result.Err != nil {
-		return "", result.Err
-	}
-
-	user, err := result.ExtractUser()
-	if err != nil {
-		return "", err
-	}
-
-	return user.ID, nil
+	return &keystonePasswordAuthenticator{
+		providerName:        providerName,
+		url:                 url,
+		domainName:          domainName,
+		client:              serviceClient,
+		identityMapper:      identityMapper,
+		useKeystoneIdentity: useKeystoneIdentity,
+	}, nil
 }
 
 // AuthenticatePassword approves any login attempt which is successfully validated with Keystone
-func (a keystonePasswordAuthenticator) AuthenticatePassword(username, password string) (user.Info, bool, error) {
-	defer func() {
-		if e := recover(); e != nil {
-			utilruntime.HandleError(fmt.Errorf("Recovered panic: %v, %s", e, debug.Stack()))
-		}
-	}()
+func (a *keystonePasswordAuthenticator) AuthenticatePassword(username, password string) (user.Info, bool, error) {
+	defer utilruntime.HandleCrash()
 
 	// if password is missing, fail authentication immediately
 	if len(password) == 0 {
 		return nil, false, nil
 	}
 
-	opts := gophercloud.AuthOptions{
+	user, err := a.getUser(username, password)
+	if err != nil {
+		if _, ok := err.(gophercloud.ErrDefault401); ok {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
+	// There is likely no way to change this while maintaining backwards compatibility
+	providerUserID := username
+	if a.useKeystoneIdentity {
+		providerUserID = user.ID
+	}
+
+	identity := authapi.NewDefaultUserIdentityInfo(a.providerName, providerUserID)
+
+	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
+	// There is likely no way to change this while maintaining backwards compatibility
+	identity.Extra[authapi.IdentityPreferredUsernameKey] = username
+
+	return identitymapper.UserFor(a.identityMapper, identity)
+}
+
+func (a *keystonePasswordAuthenticator) getUser(username, password string) (*tokens.User, error) {
+	opts := &gophercloud.AuthOptions{
 		IdentityEndpoint: a.url,
 		Username:         username,
 		Password:         password,
 		DomainName:       a.domainName,
 	}
 
-	// Calling NewClient/Authenticate manually rather than simply calling AuthenticatedClient
-	// in order to pass in a transport object that supports SSL
-	client, err := openstack.NewClient(opts.IdentityEndpoint)
-	if err != nil {
-		glog.Warningf("Failed: Initializing openstack authentication client: %v", err)
-		return nil, false, err
+	// issue new unscoped token
+	result := tokens.Create(a.client, opts)
+	if err := result.Err; err != nil {
+		return nil, err
 	}
 
-	client.HTTPClient = *a.client
-	userid, err := getUserIDv3(client, &opts, gophercloud.EndpointOpts{})
-
-	if err != nil {
-		if _, ok := err.(gophercloud.ErrDefault401); ok {
-			return nil, false, nil
-		}
-		glog.Warningf("Failed: Calling openstack AuthenticateV3: %v", err)
-		return nil, false, err
-	}
-
-	providerUserID := username
-	if a.useKeystoneIdentity {
-		providerUserID = userid
-	}
-
-	identity := authapi.NewDefaultUserIdentityInfo(a.providerName, providerUserID)
-	identity.Extra[authapi.IdentityPreferredUsernameKey] = username
-
-	return identitymapper.UserFor(a.identityMapper, identity)
+	return result.ExtractUser()
 }

@@ -593,7 +593,7 @@ func (c *OAuthServerConfig) getPasswordAuthenticator(identityProvider configapi.
 			return nil, fmt.Errorf("Error building KeystonePasswordIdentityProvider client: %v", err)
 		}
 
-		return keystonepassword.New(identityProvider.Name, connectionInfo.URL, transport, provider.DomainName, identityMapper, provider.UseKeystoneIdentity), nil
+		return keystonepassword.New(identityProvider.Name, connectionInfo.URL, provider.DomainName, transport, identityMapper, provider.UseKeystoneIdentity)
 
 	default:
 		return nil, fmt.Errorf("No password auth found that matches %v.  The OAuth server cannot start!", identityProvider)
