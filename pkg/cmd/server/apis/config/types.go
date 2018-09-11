@@ -1158,6 +1158,10 @@ type OpenIDClaims struct {
 	// Email is the list of claims whose values should be used as the email address. Optional.
 	// If unspecified, no email is set for the identity
 	Email []string
+	// Groups is the list of claims whose values should be used as the user's groups. Optional.
+	// If unspecified, no groups are consumed from the claims.
+	// Claim values must either be a string or an array of strings.
+	Groups []string
 }
 
 type GrantConfig struct {
