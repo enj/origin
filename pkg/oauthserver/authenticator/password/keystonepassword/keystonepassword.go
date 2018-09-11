@@ -70,6 +70,11 @@ func (a *keystonePasswordAuthenticator) AuthenticatePassword(username, password 
 		return nil, false, err
 	}
 
+	groups, err := a.getGroups(user)
+	if err != nil {
+		return nil, false, err // TODO should we ever ignore this error?
+	}
+
 	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
 	providerUserID := username
 	if a.useKeystoneIdentity {
@@ -81,10 +86,6 @@ func (a *keystonePasswordAuthenticator) AuthenticatePassword(username, password 
 	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
 	identity.Extra[authapi.IdentityPreferredUsernameKey] = username
 
-	groups, err := a.getGroups(user)
-	if err != nil {
-		return nil, false, err // TODO should we ever ignore this error?
-	}
 	identity.ProviderGroups = groups
 
 	return identitymapper.UserFor(a.identityMapper, identity)
