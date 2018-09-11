@@ -8,16 +8,19 @@ import (
 	"testing"
 
 	th "github.com/gophercloud/gophercloud/testhelper"
-	"github.com/openshift/origin/pkg/oauthserver/api"
+
 	"k8s.io/apiserver/pkg/authentication/user"
+
+	"github.com/openshift/origin/pkg/oauthserver/api"
 )
 
 // This type emulates a mapper with "claim" provisioning strategy
-type TestUserIdentityMapperClaim struct {
-	idnts map[string]string
+type testUserIdentityMapperClaim struct {
+	idnts  map[string]string
+	groups map[string][]string
 }
 
-func (m *TestUserIdentityMapperClaim) UserFor(identityInfo api.UserIdentityInfo) (user.Info, error) {
+func (m *testUserIdentityMapperClaim) UserFor(identityInfo api.UserIdentityInfo) (user.Info, error) {
 	userName := identityInfo.GetProviderUserName()
 	if login, ok := identityInfo.GetExtra()[api.IdentityPreferredUsernameKey]; ok && len(login) > 0 {
 		userName = login
@@ -26,12 +29,21 @@ func (m *TestUserIdentityMapperClaim) UserFor(identityInfo api.UserIdentityInfo)
 
 	if identityName, ok := m.idnts[userName]; ok && identityName != claimedIdentityName {
 		// A user with that user name is already mapped to another identity
-		return nil, fmt.Errorf("Ooops")
+		return nil, fmt.Errorf("invalid user %s, expected identity %s, got %s", userName, identityName, claimedIdentityName)
 	}
 	// Map the user with new identity
 	m.idnts[userName] = claimedIdentityName
 
+	// Record groups
+	m.groups[userName] = identityInfo.GetProviderGroups()
+
 	return &user.DefaultInfo{Name: userName}, nil
+}
+
+func (m *testUserIdentityMapperClaim) getGroupsOnce(userName string) []string {
+	groups := m.groups[userName]
+	delete(m.groups, userName)
+	return groups
 }
 
 var keystoneID string
@@ -90,8 +102,65 @@ func TestKeystoneLogin(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
 	})
+
+	initialGroups := `
+{
+    "groups": [
+        {
+            "description": "Developers cleared for work on all general projects",
+            "domain_id": "1789d1",
+            "id": "ea167b",
+            "links": {
+                "self": "https://example.com/identity/v3/groups/ea167b"
+            },
+            "building": "Hilltop A",
+            "name": "Developers"
+        },
+        {
+            "description": "Developers cleared for work on secret projects",
+            "domain_id": "1789d1",
+            "id": "a62db1",
+            "links": {
+                "self": "https://example.com/identity/v3/groups/a62db1"
+            },
+            "name": "Secure Developers"
+        }
+    ],
+    "links": {
+        "self": "http://example.com/identity/v3/users/initial_keystone_id/groups",
+        "previous": null,
+        "next": null
+    }
+}
+`
+
+	newGroups := `
+{
+    "groups": [
+        {
+            "description": "Greatest animal evvvaaarrrr",
+            "domain_id": "1789d2",
+            "id": "a62db2",
+            "links": {
+                "self": "https://example.com/identity/v3/groups/a62db2"
+            },
+            "building": "Zoo",
+            "name": "Pandas"
+        }
+    ],
+    "links": {
+        "self": "http://example.com/identity/v3/users/new_keystone_id/groups",
+        "previous": null,
+        "next": null
+    }
+}
+`
+
+	th.Mux.HandleFunc("/v3/users/initial_keystone_id/groups", getGroupHandler(t, initialGroups))
+	th.Mux.HandleFunc("/v3/users/new_keystone_id/groups", getGroupHandler(t, newGroups))
+
 	// -----Test Claim strategy with enabled Keystone identity-----
-	mapperClaim := TestUserIdentityMapperClaim{map[string]string{}}
+	mapperClaim := testUserIdentityMapperClaim{idnts: map[string]string{}, groups: map[string][]string{}}
 	keystoneID = "initial_keystone_id"
 	keystoneAuth, err := New("keystone_auth", th.Endpoint(), "default", http.DefaultTransport, &mapperClaim, true)
 	th.AssertNoErr(t, err)
@@ -101,6 +170,7 @@ func TestKeystoneLogin(t *testing.T) {
 	th.AssertNoErr(t, err)
 	th.CheckEquals(t, true, ok)
 	th.CheckEquals(t, "keystone_auth:initial_keystone_id", mapperClaim.idnts["testuser"])
+	th.CheckDeepEquals(t, []string{"Developers", "Secure Developers"}, mapperClaim.getGroupsOnce("testuser"))
 
 	// 2. Authentication with wrong or empty password fails
 	_, ok, err = keystoneAuth.AuthenticatePassword("testuser", "badpw")
@@ -114,10 +184,11 @@ func TestKeystoneLogin(t *testing.T) {
 	keystoneID = "new_keystone_id"
 	_, ok, err = keystoneAuth.AuthenticatePassword("testuser", "testpw")
 	th.CheckEquals(t, false, ok)
-	th.CheckEquals(t, "Ooops", err.Error())
+	th.CheckEquals(t, "invalid user testuser, expected identity keystone_auth:initial_keystone_id, got keystone_auth:new_keystone_id", err.Error())
+	th.CheckDeepEquals(t, []string(nil), mapperClaim.getGroupsOnce("testuser"))
 
 	// -----Test Claim strategy with disabled Keystone identity-----
-	mapperClaim = TestUserIdentityMapperClaim{map[string]string{}}
+	mapperClaim = testUserIdentityMapperClaim{idnts: map[string]string{}, groups: map[string][]string{}}
 	keystoneID = "initial_keystone_id"
 	keystoneAuth, err = New("keystone_auth", th.Endpoint(), "default", http.DefaultTransport, &mapperClaim, false)
 	th.AssertNoErr(t, err)
@@ -127,6 +198,7 @@ func TestKeystoneLogin(t *testing.T) {
 	th.AssertNoErr(t, err)
 	th.CheckEquals(t, true, ok)
 	th.CheckEquals(t, "keystone_auth:testuser", mapperClaim.idnts["testuser"])
+	th.CheckDeepEquals(t, []string{"Developers", "Secure Developers"}, mapperClaim.getGroupsOnce("testuser"))
 
 	// 2. Authentication with wrong or empty password fails
 	_, ok, err = keystoneAuth.AuthenticatePassword("testuser", "badpw")
@@ -141,4 +213,16 @@ func TestKeystoneLogin(t *testing.T) {
 	_, ok, err = keystoneAuth.AuthenticatePassword("testuser", "testpw")
 	th.CheckEquals(t, true, ok)
 	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, []string{"Pandas"}, mapperClaim.getGroupsOnce("testuser"))
+}
+
+func getGroupHandler(t *testing.T, groupData string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "GET")
+		th.TestHeader(t, r, "Accept", "application/json")
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, groupData)
+	}
 }
