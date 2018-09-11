@@ -5,7 +5,9 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/groups"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -79,6 +81,12 @@ func (a *keystonePasswordAuthenticator) AuthenticatePassword(username, password 
 	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
 	identity.Extra[authapi.IdentityPreferredUsernameKey] = username
 
+	groups, err := a.getGroups(user)
+	if err != nil {
+		return nil, false, err // TODO should we ever ignore this error?
+	}
+	identity.ProviderGroups = groups
+
 	return identitymapper.UserFor(a.identityMapper, identity)
 }
 
@@ -97,4 +105,23 @@ func (a *keystonePasswordAuthenticator) getUser(username, password string) (*tok
 	}
 
 	return result.ExtractUser()
+}
+
+func (a *keystonePasswordAuthenticator) getGroups(user *tokens.User) ([]string, error) {
+	allGroupPages, err := users.ListGroups(a.client, user.ID).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	groups, err := groups.ExtractGroups(allGroupPages)
+	if err != nil {
+		return nil, err
+	}
+	if len(groups) == 0 {
+		return nil, nil
+	}
+	groupsNames := make([]string, 0, len(groups))
+	for _, group := range groups {
+		groupsNames = append(groupsNames, group.Name)
+	}
+	return groupsNames, nil
 }
