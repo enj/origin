@@ -373,6 +373,23 @@ func IsIdentityProviderType(provider runtime.Object) bool {
 	return false
 }
 
+func IsGroupsIdentityProvider(provider runtime.Object) bool {
+	switch provider.(type) { // TODO determine if this list is reasonable
+	case
+		*RequestHeaderIdentityProvider,
+		*BasicAuthPasswordIdentityProvider,
+		*HTPasswdPasswordIdentityProvider,
+		*LDAPPasswordIdentityProvider,
+		*KeystonePasswordIdentityProvider,
+		*OpenIDIdentityProvider,
+		*GitHubIdentityProvider,
+		*GitLabIdentityProvider,
+		*GoogleIdentityProvider:
+		return true
+	}
+	return false
+}
+
 func IsOAuthIdentityProvider(provider IdentityProvider) bool {
 	switch provider.Provider.(type) {
 	case

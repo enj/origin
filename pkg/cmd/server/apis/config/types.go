@@ -925,6 +925,10 @@ type IdentityProvider struct {
 	// Provider contains the information about how to set up a specific identity provider
 	// +k8s:conversion-gen=false
 	Provider runtime.Object
+	// LocalGroups determines if groups asserted by this provider should be prepended.
+	// If false, all groups asserted by this provider are prepended with the provider's name + "/"
+	// If true, all valid groups are used as-is without any modification.
+	LocalGroups bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
