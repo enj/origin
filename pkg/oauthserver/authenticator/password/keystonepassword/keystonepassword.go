@@ -76,6 +76,7 @@ func (a *keystonePasswordAuthenticator) AuthenticatePassword(username, password 
 	}
 
 	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
+	// There is likely no way to change this while maintaining backwards compatibility
 	providerUserID := username
 	if a.useKeystoneIdentity {
 		providerUserID = user.ID
@@ -84,6 +85,7 @@ func (a *keystonePasswordAuthenticator) AuthenticatePassword(username, password 
 	identity := authapi.NewDefaultUserIdentityInfo(a.providerName, providerUserID)
 
 	// TODO this should probably be user.Name, relying on user input sounds like a terrible idea
+	// There is likely no way to change this while maintaining backwards compatibility
 	identity.Extra[authapi.IdentityPreferredUsernameKey] = username
 
 	identity.ProviderGroups = groups
