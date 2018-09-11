@@ -1045,6 +1045,8 @@ type RequestHeaderIdentityProvider struct {
 	NameHeaders []string
 	// EmailHeaders is the set of headers to check for the email address
 	EmailHeaders []string
+	// GroupsHeaders is the set of headers to check for groups.  All non-empty values from all headers are aggregated.
+	GroupsHeaders []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
