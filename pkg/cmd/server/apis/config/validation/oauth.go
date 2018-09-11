@@ -211,7 +211,19 @@ func ValidateIdentityProvider(identityProvider configapi.IdentityProvider, fldPa
 		}
 	}
 
+	validationResults.AddErrors(ValidateLocalGroups(identityProvider, fldPath)...)
+
 	return validationResults
+}
+
+func ValidateLocalGroups(identityProvider configapi.IdentityProvider, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if identityProvider.LocalGroups && !configapi.IsGroupsIdentityProvider(identityProvider.Provider) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("localGroups"), identityProvider.LocalGroups, fmt.Sprintf("%T does not support groups", identityProvider.Provider)))
+	}
+
+	return allErrs
 }
 
 func ValidateLDAPIdentityProvider(provider *configapi.LDAPPasswordIdentityProvider, fldPath *field.Path) common.ValidationResults {
