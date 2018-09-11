@@ -93,7 +93,8 @@ func TestKeystoneLogin(t *testing.T) {
 	// -----Test Claim strategy with enabled Keystone identity-----
 	mapperClaim := TestUserIdentityMapperClaim{map[string]string{}}
 	keystoneID = "initial_keystone_id"
-	keystoneAuth := New("keystone_auth", th.Endpoint(), http.DefaultTransport, "default", &mapperClaim, true)
+	keystoneAuth, err := New("keystone_auth", th.Endpoint(), "default", http.DefaultTransport, &mapperClaim, true)
+	th.AssertNoErr(t, err)
 
 	// 1. User authenticates for the first time, new identity is created
 	_, ok, err := keystoneAuth.AuthenticatePassword("testuser", "testpw")
@@ -118,7 +119,8 @@ func TestKeystoneLogin(t *testing.T) {
 	// -----Test Claim strategy with disabled Keystone identity-----
 	mapperClaim = TestUserIdentityMapperClaim{map[string]string{}}
 	keystoneID = "initial_keystone_id"
-	keystoneAuth = New("keystone_auth", th.Endpoint(), http.DefaultTransport, "default", &mapperClaim, false)
+	keystoneAuth, err = New("keystone_auth", th.Endpoint(), "default", http.DefaultTransport, &mapperClaim, false)
+	th.AssertNoErr(t, err)
 
 	// 1. User authenticates for the first time, new identity is created
 	_, ok, err = keystoneAuth.AuthenticatePassword("testuser", "testpw")
