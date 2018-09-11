@@ -50,11 +50,11 @@ func (g *groupsMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.
 		return nil, err
 	}
 
-	groupNames := make([]string, 0, len(groups)+len(user.Groups)+len(token.ProviderGroups))
+	groupsNames := make([]string, 0, len(groups)+len(user.Groups)+len(token.ProviderGroups))
 	for _, group := range groups {
-		groupNames = append(groupNames, group.Name)
+		groupsNames = append(groupsNames, group.Name)
 	}
-	groupNames = append(groupNames, user.Groups...)
+	groupsNames = append(groupsNames, user.Groups...)
 
 	// groups from the cache (backed by group API object) and the user API object are guaranteed to be valid
 	// groups from the token do not have such guarantees
@@ -70,10 +70,10 @@ func (g *groupsMapper) GroupsFor(token *oauthv1.OAuthAccessToken, user *userapi.
 		if !isValidGroupName(group) {
 			continue
 		}
-		groupNames = append(groupNames, prefix+group)
+		groupsNames = append(groupsNames, prefix+group)
 	}
 
-	return groupNames, nil
+	return groupsNames, nil
 }
 
 func (g *groupsMapper) getPrefix(token *oauthv1.OAuthAccessToken) (string, error) {
