@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/RangelReale/osin"
-	"github.com/openshift/origin/pkg/oauthserver/osinserver"
 )
 
 func TestAuthenticator(t *testing.T) {
@@ -22,10 +21,9 @@ func TestAuthenticator(t *testing.T) {
 	}
 
 	for requestType, testCase := range testCases {
-		deny := osinserver.AccessHandler(NewDenyAccessAuthenticator())
 		req := &osin.AccessRequest{Type: requestType}
 		w := httptest.NewRecorder()
-		err := deny.HandleAccess(req, w)
+		err := NewDenyAccessAuthenticator().HandleAccess(req, w)
 		if testCase.ExpectedError && err == nil {
 			t.Fatalf("%s: Expected error, got success", requestType)
 		}
