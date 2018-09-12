@@ -108,8 +108,12 @@ func NewProvider(providerName string, transport http.RoundTripper, config Config
 		return nil, errors.New("IDClaims must specify at least one claim")
 	}
 
+	// we purposefully do not store IDClaims here because that could lead to a different
+	// identity object name based on a distributed claim that was previously ignored.
+	// thus we cannot support fields that use distributed claims as IDClaims.
+	// this is fine because only the sub claim should be used as an ID claim.
+	// the sub claim is both required and must be stable per the OIDC spec.
 	allClaims := sets.NewString()
-	allClaims.Insert(config.IDClaims...)
 	allClaims.Insert(config.PreferredUsernameClaims...)
 	allClaims.Insert(config.EmailClaims...)
 	allClaims.Insert(config.NameClaims...)
