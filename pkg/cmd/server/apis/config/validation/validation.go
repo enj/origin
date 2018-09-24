@@ -35,25 +35,6 @@ func ValidateKubeConfig(path string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func ValidateRemoteConnectionInfo(remoteConnectionInfo config.RemoteConnectionInfo, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if len(remoteConnectionInfo.URL) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("url"), ""))
-	} else {
-		_, urlErrs := common.ValidateURL(remoteConnectionInfo.URL, fldPath.Child("url"))
-		allErrs = append(allErrs, urlErrs...)
-	}
-
-	if len(remoteConnectionInfo.CA) > 0 {
-		allErrs = append(allErrs, common.ValidateFile(remoteConnectionInfo.CA, fldPath.Child("ca"))...)
-	}
-
-	allErrs = append(allErrs, common.ValidateCertInfo(remoteConnectionInfo.ClientCert, false, fldPath)...)
-
-	return allErrs
-}
-
 func ValidatePodManifestConfig(podManifestConfig *config.PodManifestConfig, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

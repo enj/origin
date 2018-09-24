@@ -32,10 +32,10 @@ import (
 	usertypedclient "github.com/openshift/client-go/user/clientset/versioned/typed/user/v1"
 	userinformer "github.com/openshift/client-go/user/informers/externalversions/user/v1"
 	"github.com/openshift/origin/pkg/apiserver/authentication/oauth"
+	"github.com/openshift/origin/pkg/apiserver/authentication/paramtoken"
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
 	oauthvalidation "github.com/openshift/origin/pkg/oauth/apis/oauth/validation"
-	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/paramtoken"
 	usercache "github.com/openshift/origin/pkg/user/cache"
 )
 

@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/cmd/server/cm"
 	oauthutil "github.com/openshift/origin/pkg/oauth/util"
+	"github.com/openshift/origin/pkg/oauthserver/config/validation"
 	"github.com/openshift/origin/pkg/security/mcs"
 	"github.com/openshift/origin/pkg/security/uid"
 	"github.com/openshift/origin/pkg/util/labelselector"
@@ -97,7 +98,7 @@ func ValidateMasterConfig(config *configapi.MasterConfig, fldPath *field.Path) c
 
 	validationResults.AddErrors(ValidatePolicyConfig(config.PolicyConfig, fldPath.Child("policyConfig"))...)
 	if config.OAuthConfig != nil {
-		validationResults.Append(ValidateOAuthConfig(config.OAuthConfig, fldPath.Child("oauthConfig")))
+		validationResults.Append(validation.ValidateOAuthConfig(config.OAuthConfig, fldPath.Child("oauthConfig")))
 		if len(config.AuthConfig.OAuthMetadataFile) > 0 {
 			validationResults.AddErrors(field.Invalid(fldPath.Child("authConfig", "oauthMetadataFile"), config.AuthConfig.OAuthMetadataFile, "Cannot specify external OAuth Metadata when the internal Oauth Server is configured"))
 		}

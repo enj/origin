@@ -14,10 +14,10 @@ import (
 
 	oauthapi "github.com/openshift/api/oauth/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
-	scopeauthorizer "github.com/openshift/origin/pkg/authorization/authorizer/scope"
-	"github.com/openshift/origin/pkg/oauth/scope"
 	"github.com/openshift/origin/pkg/oauthserver/api"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/handlers"
+	"github.com/openshift/origin/pkg/oauthserver/scope"
+	scopeauthorizer "github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
 )
 
 type storage struct {

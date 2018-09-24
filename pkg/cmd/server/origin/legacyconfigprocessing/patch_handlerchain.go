@@ -9,7 +9,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/openshift/origin/pkg/cmd/openshift-apiserver/openshiftapiserver/configprocessing"
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
-	"github.com/openshift/origin/pkg/oauth/urls"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"

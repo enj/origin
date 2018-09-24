@@ -23,7 +23,7 @@ import (
 	routeapi "github.com/openshift/api/route/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	"github.com/openshift/origin/pkg/api/legacy"
-	scopeauthorizer "github.com/openshift/origin/pkg/authorization/authorizer/scope"
+	scopeauthorizer "github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
 )
 
 const (

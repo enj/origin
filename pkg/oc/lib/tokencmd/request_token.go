@@ -14,8 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 
-	"github.com/openshift/origin/pkg/oauth/urls"
 	"github.com/openshift/origin/pkg/oauth/util"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
 
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"

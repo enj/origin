@@ -20,7 +20,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
-	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
+	"github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
 )
 
 // Lister enforces ability to enumerate a resource based on role

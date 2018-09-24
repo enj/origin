@@ -6,8 +6,6 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	kauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
-
-	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 )
 
 func TestAuthorize(t *testing.T) {
@@ -48,7 +46,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "empty scopes",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {}}},
 				ResourceRequest: true,
 				Namespace:       "ns",
 			},
@@ -57,7 +55,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "bad scope",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"does-not-exist"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"does-not-exist"}}},
 				ResourceRequest: true,
 				Namespace:       "ns",
 			},
@@ -67,7 +65,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "bad scope 2",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"role:dne"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"role:dne"}}},
 				ResourceRequest: true,
 				Namespace:       "ns",
 			},
@@ -77,7 +75,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "scope doesn't cover",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"user:info"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"user:info"}}},
 				ResourceRequest: true,
 				Namespace:       "ns",
 				Verb:            "get", Resource: "users", Name: "harold"},
@@ -87,7 +85,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "scope covers",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"user:info"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"user:info"}}},
 				ResourceRequest: true,
 				Namespace:       "ns",
 				Verb:            "get", Resource: "users", Name: "~"},
@@ -96,7 +94,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "scope covers for discovery",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"user:info"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"user:info"}}},
 				ResourceRequest: false,
 				Namespace:       "ns",
 				Verb:            "get", Path: "/api"},
@@ -105,7 +103,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "user:full covers any resource",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"user:full"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"user:full"}}},
 				ResourceRequest: true,
 				Namespace:       "ns",
 				Verb:            "update", Resource: "users", Name: "harold"},
@@ -114,7 +112,7 @@ func TestAuthorize(t *testing.T) {
 		{
 			name: "user:full covers any non-resource",
 			attributes: kauthorizer.AttributesRecord{
-				User:            &user.DefaultInfo{Extra: map[string][]string{authorizationapi.ScopesKey: {"user:full"}}},
+				User:            &user.DefaultInfo{Extra: map[string][]string{ScopesKey: {"user:full"}}},
 				ResourceRequest: false,
 				Namespace:       "ns",
 				Verb:            "post", Path: "/foo/bar/baz"},

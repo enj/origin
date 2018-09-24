@@ -8,8 +8,8 @@ import (
 	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
 	osinv1 "github.com/openshift/api/osin/v1"
 	"github.com/openshift/origin/pkg/cmd/openshift-apiserver/openshiftapiserver/configprocessing"
-	"github.com/openshift/origin/pkg/oauth/urls"
-	"github.com/openshift/origin/pkg/util/httprequest"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
+	"github.com/openshift/origin/pkg/oauthserver/util/httprequest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 

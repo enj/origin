@@ -13,8 +13,8 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
-	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	oauthutil "github.com/openshift/origin/pkg/oauth/util"
+	"github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
 	openapigenerated "github.com/openshift/origin/pkg/openapi"
 	"github.com/openshift/origin/pkg/version"
 )

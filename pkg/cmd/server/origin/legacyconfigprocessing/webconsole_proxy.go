@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	webconsoleconfigv1 "github.com/openshift/api/webconsole/v1"
-	"github.com/openshift/origin/pkg/util/httprequest"
+	"github.com/openshift/origin/pkg/oauthserver/util/httprequest"
 )
 
 // If we know the location of the asset server, redirect to it when / is requested

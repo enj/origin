@@ -10,10 +10,10 @@ import (
 	"github.com/golang/glog"
 
 	osinv1 "github.com/openshift/api/osin/v1"
-	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/oauth/apis/oauth/validation"
-	"github.com/openshift/origin/pkg/oauth/urls"
+	"github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
 )
 
 // OauthAuthorizationServerMetadata holds OAuth 2.0 Authorization Server Metadata used for discovery

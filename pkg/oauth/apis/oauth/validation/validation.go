@@ -11,8 +11,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 
-	authorizerscopes "github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	oauthapi "github.com/openshift/origin/pkg/oauth/apis/oauth"
+	"github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
 	uservalidation "github.com/openshift/origin/pkg/user/apis/user/validation"
 )
 
@@ -72,7 +72,7 @@ func ValidateAccessToken(accessToken *oauthapi.OAuthAccessToken) field.ErrorList
 	allErrs := validation.ValidateObjectMeta(&accessToken.ObjectMeta, false, ValidateTokenName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateClientNameField(accessToken.ClientName, field.NewPath("clientName"))...)
 	allErrs = append(allErrs, ValidateUserNameField(accessToken.UserName, field.NewPath("userName"))...)
-	allErrs = append(allErrs, ValidateScopes(accessToken.Scopes, field.NewPath("scopes"))...)
+	allErrs = append(allErrs, scope.ValidateScopes(accessToken.Scopes, field.NewPath("scopes"))...)
 
 	if len(accessToken.UserUID) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("userUID"), ""))
@@ -123,7 +123,7 @@ func ValidateAuthorizeToken(authorizeToken *oauthapi.OAuthAuthorizeToken) field.
 	allErrs := validation.ValidateObjectMeta(&authorizeToken.ObjectMeta, false, ValidateTokenName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateClientNameField(authorizeToken.ClientName, field.NewPath("clientName"))...)
 	allErrs = append(allErrs, ValidateUserNameField(authorizeToken.UserName, field.NewPath("userName"))...)
-	allErrs = append(allErrs, ValidateScopes(authorizeToken.Scopes, field.NewPath("scopes"))...)
+	allErrs = append(allErrs, scope.ValidateScopes(authorizeToken.Scopes, field.NewPath("scopes"))...)
 
 	if len(authorizeToken.UserUID) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("userUID"), ""))
@@ -261,7 +261,7 @@ func ValidateClientAuthorization(clientAuthorization *oauthapi.OAuthClientAuthor
 
 	allErrs = append(allErrs, ValidateClientNameField(clientAuthorization.ClientName, field.NewPath("clientName"))...)
 	allErrs = append(allErrs, ValidateUserNameField(clientAuthorization.UserName, field.NewPath("userName"))...)
-	allErrs = append(allErrs, ValidateScopes(clientAuthorization.Scopes, field.NewPath("scopes"))...)
+	allErrs = append(allErrs, scope.ValidateScopes(clientAuthorization.Scopes, field.NewPath("scopes"))...)
 
 	if len(clientAuthorization.UserUID) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("useruid"), ""))
@@ -308,48 +308,6 @@ func ValidateUserNameField(value string, fldPath *field.Path) field.ErrorList {
 		return field.ErrorList{field.Invalid(fldPath, value, strings.Join(reasons, ", "))}
 	}
 	return field.ErrorList{}
-}
-
-func ValidateScopes(scopes []string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	for i, scope := range scopes {
-		illegalCharacter := false
-		// https://tools.ietf.org/html/rfc6749#section-3.3 (full list of allowed chars is %x21 / %x23-5B / %x5D-7E)
-		// for those without an ascii table, that's `!`, `#-[`, `]-~` inclusive.
-		for _, ch := range scope {
-			switch {
-			case ch == '!':
-			case ch >= '#' && ch <= '[':
-			case ch >= ']' && ch <= '~':
-			default:
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), scope, fmt.Sprintf("%v not allowed", ch)))
-				illegalCharacter = true
-			}
-		}
-		if illegalCharacter {
-			continue
-		}
-
-		found := false
-		for _, evaluator := range authorizerscopes.ScopeEvaluators {
-			if !evaluator.Handles(scope) {
-				continue
-			}
-
-			found = true
-			if err := evaluator.Validate(scope); err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), scope, err.Error()))
-				break
-			}
-		}
-
-		if !found {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), scope, "no scope handler found"))
-		}
-	}
-
-	return allErrs
 }
 
 func ValidateOAuthRedirectReference(sref *oauthapi.OAuthRedirectReference) field.ErrorList {

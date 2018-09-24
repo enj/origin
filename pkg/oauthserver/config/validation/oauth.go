@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	kpath "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -15,14 +16,12 @@ import (
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/validation/common"
-	"github.com/openshift/origin/pkg/cmd/server/apis/config/validation/ldap"
-	oauthvalidation "github.com/openshift/origin/pkg/oauth/apis/oauth/validation"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/tokens"
+	"github.com/openshift/origin/pkg/oauthserver/config/validation/ldap"
 	"github.com/openshift/origin/pkg/oauthserver/server/errorpage"
 	"github.com/openshift/origin/pkg/oauthserver/server/login"
 	"github.com/openshift/origin/pkg/oauthserver/server/selectprovider"
 	"github.com/openshift/origin/pkg/oauthserver/userregistry/identitymapper"
-	"github.com/openshift/origin/pkg/user/apis/user/validation"
 )
 
 func ValidateOAuthConfig(config *configapi.OAuthConfig, fldPath *field.Path) common.ValidationResults {
@@ -108,11 +107,11 @@ func ValidateOAuthConfig(config *configapi.OAuthConfig, fldPath *field.Path) com
 	}
 
 	if timeout := config.TokenConfig.AccessTokenInactivityTimeoutSeconds; timeout != nil {
-		if *timeout != 0 && *timeout < oauthvalidation.MinimumInactivityTimeoutSeconds {
+		if *timeout != 0 && *timeout < MinimumInactivityTimeoutSeconds {
 			validationResults.AddErrors(field.Invalid(
 				fldPath.Child("tokenConfig", "accessTokenInactivityTimeoutSeconds"), *timeout,
 				fmt.Sprintf("The minimum acceptable token timeout value is %d seconds",
-					oauthvalidation.MinimumInactivityTimeoutSeconds)))
+					MinimumInactivityTimeoutSeconds)))
 		}
 	}
 
@@ -167,7 +166,7 @@ func ValidateIdentityProvider(identityProvider configapi.IdentityProvider, fldPa
 	if len(identityProvider.Name) == 0 {
 		validationResults.AddErrors(field.Required(fldPath.Child("name"), ""))
 	}
-	if reasons := validation.ValidateIdentityProviderName(identityProvider.Name); len(reasons) != 0 {
+	if reasons := ValidateIdentityProviderName(identityProvider.Name); len(reasons) != 0 {
 		validationResults.AddErrors(field.Invalid(fldPath.Child("name"), identityProvider.Name, strings.Join(reasons, ", ")))
 	}
 
@@ -541,3 +540,45 @@ func ValidateSessionSecrets(config *configapi.SessionSecrets) field.ErrorList {
 
 	return allErrs
 }
+
+func ValidateRemoteConnectionInfo(remoteConnectionInfo configapi.RemoteConnectionInfo, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(remoteConnectionInfo.URL) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("url"), ""))
+	} else {
+		_, urlErrs := common.ValidateURL(remoteConnectionInfo.URL, fldPath.Child("url"))
+		allErrs = append(allErrs, urlErrs...)
+	}
+
+	if len(remoteConnectionInfo.CA) > 0 {
+		allErrs = append(allErrs, common.ValidateFile(remoteConnectionInfo.CA, fldPath.Child("ca"))...)
+	}
+
+	allErrs = append(allErrs, common.ValidateCertInfo(remoteConnectionInfo.ClientCert, false, fldPath)...)
+
+	return allErrs
+}
+
+// copied from github.com/openshift/origin/pkg/user/apis/user/validation/validation.go
+
+func ValidateIdentityProviderName(name string) []string {
+	if reasons := kpath.ValidatePathSegmentName(name, false); len(reasons) != 0 {
+		return reasons
+	}
+
+	if strings.Contains(name, ":") {
+		return []string{`may not contain ":"`}
+	}
+	return nil
+}
+
+// copied from github.com/openshift/origin/pkg/oauth/apis/oauth/validation/validation.go
+
+const (
+	// MinimumInactivityTimeoutSeconds defines the the smallest value allowed
+	// for AccessTokenInactivityTimeoutSeconds.
+	// It also defines the ticker interval for the token update routine as
+	// MinimumInactivityTimeoutSeconds / 3 is used there.
+	MinimumInactivityTimeoutSeconds = 5 * 60
+)

@@ -12,8 +12,8 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/openshift/origin/pkg/oauth/urls"
 	"github.com/openshift/origin/pkg/oauthserver"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
 )
 
 type endpointDetails struct {

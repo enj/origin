@@ -13,7 +13,7 @@ import (
 	kbootstrappolicy "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 
 	"github.com/openshift/origin/pkg/authorization/authorizer/browsersafe"
-	"github.com/openshift/origin/pkg/authorization/authorizer/scope"
+	"github.com/openshift/origin/pkg/oauthserver/scope/authorizer"
 )
 
 func NewAuthorizer(internalInformers internalinformers.SharedInformerFactory, versionedInformers informers.SharedInformerFactory) authorizer.Authorizer {

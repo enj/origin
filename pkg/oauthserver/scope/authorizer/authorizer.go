@@ -6,8 +6,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	authorizerrbac "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
-
-	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 )
 
 type scopeAuthorizer struct {
@@ -24,7 +22,7 @@ func (a *scopeAuthorizer) Authorize(attributes authorizer.Attributes) (authorize
 		return authorizer.DecisionNoOpinion, "", fmt.Errorf("user missing from context")
 	}
 
-	scopes := user.GetExtra()[authorizationapi.ScopesKey]
+	scopes := user.GetExtra()[ScopesKey]
 	if len(scopes) == 0 {
 		return authorizer.DecisionNoOpinion, "", nil
 	}
@@ -45,3 +43,7 @@ func (a *scopeAuthorizer) Authorize(attributes authorizer.Attributes) (authorize
 	// the scope prevent this.  We need to authoritatively deny
 	return authorizer.DecisionDeny, fmt.Sprintf("scopes %v prevent this action%s", scopes, nonFatalErrors), nil
 }
+
+// copied from github.com/openshift/origin/pkg/authorization/apis/authorization/types.go
+
+const ScopesKey = "scopes.authorization.openshift.io"

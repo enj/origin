@@ -1,6 +1,7 @@
 package oauthserver
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"net/http"
@@ -21,8 +22,6 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 
-	"bytes"
-
 	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	osinv1 "github.com/openshift/api/osin/v1"
@@ -32,9 +31,9 @@ import (
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/configconversion"
-	"github.com/openshift/origin/pkg/oauth/urls"
 	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 	"github.com/openshift/origin/pkg/oauthserver/server/session"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
 )
 
 var (

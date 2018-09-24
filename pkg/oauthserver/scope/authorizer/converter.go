@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kutilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	kauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	kauthorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
@@ -17,18 +18,23 @@ import (
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	authorizerrbac "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 
+	authorizationapi "github.com/openshift/api/authorization"
+	imageapi "github.com/openshift/api/image"
 	oauthapi "github.com/openshift/api/oauth/v1"
-	"github.com/openshift/origin/pkg/api/legacy"
-	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
-	imageapi "github.com/openshift/origin/pkg/image/apis/image"
-	projectapi "github.com/openshift/origin/pkg/project/apis/project"
-	userapi "github.com/openshift/origin/pkg/user/apis/user"
+	projectapi "github.com/openshift/api/project"
+	userapi "github.com/openshift/api/user"
+)
+
+const (
+	ScopesAllNamespaces = "*"
+
+	legacyGroupName = ""
 )
 
 // ScopesToRules takes the scopes and return the rules back.  We ALWAYS add the discovery rules and it is possible to get some rules and and
 // an error since errors aren't fatal to evaluation
 func ScopesToRules(scopes []string, namespace string, clusterRoleGetter rbaclisters.ClusterRoleLister) ([]rbacv1.PolicyRule, error) {
-	rules := append([]rbacv1.PolicyRule{}, authorizationapi.DiscoveryRule)
+	rules := append([]rbacv1.PolicyRule{}, DiscoveryRule)
 
 	errors := []error{}
 	for _, scope := range scopes {
@@ -150,10 +156,6 @@ func DefaultSupportedScopes() []string {
 	return sets.StringKeySet(defaultSupportedScopesMap).List()
 }
 
-func DefaultSupportedScopesMap() map[string]string {
-	return defaultSupportedScopesMap
-}
-
 func DescribeScopes(scopes []string) map[string]string {
 	ret := map[string]string{}
 	for _, s := range scopes {
@@ -202,7 +204,7 @@ func (userEvaluator) ResolveRules(scope, namespace string, _ rbaclisters.Cluster
 	case UserInfo:
 		return []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get").
-				Groups(userapi.GroupName, legacy.GroupName).
+				Groups(userapi.GroupName, legacyGroupName).
 				Resources("users").
 				Names("~").
 				RuleOrDie(),
@@ -214,21 +216,21 @@ func (userEvaluator) ResolveRules(scope, namespace string, _ rbaclisters.Cluster
 				Resources("selfsubjectaccessreviews").
 				RuleOrDie(),
 			rbacv1helpers.NewRule("create").
-				Groups(authorizationapi.GroupName, legacy.GroupName).
+				Groups(authorizationapi.GroupName, legacyGroupName).
 				Resources("selfsubjectrulesreviews").
 				RuleOrDie(),
 		}, nil
 	case UserListScopedProjects:
 		return []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("list", "watch").
-				Groups(projectapi.GroupName, legacy.GroupName).
+				Groups(projectapi.GroupName, legacyGroupName).
 				Resources("projects").
 				RuleOrDie(),
 		}, nil
 	case UserListAllProjects:
 		return []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("list", "watch").
-				Groups(projectapi.GroupName, legacy.GroupName).
+				Groups(projectapi.GroupName, legacyGroupName).
 				Resources("projects").
 				RuleOrDie(),
 			rbacv1helpers.NewRule("get").
@@ -265,25 +267,25 @@ var escalatingScopeResources = []schema.GroupResource{
 	{Group: kapi.GroupName, Resource: "secrets"},
 
 	{Group: imageapi.GroupName, Resource: "imagestreams/secrets"},
-	{Group: legacy.GroupName, Resource: "imagestreams/secrets"},
+	{Group: legacyGroupName, Resource: "imagestreams/secrets"},
 
 	{Group: oauthapi.GroupName, Resource: "oauthauthorizetokens"},
-	{Group: legacy.GroupName, Resource: "oauthauthorizetokens"},
+	{Group: legacyGroupName, Resource: "oauthauthorizetokens"},
 
 	{Group: oauthapi.GroupName, Resource: "oauthaccesstokens"},
-	{Group: legacy.GroupName, Resource: "oauthaccesstokens"},
+	{Group: legacyGroupName, Resource: "oauthaccesstokens"},
 
 	{Group: authorizationapi.GroupName, Resource: "roles"},
-	{Group: legacy.GroupName, Resource: "roles"},
+	{Group: legacyGroupName, Resource: "roles"},
 
 	{Group: authorizationapi.GroupName, Resource: "rolebindings"},
-	{Group: legacy.GroupName, Resource: "rolebindings"},
+	{Group: legacyGroupName, Resource: "rolebindings"},
 
 	{Group: authorizationapi.GroupName, Resource: "clusterroles"},
-	{Group: legacy.GroupName, Resource: "clusterroles"},
+	{Group: legacyGroupName, Resource: "clusterroles"},
 
 	{Group: authorizationapi.GroupName, Resource: "clusterrolebindings"},
-	{Group: legacy.GroupName, Resource: "clusterrolebindings"},
+	{Group: legacyGroupName, Resource: "clusterrolebindings"},
 }
 
 // role:<clusterrole name>:<namespace to allow the cluster role, * means all>
@@ -342,7 +344,7 @@ func (e clusterRoleEvaluator) Describe(scope string) (string, string, error) {
 	// Anything you can do [in project "foo" | server-wide] that is also allowed by the "admin" role[, except access escalating resources like secrets]
 
 	scopePhrase := ""
-	if scopeNamespace == authorizationapi.ScopesAllNamespaces {
+	if scopeNamespace == ScopesAllNamespaces {
 		scopePhrase = "server-wide"
 	} else {
 		scopePhrase = fmt.Sprintf("in project %q", scopeNamespace)
@@ -368,7 +370,7 @@ func (e clusterRoleEvaluator) ResolveRules(scope, namespace string, clusterRoleG
 	}
 
 	// if the scope limit on the clusterrole doesn't match, then don't add any rules, but its not an error
-	if !(scopeNamespace == authorizationapi.ScopesAllNamespaces || scopeNamespace == namespace) {
+	if !(scopeNamespace == ScopesAllNamespaces || scopeNamespace == namespace) {
 		return []rbacv1.PolicyRule{}, nil
 	}
 
@@ -579,4 +581,68 @@ func validateClusterRoleScopeRestrictions(scope string, restriction oauthapi.Clu
 	}
 
 	return nil
+}
+
+func ValidateScopes(scopes []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, scope := range scopes {
+		illegalCharacter := false
+		// https://tools.ietf.org/html/rfc6749#section-3.3 (full list of allowed chars is %x21 / %x23-5B / %x5D-7E)
+		// for those without an ascii table, that's `!`, `#-[`, `]-~` inclusive.
+		for _, ch := range scope {
+			switch {
+			case ch == '!':
+			case ch >= '#' && ch <= '[':
+			case ch >= ']' && ch <= '~':
+			default:
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), scope, fmt.Sprintf("%v not allowed", ch)))
+				illegalCharacter = true
+			}
+		}
+		if illegalCharacter {
+			continue
+		}
+
+		found := false
+		for _, evaluator := range ScopeEvaluators {
+			if !evaluator.Handles(scope) {
+				continue
+			}
+
+			found = true
+			if err := evaluator.Validate(scope); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), scope, err.Error()))
+				break
+			}
+		}
+
+		if !found {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), scope, "no scope handler found"))
+		}
+	}
+
+	return allErrs
+}
+
+// copied from github.com/openshift/origin/pkg/authorization/apis/authorization/types.go
+
+var DiscoveryRule = rbacv1.PolicyRule{
+	Verbs: []string{"get"},
+	NonResourceURLs: []string{
+		// Server version checking
+		"/version", "/version/*",
+
+		// API discovery/negotiation
+		"/api", "/api/*",
+		"/apis", "/apis/*",
+		"/oapi", "/oapi/*",
+		"/openapi/v2",
+		"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1",
+		"/osapi", "/osapi/", // these cannot be removed until we can drop support for pre 3.1 clients
+		"/.well-known", "/.well-known/*",
+
+		// we intentionally allow all to here
+		"/",
+	},
 }

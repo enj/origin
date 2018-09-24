@@ -24,8 +24,7 @@ const (
 	VerbAll        = "*"
 	NonResourceAll = "*"
 
-	ScopesKey           = "scopes.authorization.openshift.io"
-	ScopesAllNamespaces = "*"
+	ScopesKey = "scopes.authorization.openshift.io"
 
 	UserKind           = "User"
 	GroupKind          = "Group"

@@ -28,7 +28,6 @@ import (
 	oauthapi "github.com/openshift/api/oauth/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
-	"github.com/openshift/origin/pkg/oauth/urls"
 	"github.com/openshift/origin/pkg/oauthserver"
 	"github.com/openshift/origin/pkg/oauthserver/api"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/challenger/passwordchallenger"
@@ -58,6 +57,7 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/server/login"
 	"github.com/openshift/origin/pkg/oauthserver/server/selectprovider"
 	"github.com/openshift/origin/pkg/oauthserver/server/tokenrequest"
+	"github.com/openshift/origin/pkg/oauthserver/urls"
 	"github.com/openshift/origin/pkg/oauthserver/userregistry/identitymapper"
 	saoauth "github.com/openshift/origin/pkg/serviceaccounts/oauthclient"
 )
