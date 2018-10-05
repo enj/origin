@@ -4,13 +4,14 @@ import (
 	"fmt"
 
 	oauthv1 "github.com/openshift/api/oauth/v1"
+	osinv1 "github.com/openshift/api/osin/v1"
 	userapi "github.com/openshift/api/user/v1"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/user/apis/user/validation"
 	usercache "github.com/openshift/origin/pkg/user/cache"
 )
 
-func NewGroupsMapper(groupCache *usercache.GroupCache, identityProviders []config.IdentityProvider) GroupsMapper {
+func NewGroupsMapper(groupCache *usercache.GroupCache, identityProviders []osinv1.IdentityProvider) GroupsMapper {
 	idpGroupsPrefix := map[string]string{
 		"": "", // prevents having to special case tokens that have no groups (and thus no provider name / prefix)
 	}
@@ -29,6 +30,14 @@ func NewGroupsMapper(groupCache *usercache.GroupCache, identityProviders []confi
 		groupCache:      groupCache,
 		idpGroupsPrefix: idpGroupsPrefix,
 	}
+}
+
+func NewLegacyGroupsMapper(groupCache *usercache.GroupCache, identityProviders []config.IdentityProvider) GroupsMapper {
+	newIdentityProviders := make([]osinv1.IdentityProvider, len(identityProviders))
+	for i, identityProvider := range identityProviders {
+		newIdentityProviders[i] = osinv1.IdentityProvider{Name: identityProvider.Name}
+	}
+	return NewGroupsMapper(groupCache, newIdentityProviders)
 }
 
 type groupsMapper struct {
