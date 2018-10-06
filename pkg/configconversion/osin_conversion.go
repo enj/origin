@@ -14,9 +14,3 @@ func Convert_legacyconfigv1_OAuthConfig_to_osinv1_OAuthConfig(in *legacyconfigv1
 	_, meta := converter.DefaultMeta(reflect.TypeOf(in))
 	return converter.DefaultConvert(in, out, conversion.AllowDifferentFieldTypeNames, meta)
 }
-
-func Convert_osinv1_OAuthConfig_to_legacyconfigv1_OAuthConfig(in *osinv1.OAuthConfig, out *legacyconfigv1.OAuthConfig, s conversion.Scope) error {
-	converter := conversion.NewConverter(conversion.DefaultNameFunc)
-	_, meta := converter.DefaultMeta(reflect.TypeOf(in))
-	return converter.DefaultConvert(in, out, conversion.AllowDifferentFieldTypeNames, meta)
-}
