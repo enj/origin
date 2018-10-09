@@ -127,6 +127,10 @@ func (o *OpenShiftKubeAPIServerServer) RunAPIServer() error {
 		return RunOpenShiftKubeAPIServerServer(config)
 	}
 
+	if _, ok := os.LookupEnv("MOHERE"); ok {
+		panic(err)
+	}
+
 	// TODO this code disappears once the kube-core operator switches to external types
 	// TODO we will simply run some defaulting code and convert
 	// reading internal gives us defaulting that we need for now

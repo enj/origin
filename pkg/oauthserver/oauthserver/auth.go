@@ -152,8 +152,8 @@ func (c *OAuthServerConfig) getOsinOAuthClient() (*osincli.Client, error) {
 		return nil, err
 	}
 
-	osOAuthClientConfig := newOpenShiftOAuthClientConfig(browserClient.Name, browserClient.Secret, c.ExtraOAuthConfig.Options.MasterPublicURL, c.ExtraOAuthConfig.Options.MasterURL)
-	osOAuthClientConfig.RedirectUrl = urls.OpenShiftOAuthTokenDisplayURL(c.ExtraOAuthConfig.Options.MasterPublicURL)
+	osOAuthClientConfig := newOpenShiftOAuthClientConfig(browserClient.Name, browserClient.Secret, "https://127.0.0.1:6443", "https://127.0.0.1:6443")
+	osOAuthClientConfig.RedirectUrl = urls.OpenShiftOAuthTokenDisplayURL("https://127.0.0.1:6443")
 
 	osOAuthClient, err := osincli.NewClient(osOAuthClientConfig)
 	if err != nil {
