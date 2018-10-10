@@ -80,8 +80,9 @@ func getBasicAuthInfo(r *http.Request) (string, string, bool, error) {
 
 	username, password := cred[0], cred[1]
 
+	// empty user or pass is not an error but we do not want to try to authenticate in this case
 	if len(username) == 0 || len(password) == 0 {
-		return "", "", false, errors.New("invalid username or password")
+		return "", "", false, nil
 	}
 
 	return username, password, true, nil
