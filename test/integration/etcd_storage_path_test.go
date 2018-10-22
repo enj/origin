@@ -619,14 +619,14 @@ func TestEtcd3StoragePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resourcesToPersist = append(resourcesToPersist, getResourcesToPersist(serverResources, false, t)...)
+	resourcesToPersist = append(resourcesToPersist, getResourcesToPersist(serverResources, t)...)
 	oapiServerResources := &metav1.APIResourceList{
 		GroupVersion: "v1",
 	}
 	if err := kubeClient.Discovery().RESTClient().Get().AbsPath("oapi", "v1").Do().Into(oapiServerResources); err != nil {
 		t.Fatal(err)
 	}
-	resourcesToPersist = append(resourcesToPersist, getResourcesToPersist([]*metav1.APIResourceList{oapiServerResources}, true, t)...)
+	resourcesToPersist = append(resourcesToPersist, getResourcesToPersist([]*metav1.APIResourceList{oapiServerResources}, t)...)
 
 	for _, resourceToPersist := range resourcesToPersist {
 		gvk := resourceToPersist.gvk
@@ -749,17 +749,11 @@ func TestEtcd3StoragePath(t *testing.T) {
 type resourceToPersist struct {
 	gvk        schema.GroupVersionKind
 	gvr        schema.GroupVersionResource
-	golangType reflect.Type
 	namespaced bool
-	isOAPI     bool
 }
 
-func getResourcesToPersist(serverResources []*metav1.APIResourceList, isOAPI bool, t *testing.T) []resourceToPersist {
+func getResourcesToPersist(serverResources []*metav1.APIResourceList, t *testing.T) []resourceToPersist {
 	resourcesToPersist := []resourceToPersist{}
-
-	scheme := runtime.NewScheme()
-	install.InstallInternalOpenShift(scheme)
-	install.InstallInternalKube(scheme)
 
 	for _, discoveryGroup := range serverResources {
 		for _, discoveryResource := range discoveryGroup.APIResources {
@@ -799,7 +793,6 @@ func getResourcesToPersist(serverResources []*metav1.APIResourceList, isOAPI boo
 				gvk:        gvk,
 				gvr:        gvr,
 				namespaced: discoveryResource.Namespaced,
-				isOAPI:     isOAPI,
 			})
 		}
 	}
