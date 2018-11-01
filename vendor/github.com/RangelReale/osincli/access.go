@@ -145,13 +145,13 @@ func (c *AccessRequest) GetToken() (*AccessData, error) {
 	// extract and convert received data
 	token_type, ok := ret.ResponseData["token_type"]
 	if !ok {
-		return nil, errors.New("Invalid parameters received")
+		//return nil, errors.New("Invalid parameters received")
 	}
 	ret.TokenType = fmt.Sprintf("%v", token_type)
 
 	access_token, ok := ret.ResponseData["access_token"]
 	if !ok {
-		return nil, errors.New("Invalid parameters received")
+		//return nil, errors.New("Invalid parameters received")
 	}
 	ret.AccessToken = fmt.Sprintf("%v", access_token)
 

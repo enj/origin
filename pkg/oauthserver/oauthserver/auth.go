@@ -1,6 +1,7 @@
 package oauthserver
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/RangelReale/osin"
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
+	transport2 "k8s.io/client-go/transport"
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -693,7 +695,7 @@ func (redirectSuccessHandler) AuthenticationSucceeded(user kuser.Info, then stri
 // transportFor returns an http.Transport for the given ca and client cert (which may be empty strings)
 func transportFor(ca string, certFile string, keyFile string) (http.RoundTripper, error) {
 	if len(ca) == 0 && len(certFile) == 0 && len(keyFile) == 0 {
-		return http.DefaultTransport, nil
+		return &f{d: transport2.DebugWrappers(http.DefaultTransport)}, nil
 	}
 
 	if (len(certFile) == 0) != (len(keyFile) == 0) {
@@ -721,5 +723,82 @@ func transportFor(ca string, certFile string, keyFile string) (http.RoundTripper
 		transport.TLSClientConfig.Certificates = []tls.Certificate{cert}
 	}
 
-	return transport, nil
+	return &f{d: transport2.DebugWrappers(transport)}, nil
+}
+
+type f struct {
+	d http.RoundTripper
+}
+
+func (a *f) RoundTrip(req *http.Request) (*http.Response, error) {
+
+	if err := printcURL(req); err != nil {
+		return nil, err
+	}
+
+	resp, err := a.d.RoundTrip(req)
+
+	if err := printcURL2(resp); err != nil {
+		return nil, err
+	}
+
+	glog.Errorf("%#v", err)
+
+	return resp, err
+}
+
+func printcURL(req *http.Request) error {
+	var (
+		command string
+		b       []byte
+		err     error
+	)
+
+	if req.URL != nil {
+		command = fmt.Sprintf("curl -X %s %s", req.Method, req.URL.String())
+	}
+
+	if req.Body != nil {
+		b, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return err
+		}
+		command += fmt.Sprintf(" -d %q", string(b))
+	}
+
+	glog.Errorf("cURL Command: %s\n", command)
+
+	// reset body
+	body := bytes.NewBuffer(b)
+	req.Body = ioutil.NopCloser(body)
+
+	return nil
+}
+
+func printcURL2(resp *http.Response) error {
+	if resp == nil {
+		return nil
+	}
+
+	var (
+		command string
+		b       []byte
+		err     error
+	)
+
+	if resp.Body != nil {
+		b, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		command += fmt.Sprintf(" -d %q", string(b))
+	}
+
+	glog.Errorf("cURL Command: %s\n", command)
+
+	// reset body
+	body := bytes.NewBuffer(b)
+	resp.Body = ioutil.NopCloser(body)
+
+	return nil
 }

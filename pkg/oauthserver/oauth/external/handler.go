@@ -114,6 +114,7 @@ func NewOAuthPasswordAuthenticator(provider Provider, mapper authapi.UserIdentit
 func (h *Handler) AuthenticatePassword(username, password string) (user.Info, bool, error) {
 	// Exchange password for a token
 	accessReq := h.client.NewAccessRequest(osincli.PASSWORD, &osincli.AuthorizeData{Username: username, Password: password})
+	//accessReq.CustomParameters["resource"] = "https://graph.windows.net/"
 	accessData, err := accessReq.GetToken()
 	if err != nil {
 		if oauthErr, ok := err.(*osincli.Error); ok && oauthErr.Id == "invalid_grant" {

@@ -141,11 +141,15 @@ func (p provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentit
 		return nil, false, fmt.Errorf("No id_token returned in %v", data.ResponseData)
 	}
 
+	glog.Error(idToken)
+
 	// id_token MUST be a valid JWT
 	idTokenClaims, err := decodeJWT(idToken)
 	if err != nil {
 		return nil, false, err
 	}
+
+	glog.Errorf("%#v", idTokenClaims)
 
 	if p.IDTokenValidator != nil {
 		if err := p.IDTokenValidator(idTokenClaims); err != nil {
@@ -186,6 +190,8 @@ func (p provider) GetUserIdentity(data *osincli.AccessData) (authapi.UserIdentit
 		if userInfoSubject != idTokenSubject {
 			return nil, false, fmt.Errorf("userinfo 'sub' claim (%s) did not match id_token 'sub' claim (%s)", userInfoSubject, idTokenSubject)
 		}
+
+		glog.Errorf("%#v", userInfoClaims)
 
 		// Merge in userinfo claims in case id_token claims contained some that userinfo did not
 		for k, v := range userInfoClaims {
