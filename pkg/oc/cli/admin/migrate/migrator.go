@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
@@ -416,6 +417,16 @@ type ResourceVisitor struct {
 	Workers int
 }
 
+var spewState = spew.ConfigState{
+	Indent:                  "\t",
+	MaxDepth:                11,
+	DisableMethods:          true,
+	DisablePointerAddresses: true,
+	DisableCapacities:       true,
+	SortKeys:                true,
+	SpewKeys:                true,
+}
+
 func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	dryRun := o.DryRun
 	summarize := true
@@ -431,7 +442,11 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	out := o.Out
 
 	// Ignore any resource that does not support GET
-	visitor, err := o.Builder.Visitor(errors.IsMethodNotSupported, errors.IsNotFound)
+	visitor, err := o.Builder.Visitor(errors.IsMethodNotSupported, errors.IsNotFound,
+		func(meh error) bool {
+			spewState.Dump("SPEW_A", meh)
+			return false
+		})
 	if err != nil {
 		return err
 	}
@@ -477,6 +492,10 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 	}()
 
 	err = visitor.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			spewState.Dump("SPEW_B", info)
+			spewState.Dump("SPEW_C", err)
+		}
 		// send data from producer visitor to workers
 		work <- workData{info: info, err: err}
 		return nil
@@ -505,6 +524,7 @@ func (o *ResourceVisitor) Visit(fn MigrateVisitFunc) error {
 
 	switch {
 	case err != nil:
+		spewState.Dump("SPEW_D", err)
 		fmt.Fprintf(out, "error: exited without processing all resources: %v\n", err)
 		err = kcmdutil.ErrExit
 	case t.errors > 0:
@@ -599,6 +619,7 @@ func (t *migrateTracker) report(prefix string, info *resource.Info, err error) {
 	groupResource := info.Mapping.Resource.GroupResource()
 	groupResourceStr := (&groupResource).String()
 	if err != nil {
+		spewState.Dump("SPEW_E", err)
 		fmt.Fprintf(t.out, "E%s %-10s%s %s/%s: %v\n", timeStampNow(), prefix, ns, groupResourceStr, info.Name, err)
 	} else {
 		fmt.Fprintf(t.out, "I%s %-10s%s %s/%s\n", timeStampNow(), prefix, ns, groupResourceStr, info.Name)
@@ -759,6 +780,7 @@ func DefaultRetriable(info *resource.Info, err error) error {
 	case errors.IsServerTimeout(err):
 		return ErrRetriable{err}
 	default:
+		spewState.Dump("SPEW_M", err)
 		return err
 	}
 }

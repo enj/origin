@@ -58,7 +58,15 @@ func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error
 		// TODO: I should be part of GetOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
-	return req.Do().Get()
+	res := req.Do()
+	o, e := res.Get()
+	if e != nil {
+		spewState.Dump("SPEW_Q", req)
+		spewState.Dump("SPEW_R", res)
+		spewState.Dump("SPEW_S", o)
+		spewState.Dump("SPEW_T", e)
+	}
+	return o, e
 }
 
 func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1.ListOptions) (runtime.Object, error) {
@@ -70,7 +78,15 @@ func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1
 		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
-	return req.Do().Get()
+	res := req.Do()
+	o, e := res.Get()
+	if e != nil {
+		spewState.Dump("SPEW_I", req)
+		spewState.Dump("SPEW_J", res)
+		spewState.Dump("SPEW_K", o)
+		spewState.Dump("SPEW_L", e)
+	}
+	return o, e
 }
 
 func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions) (watch.Interface, error) {

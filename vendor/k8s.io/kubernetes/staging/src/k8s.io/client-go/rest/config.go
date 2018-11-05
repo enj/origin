@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -28,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -213,7 +215,101 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		}
 	}
 
+	if httpClient.Transport == nil {
+		httpClient.Transport = http.DefaultTransport
+	}
+
+	httpClient.Transport = &f{d: httpClient.Transport}
+
 	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+}
+
+var spewState = spew.ConfigState{
+	Indent:                  "\t",
+	MaxDepth:                11,
+	DisableMethods:          true,
+	DisablePointerAddresses: true,
+	DisableCapacities:       true,
+	SortKeys:                true,
+	SpewKeys:                true,
+}
+
+type f struct {
+	d http.RoundTripper
+}
+
+func (a *f) RoundTrip(req *http.Request) (*http.Response, error) {
+	if e1 := printcURL(req); e1 != nil {
+		spewState.Dump("SPEW_N", e1)
+	}
+
+	resp, err := a.d.RoundTrip(req)
+
+	if e2 := printcURL2(resp); e2 != nil {
+		spewState.Dump("SPEW_O", e2)
+	}
+
+	if err != nil {
+		spewState.Dump("SPEW_P", err)
+	}
+
+	return resp, err
+}
+
+func printcURL(req *http.Request) error {
+	var (
+		command string
+		b       []byte
+		err     error
+	)
+
+	if req.URL != nil {
+		command = fmt.Sprintf("curl -X %s %s", req.Method, req.URL.String())
+	}
+
+	if req.Body != nil {
+		b, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return err
+		}
+		command += fmt.Sprintf(" -d %q", string(b))
+	}
+
+	glog.Errorf("cURL Command: %s\n", command)
+
+	// reset body
+	body := bytes.NewBuffer(b)
+	req.Body = ioutil.NopCloser(body)
+
+	return nil
+}
+
+func printcURL2(resp *http.Response) error {
+	if resp == nil {
+		return nil
+	}
+
+	var (
+		command string
+		b       []byte
+		err     error
+	)
+
+	if resp.Body != nil {
+		b, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		command += fmt.Sprintf(" -d %q", string(b))
+	}
+
+	glog.Errorf("cURL Command: %s\n", command)
+
+	// reset body
+	body := bytes.NewBuffer(b)
+	resp.Body = ioutil.NopCloser(body)
+
+	return nil
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows

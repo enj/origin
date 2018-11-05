@@ -19,6 +19,8 @@ package resource
 import (
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +53,16 @@ func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelS
 	}
 }
 
+var spewState = spew.ConfigState{
+	Indent:                  "\t",
+	MaxDepth:                11,
+	DisableMethods:          true,
+	DisablePointerAddresses: true,
+	DisableCapacities:       true,
+	SortKeys:                true,
+	SpewKeys:                true,
+}
+
 // Visit implements Visitor and uses request chunking by default.
 func (r *Selector) Visit(fn VisitorFunc) error {
 	var continueToken string
@@ -68,6 +80,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 			},
 		)
 		if err != nil {
+			spewState.Dump("SPEW_F", err)
 			if errors.IsResourceExpired(err) {
 				return err
 			}
@@ -101,6 +114,8 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		}
 
 		if err := fn(info, nil); err != nil {
+			spewState.Dump("SPEW_G", info)
+			spewState.Dump("SPEW_H", err)
 			return err
 		}
 		if len(nextContinueToken) == 0 {
