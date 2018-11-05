@@ -239,13 +239,15 @@ type f struct {
 }
 
 func (a *f) RoundTrip(req *http.Request) (*http.Response, error) {
-	if e1 := logRequest(req); e1 != nil {
+	b := &strings.Builder{}
+
+	if e1 := logRequest(req, b); e1 != nil {
 		spewState.Dump("SPEW_N", e1)
 	}
 
 	resp, err := a.d.RoundTrip(req)
 
-	if e2 := logResponse(resp); e2 != nil {
+	if e2 := logResponse(resp, b); e2 != nil {
 		spewState.Dump("SPEW_O", e2)
 	}
 
@@ -253,10 +255,12 @@ func (a *f) RoundTrip(req *http.Request) (*http.Response, error) {
 		spewState.Dump("SPEW_P", err)
 	}
 
+	glog.Error(b.String())
+
 	return resp, err
 }
 
-func logRequest(req *http.Request) error {
+func logRequest(req *http.Request, b2 *strings.Builder) error {
 	var (
 		command string
 		b       []byte
@@ -275,8 +279,8 @@ func logRequest(req *http.Request) error {
 		command += fmt.Sprintf(" -d %q", string(b))
 	}
 
-	glog.Errorf("REQUEST: %s\n", command)
-	glog.Errorf("REQUEST Header: %#v", req.Header)
+	b2.WriteString(fmt.Sprintf("\n\nREQUEST: %s\n", command))
+	b2.WriteString(fmt.Sprintf("REQUEST Header: %#v\n", req.Header))
 
 	// reset body
 	body := bytes.NewBuffer(b)
@@ -285,7 +289,7 @@ func logRequest(req *http.Request) error {
 	return nil
 }
 
-func logResponse(resp *http.Response) error {
+func logResponse(resp *http.Response, b2 *strings.Builder) error {
 	if resp == nil {
 		return nil
 	}
@@ -296,14 +300,14 @@ func logResponse(resp *http.Response) error {
 			return err
 		}
 
-		glog.Errorf("RESPONSE: %s", string(b))
+		b2.WriteString(fmt.Sprintf("RESPONSE: %s", string(b)))
 
 		// reset body
 		body := bytes.NewBuffer(b)
 		resp.Body = ioutil.NopCloser(body)
 	}
 
-	glog.Errorf("RESPONSE Header: %#v", resp.Header)
+	b2.WriteString(fmt.Sprintf("RESPONSE Header: %#v\n", resp.Header))
 
 	return nil
 }
