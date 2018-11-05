@@ -19,6 +19,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -300,16 +301,21 @@ func logResponse(resp *http.Response, b2 *strings.Builder) error {
 			return err
 		}
 
-		b2.WriteString(fmt.Sprintf("RESPONSE: %s", string(b)))
+		b2.WriteString(fmt.Sprintf("RESPONSE (JSON=%v): %s", isJSON(b), string(b)))
 
 		// reset body
 		body := bytes.NewBuffer(b)
 		resp.Body = ioutil.NopCloser(body)
 	}
 
-	b2.WriteString(fmt.Sprintf("RESPONSE Header: %#v\n", resp.Header))
+	b2.WriteString(fmt.Sprintf("RESPONSE Header: %#v\n\n", resp.Header))
 
 	return nil
+}
+
+func isJSON(data []byte) bool {
+	var js json.RawMessage
+	return json.Unmarshal(data, &js) == nil
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
