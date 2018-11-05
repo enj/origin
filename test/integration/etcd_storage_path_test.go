@@ -526,32 +526,6 @@ func TestEtcd3StoragePath(t *testing.T) {
 	// TODO storage is broken somehow.  failing on v1beta1 serialization
 	delete(etcdStorageData, gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"))
 
-	type hackOverride struct {
-		path string
-		gvk  *schema.GroupVersionKind
-	}
-
-	// TODO we store these in the wrong place and version in etcd
-	for resource, override := range map[schema.GroupVersionResource]hackOverride{
-		gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {
-			// this path should be /registry/apiregistration.k8s.io/apiservices/as1.foo.com
-			path: "/registry/apiservices/as1.foo.com",
-			// we store at v1, upstream stores at v1beta1
-			gvk: gvkP("apiregistration.k8s.io", "v1", "APIService"),
-		},
-		gvr("apiregistration.k8s.io", "v1", "apiservices"): {
-			// this path should be /registry/apiregistration.k8s.io/apiservices/as2.foo.com
-			path: "/registry/apiservices/as2.foo.com",
-			// we store at v1, upstream stores at v1beta1
-			gvk: nil,
-		},
-	} {
-		data := etcdStorageData[resource]
-		data.ExpectedEtcdPath = override.path
-		data.ExpectedGVK = override.gvk
-		etcdStorageData[resource] = data
-	}
-
 	for gvr := range etcdStorageData {
 		data := etcdStorageData[gvr]
 		path := data.ExpectedEtcdPath
