@@ -239,13 +239,13 @@ type f struct {
 }
 
 func (a *f) RoundTrip(req *http.Request) (*http.Response, error) {
-	if e1 := printcURL(req); e1 != nil {
+	if e1 := logRequest(req); e1 != nil {
 		spewState.Dump("SPEW_N", e1)
 	}
 
 	resp, err := a.d.RoundTrip(req)
 
-	if e2 := printcURL2(resp); e2 != nil {
+	if e2 := logResponse(resp); e2 != nil {
 		spewState.Dump("SPEW_O", e2)
 	}
 
@@ -256,7 +256,7 @@ func (a *f) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func printcURL(req *http.Request) error {
+func logRequest(req *http.Request) error {
 	var (
 		command string
 		b       []byte
@@ -275,7 +275,8 @@ func printcURL(req *http.Request) error {
 		command += fmt.Sprintf(" -d %q", string(b))
 	}
 
-	glog.Errorf("cURL Command: %s\n", command)
+	glog.Errorf("REQUEST: %s\n", command)
+	glog.Errorf("REQUEST Header: %#v", req.Header)
 
 	// reset body
 	body := bytes.NewBuffer(b)
@@ -284,30 +285,25 @@ func printcURL(req *http.Request) error {
 	return nil
 }
 
-func printcURL2(resp *http.Response) error {
+func logResponse(resp *http.Response) error {
 	if resp == nil {
 		return nil
 	}
 
-	var (
-		command string
-		b       []byte
-		err     error
-	)
-
 	if resp.Body != nil {
-		b, err = ioutil.ReadAll(resp.Body)
+		b, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}
-		command += fmt.Sprintf(" -d %q", string(b))
+
+		glog.Errorf("RESPONSE: %s", string(b))
+
+		// reset body
+		body := bytes.NewBuffer(b)
+		resp.Body = ioutil.NopCloser(body)
 	}
 
-	glog.Errorf("cURL Command: %s\n", command)
-
-	// reset body
-	body := bytes.NewBuffer(b)
-	resp.Body = ioutil.NopCloser(body)
+	glog.Errorf("RESPONSE Header: %#v", resp.Header)
 
 	return nil
 }
