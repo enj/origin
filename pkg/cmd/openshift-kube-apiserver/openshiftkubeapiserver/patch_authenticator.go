@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -18,6 +19,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	kclientsetexternal "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 	sacontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -79,10 +81,22 @@ func NewAuthenticator(
 		userClient.User().Users(),
 		apiClientCAs,
 		usercache.NewGroupCache(groupInformer),
+		kubeExternalClient.CoreV1(),
 	)
 }
 
-func newAuthenticator(serviceAccountPublicKeyFiles []string, oauthConfig *osinv1.OAuthConfig, authConfig kubecontrolplanev1.MasterAuthConfig, accessTokenGetter oauthclient.OAuthAccessTokenInterface, oauthClientLister oauthclientlister.OAuthClientLister, tokenGetter serviceaccount.ServiceAccountTokenGetter, userGetter usertypedclient.UserInterface, apiClientCAs *x509.CertPool, groupMapper oauth.UserToGroupMapper) (authenticator.Request, map[string]genericapiserver.PostStartHookFunc, error) {
+func newAuthenticator(
+	serviceAccountPublicKeyFiles []string,
+	oauthConfig *osinv1.OAuthConfig,
+	authConfig kubecontrolplanev1.MasterAuthConfig,
+	accessTokenGetter oauthclient.OAuthAccessTokenInterface,
+	oauthClientLister oauthclientlister.OAuthClientLister,
+	tokenGetter serviceaccount.ServiceAccountTokenGetter,
+	userGetter usertypedclient.UserInterface,
+	apiClientCAs *x509.CertPool,
+	groupMapper oauth.UserToGroupMapper,
+	secretsGetter v1.SecretsGetter,
+) (authenticator.Request, map[string]genericapiserver.PostStartHookFunc, error) {
 	postStartHooks := map[string]genericapiserver.PostStartHookFunc{}
 	authenticators := []authenticator.Request{}
 	tokenAuthenticators := []authenticator.Token{}
@@ -122,7 +136,7 @@ func newAuthenticator(serviceAccountPublicKeyFiles []string, oauthConfig *osinv1
 			// if you have an OAuth bearer token, you're a human (usually)
 			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}),
 			// bootstrap oauth user
-			oauth.NewBootstrapAuthenticator(accessTokenGetter, nil, validators...), // TODO
+			oauth.NewBootstrapAuthenticator(accessTokenGetter, secretsGetter.Secrets(metav1.NamespaceSystem), validators...),
 		)
 	}
 
