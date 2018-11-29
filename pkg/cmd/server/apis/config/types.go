@@ -927,6 +927,20 @@ type IdentityProvider struct {
 	Provider runtime.Object
 }
 
+// TODO move this stuff
+
+const BootstrapUser = "oauth:admin"
+
+type BootstrapIdentityProvider struct {
+	metav1.TypeMeta
+}
+
+func (b *BootstrapIdentityProvider) DeepCopyObject() runtime.Object {
+	return &BootstrapIdentityProvider{
+		TypeMeta: b.TypeMeta,
+	}
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type BasicAuthPasswordIdentityProvider struct {

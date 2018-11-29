@@ -120,7 +120,10 @@ func newAuthenticator(serviceAccountPublicKeyFiles []string, oauthConfig *osinv1
 		oauthTokenAuthenticator := oauth.NewTokenAuthenticator(accessTokenGetter, userGetter, groupMapper, validators...)
 		tokenAuthenticators = append(tokenAuthenticators,
 			// if you have an OAuth bearer token, you're a human (usually)
-			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}))
+			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}),
+			// bootstrap oauth user
+			oauth.NewBootstrapAuthenticator(accessTokenGetter),
+		)
 	}
 
 	for _, wta := range authConfig.WebhookTokenAuthenticators {

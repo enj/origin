@@ -35,6 +35,7 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/challenger/placeholderchallenger"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/allowanypassword"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/basicauthpassword"
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/denypassword"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/htpasswd"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/keystonepassword"
@@ -594,6 +595,9 @@ func (c *OAuthServerConfig) getPasswordAuthenticator(identityProvider configapi.
 		}
 
 		return keystonepassword.New(identityProvider.Name, connectionInfo.URL, transport, provider.DomainName, identityMapper, provider.UseKeystoneIdentity), nil
+
+	case *configapi.BootstrapIdentityProvider:
+		return bootstrap.New(), nil
 
 	default:
 		return nil, fmt.Errorf("No password auth found that matches %v.  The OAuth server cannot start!", identityProvider)

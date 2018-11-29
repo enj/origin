@@ -344,7 +344,8 @@ func IsPasswordAuthenticator(provider IdentityProvider) bool {
 		*DenyAllPasswordIdentityProvider,
 		*HTPasswdPasswordIdentityProvider,
 		*LDAPPasswordIdentityProvider,
-		*KeystonePasswordIdentityProvider:
+		*KeystonePasswordIdentityProvider,
+		*BootstrapIdentityProvider:
 
 		return true
 	}

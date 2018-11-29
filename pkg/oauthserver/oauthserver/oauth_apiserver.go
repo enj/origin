@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/openshift/origin/pkg/oauthserver/userregistry/identitymapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -73,6 +74,17 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 			return nil, err
 		}
 		sessionAuth = auth
+
+		// TODO a knob to disable this may make sense, even once the bootstrap secret is deleted
+		oauthConfig.IdentityProviders = append(oauthConfig.IdentityProviders,
+			configapi.IdentityProvider{
+				Name:            configapi.BootstrapUser,
+				UseAsChallenger: true,
+				UseAsLogin:      true,
+				MappingMethod:   string(identitymapper.MappingMethodClaim),
+				Provider:        &configapi.BootstrapIdentityProvider{},
+			},
+		)
 	}
 
 	userClient, err := userclient.NewForConfig(userClientConfig)
