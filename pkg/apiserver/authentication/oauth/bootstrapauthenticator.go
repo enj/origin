@@ -29,9 +29,12 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 		return nil, false, nil
 	}
 
+	// TODO make sure secret is still valid -- could store the hash as user UID, actually just stored secret UUID
+	// TODO make sure token is not expired
+
+	// we explicitly do not set UID as we do not want to leak any derivative of the password
 	return &kuser.DefaultInfo{
-		Name:   token.UserName,
-		UID:    token.UserUID,
+		Name:   config.BootstrapUser,
 		Groups: []string{kuser.SystemPrivilegedGroup},
 	}, true, nil
 }

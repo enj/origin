@@ -291,7 +291,13 @@ func (c *OAuthServerConfig) getAuthenticationFinalizer() osinserver.AuthorizeHan
 	if c.ExtraOAuthConfig.SessionAuth != nil {
 		// The session needs to know the authorize flow is done so it can invalidate the session
 		return osinserver.AuthorizeHandlerFunc(func(ar *osin.AuthorizeRequest, resp *osin.Response, w http.ResponseWriter) (bool, error) {
-			if err := c.ExtraOAuthConfig.SessionAuth.InvalidateAuthentication(w, ar.HttpRequest); err != nil {
+			user, ok := ar.UserData.(kuser.Info)
+			if !ok {
+				glog.Errorf("the provided user data is not a user.Info object: %#v", user)
+				user = &kuser.DefaultInfo{} // set non-nil so we always try to invalidate
+			}
+
+			if err := c.ExtraOAuthConfig.SessionAuth.InvalidateAuthentication(w, user); err != nil {
 				glog.V(5).Infof("error invaliding cookie session: %v", err)
 			}
 			// do not fail the OAuth flow if we cannot invalidate the cookie

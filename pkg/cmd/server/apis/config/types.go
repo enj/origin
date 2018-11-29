@@ -931,6 +931,9 @@ type IdentityProvider struct {
 
 const BootstrapUser = "oauth:admin"
 
+// support basic auth which does not allow : in username
+const BootstrapUserBasicAuth = "oauthadmin"
+
 type BootstrapIdentityProvider struct {
 	metav1.TypeMeta
 }
