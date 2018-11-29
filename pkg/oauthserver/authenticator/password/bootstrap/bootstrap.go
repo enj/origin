@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"crypto/sha512"
 	"encoding/base64"
 
 	"golang.org/x/crypto/bcrypt"
@@ -68,10 +69,7 @@ func HashAndUID(secrets v1.SecretInterface) ([]byte, string, bool, error) {
 	exactSecret := string(secret.UID) + secret.ResourceVersion
 	both := append([]byte(exactSecret), hashedPassword...)
 
-	uidBytes, err := bcrypt.GenerateFromPassword(both, bcrypt.DefaultCost)
-	if err != nil {
-		return nil, "", false, err
-	}
+	uidBytes := sha512.Sum512(both)
 
-	return hashedPassword, base64.RawURLEncoding.EncodeToString(uidBytes), true, nil
+	return hashedPassword, base64.RawURLEncoding.EncodeToString(uidBytes[:]), true, nil
 }
