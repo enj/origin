@@ -5,7 +5,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -16,9 +15,9 @@ import (
 	"github.com/openshift/origin/pkg/cmd/server/apis/config"
 )
 
-func New(getter v1.SecretsGetter) authenticator.Password {
+func New(secrets v1.SecretInterface) authenticator.Password {
 	return &bootstrapPassword{
-		secrets: getter.Secrets(metav1.NamespaceSystem),
+		secrets: secrets,
 		names:   sets.NewString(config.BootstrapUser, config.BootstrapUserBasicAuth),
 	}
 }
@@ -33,28 +32,15 @@ func (b *bootstrapPassword) AuthenticatePassword(username, password string) (use
 		return nil, false, nil
 	}
 
-	secret, err := b.secrets.Get(config.BootstrapUserBasicAuth, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-
-	hashedPassword := secret.Data[config.BootstrapUserBasicAuth]
-	if len(hashedPassword) == 0 {
-		return nil, false, nil
+	hashedPassword, uid, ok, err := HashAndUID(b.secrets)
+	if err != nil || !ok {
+		return nil, ok, err
 	}
 
 	if err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password)); err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
 			return nil, false, nil
 		}
-		return nil, false, err
-	}
-
-	uid, err := SecretToUID(secret)
-	if err != nil {
 		return nil, false, err
 	}
 
@@ -65,13 +51,27 @@ func (b *bootstrapPassword) AuthenticatePassword(username, password string) (use
 	}, true, nil
 }
 
-func SecretToUID(secret *corev1.Secret) (string, error) {
+func HashAndUID(secrets v1.SecretInterface) ([]byte, string, bool, error) {
+	secret, err := secrets.Get(config.BootstrapUserBasicAuth, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil, "", false, nil
+	}
+	if err != nil {
+		return nil, "", false, err
+	}
+
 	hashedPassword := secret.Data[config.BootstrapUserBasicAuth]
+	if len(hashedPassword) == 0 {
+		return nil, "", false, nil
+	}
+
 	exactSecret := string(secret.UID) + secret.ResourceVersion
 	both := append([]byte(exactSecret), hashedPassword...)
-	uid, err := bcrypt.GenerateFromPassword(both, bcrypt.DefaultCost)
+
+	uidBytes, err := bcrypt.GenerateFromPassword(both, bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		return nil, "", false, err
 	}
-	return base64.RawURLEncoding.EncodeToString(uid), nil
+
+	return hashedPassword, base64.RawURLEncoding.EncodeToString(uidBytes), true, nil
 }

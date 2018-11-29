@@ -122,7 +122,7 @@ func newAuthenticator(serviceAccountPublicKeyFiles []string, oauthConfig *osinv1
 			// if you have an OAuth bearer token, you're a human (usually)
 			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}),
 			// bootstrap oauth user
-			oauth.NewBootstrapAuthenticator(accessTokenGetter),
+			oauth.NewBootstrapAuthenticator(accessTokenGetter, nil, validators...), // TODO
 		)
 	}
 

@@ -1,21 +1,29 @@
 package oauth
 
 import (
-	"github.com/openshift/origin/pkg/cmd/server/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	kauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	kuser "k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 
+	userapi "github.com/openshift/api/user/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
+	"github.com/openshift/origin/pkg/cmd/server/apis/config"
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 )
 
 type bootstrapAuthenticator struct {
-	tokens oauthclient.OAuthAccessTokenInterface
+	tokens    oauthclient.OAuthAccessTokenInterface
+	secrets   v1.SecretInterface
+	validator OAuthTokenValidator
 }
 
-func NewBootstrapAuthenticator(tokens oauthclient.OAuthAccessTokenInterface) kauthenticator.Token {
+func NewBootstrapAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, secrets v1.SecretInterface, validators ...OAuthTokenValidator) kauthenticator.Token {
 	return &bootstrapAuthenticator{
-		tokens: tokens,
+		tokens:    tokens,
+		secrets:   secrets,
+		validator: OAuthTokenValidators(validators),
 	}
 }
 
@@ -29,8 +37,21 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 		return nil, false, nil
 	}
 
-	// TODO make sure secret is still valid -- could store the hash as user UID, actually just stored secret UUID
-	// TODO make sure token is not expired
+	_, uid, ok, err := bootstrap.HashAndUID(a.secrets)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+
+	// this allows us to reuse existing validators
+	fakeUser := &userapi.User{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(uid),
+		},
+	}
+
+	if err := a.validator.Validate(token, fakeUser); err != nil {
+		return nil, false, err
+	}
 
 	// we explicitly do not set UID as we do not want to leak any derivative of the password
 	return &kuser.DefaultInfo{
