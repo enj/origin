@@ -133,10 +133,13 @@ func newAuthenticator(
 		oauthTokenAuthenticator := oauth.NewTokenAuthenticator(accessTokenGetter, userGetter, groupMapper, validators...)
 		tokenAuthenticators = append(tokenAuthenticators,
 			// if you have an OAuth bearer token, you're a human (usually)
-			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}),
-			// bootstrap oauth user
-			oauth.NewBootstrapAuthenticator(accessTokenGetter, secretsGetter, validators...),
-		)
+			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}))
+
+		if oauthConfig.SessionConfig != nil {
+			tokenAuthenticators = append(tokenAuthenticators,
+				// bootstrap oauth user that can do anything, backed by a secret
+				oauth.NewBootstrapAuthenticator(accessTokenGetter, secretsGetter, validators...))
+		}
 	}
 
 	for _, wta := range authConfig.WebhookTokenAuthenticators {

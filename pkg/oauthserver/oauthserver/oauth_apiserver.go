@@ -96,14 +96,17 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 		}
 		sessionAuth = auth
 
-		// TODO a knob to disable this may make sense, even once the bootstrap secret is deleted
+		// session capability is the only thing required to enable the bootstrap IDP
+		// we dynamically enable or disable its UI based on the backing secret
+		// this must be the first IDP to make sure that it can handle basic auth challenges first
+		// this mostly avoids weird cases with the allow all IDP
 		oauthConfig.IdentityProviders = append(
 			[]configapi.IdentityProvider{
 				{
-					Name:            bootstrap.BootstrapUser,
+					Name:            bootstrap.BootstrapUser, // will never conflict with other IDPs due to the :
 					UseAsChallenger: true,
 					UseAsLogin:      true,
-					MappingMethod:   string(identitymapper.MappingMethodClaim),
+					MappingMethod:   string(identitymapper.MappingMethodClaim), // irrelevant, but needs to be valid
 					Provider:        &configapi.BootstrapIdentityProvider{},
 				},
 			},

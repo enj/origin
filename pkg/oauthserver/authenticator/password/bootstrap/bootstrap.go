@@ -53,7 +53,7 @@ func (b *bootstrapPassword) AuthenticatePassword(username, password string) (use
 	// do not set other fields, see identitymapper.userToInfo func
 	return &user.DefaultInfo{
 		Name: BootstrapUser,
-		UID:  uid,
+		UID:  uid, // uid ties this authentication to the current state of the secret
 	}, true, nil
 }
 
@@ -74,6 +74,8 @@ func HashAndUID(secrets v1.SecretInterface) ([]byte, string, bool, error) {
 	exactSecret := string(secret.UID) + secret.ResourceVersion
 	both := append([]byte(exactSecret), hashedPassword...)
 
+	// use a hash to avoid leaking any derivative of the password
+	// this makes it easy for us to tell if the secret changed
 	uidBytes := sha512.Sum512(both)
 
 	return hashedPassword, base64.RawURLEncoding.EncodeToString(uidBytes[:]), true, nil

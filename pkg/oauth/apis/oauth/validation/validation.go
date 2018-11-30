@@ -314,6 +314,8 @@ func ValidateUserNameField(value string, fldPath *field.Path) field.ErrorList {
 	if len(value) == 0 {
 		return field.ErrorList{field.Required(fldPath, "")}
 	}
+	// we explicitly allow the bootstrap user in the username field
+	// note that we still do not allow the user API objects to have such a name
 	if value == bootstrap.BootstrapUser {
 		return field.ErrorList{}
 	}
