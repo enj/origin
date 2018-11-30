@@ -453,6 +453,11 @@ func (c *OAuthServerConfig) getAuthenticationHandler(mux oauthserver.Mux, errorH
 
 	selectProvider := selectprovider.NewSelectProvider(selectProviderRenderer, c.ExtraOAuthConfig.Options.AlwaysShowProviderSelection)
 
+	// the bootstrap user IDP is always set as the first one when sessions are enabled
+	if c.ExtraOAuthConfig.Options.SessionConfig != nil {
+		selectProvider = selectprovider.NewBootstrapSelectProvider(selectProvider, c.ExtraOAuthConfig.KubeClient.CoreV1())
+	}
+
 	authHandler := handlers.NewUnionAuthenticationHandler(challengers, redirectors, errorHandler, selectProvider)
 	return authHandler, nil
 }
