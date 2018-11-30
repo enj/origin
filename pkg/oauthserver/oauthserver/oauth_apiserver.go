@@ -76,14 +76,17 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 		sessionAuth = auth
 
 		// TODO a knob to disable this may make sense, even once the bootstrap secret is deleted
-		oauthConfig.IdentityProviders = append(oauthConfig.IdentityProviders,
-			configapi.IdentityProvider{
-				Name:            bootstrap.BootstrapUser,
-				UseAsChallenger: true,
-				UseAsLogin:      true,
-				MappingMethod:   string(identitymapper.MappingMethodClaim),
-				Provider:        &bootstrap.BootstrapIdentityProvider{},
+		oauthConfig.IdentityProviders = append(
+			[]configapi.IdentityProvider{
+				{
+					Name:            bootstrap.BootstrapUser,
+					UseAsChallenger: true,
+					UseAsLogin:      true,
+					MappingMethod:   string(identitymapper.MappingMethodClaim),
+					Provider:        &configapi.BootstrapIdentityProvider{},
+				},
 			},
+			oauthConfig.IdentityProviders...,
 		)
 	}
 

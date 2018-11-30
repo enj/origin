@@ -602,7 +602,7 @@ func (c *OAuthServerConfig) getPasswordAuthenticator(identityProvider configapi.
 
 		return keystonepassword.New(identityProvider.Name, connectionInfo.URL, transport, provider.DomainName, identityMapper, provider.UseKeystoneIdentity), nil
 
-	case *bootstrap.BootstrapIdentityProvider:
+	case *configapi.BootstrapIdentityProvider:
 		return bootstrap.New(c.ExtraOAuthConfig.KubeClient.CoreV1()), nil
 
 	default:

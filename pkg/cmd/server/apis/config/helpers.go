@@ -17,7 +17,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
-	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 )
 
 // ParseNamespaceAndName returns back the namespace and name (empty if something goes wrong), for a given string.
@@ -346,7 +345,7 @@ func IsPasswordAuthenticator(provider IdentityProvider) bool {
 		*HTPasswdPasswordIdentityProvider,
 		*LDAPPasswordIdentityProvider,
 		*KeystonePasswordIdentityProvider,
-		*bootstrap.BootstrapIdentityProvider:
+		*BootstrapIdentityProvider:
 
 		return true
 	}
