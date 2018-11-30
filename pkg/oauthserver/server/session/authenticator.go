@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
+
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 )
 
 const (
