@@ -345,6 +345,9 @@ func IsPasswordAuthenticator(provider IdentityProvider) bool {
 		*HTPasswdPasswordIdentityProvider,
 		*LDAPPasswordIdentityProvider,
 		*KeystonePasswordIdentityProvider,
+		// we explicitly only include the bootstrap type in this function
+		// but not IsIdentityProviderType as this is not a real IDP
+		// it is an implementation detail that is not surfaced to users
 		*BootstrapIdentityProvider:
 
 		return true

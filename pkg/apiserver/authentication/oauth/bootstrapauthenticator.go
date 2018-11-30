@@ -42,6 +42,8 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 	}
 
 	// this allows us to reuse existing validators
+	// since the uid is based on the secret, if the secret changes, all
+	// tokens issued for the bootstrap user before that change stop working
 	fakeUser := &userapi.User{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: types.UID(uid),
@@ -55,6 +57,6 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 	// we explicitly do not set UID as we do not want to leak any derivative of the password
 	return &kuser.DefaultInfo{
 		Name:   bootstrap.BootstrapUser,
-		Groups: []string{kuser.SystemPrivilegedGroup},
+		Groups: []string{kuser.SystemPrivilegedGroup}, // authorized to do everything
 	}, true, nil
 }

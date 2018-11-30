@@ -65,11 +65,32 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 	genericConfig := genericapiserver.NewRecommendedConfig(codecs)
 	genericConfig.LoopbackClientConfig = userClientConfig
 
+	userClient, err := userclient.NewForConfig(userClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	oauthClient, err := oauthclient.NewForConfig(userClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	eventsClient, err := corev1.NewForConfig(userClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	routeClient, err := routeclient.NewForConfig(userClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	kubeClient, err := kclientset.NewForConfig(userClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	var sessionAuth *session.Authenticator
 	if oauthConfig.SessionConfig != nil {
 		// TODO we really need to enforce HTTPS always
 		secure := isHTTPS(oauthConfig.MasterPublicURL)
-		auth, err := buildSessionAuth(secure, oauthConfig.SessionConfig)
+		auth, err := buildSessionAuth(secure, oauthConfig.SessionConfig, kubeClient.CoreV1())
 		if err != nil {
 			return nil, err
 		}
@@ -90,32 +111,21 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 		)
 	}
 
-	userClient, err := userclient.NewForConfig(userClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	oauthClient, err := oauthclient.NewForConfig(userClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	eventsClient, err := corev1.NewForConfig(userClientConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	ret := &OAuthServerConfig{
 		GenericConfig: genericConfig,
 		ExtraOAuthConfig: ExtraOAuthConfig{
 			Options:                        oauthConfig,
-			SessionAuth:                    sessionAuth,
+			KubeClient:                     kubeClient,
 			EventsClient:                   eventsClient.Events(""),
-			IdentityClient:                 userClient.Identities(),
+			RouteClient:                    routeClient,
 			UserClient:                     userClient.Users(),
+			IdentityClient:                 userClient.Identities(),
 			UserIdentityMappingClient:      userClient.UserIdentityMappings(),
 			OAuthAccessTokenClient:         oauthClient.OAuthAccessTokens(),
 			OAuthAuthorizeTokenClient:      oauthClient.OAuthAuthorizeTokens(),
 			OAuthClientClient:              oauthClient.OAuthClients(),
 			OAuthClientAuthorizationClient: oauthClient.OAuthClientAuthorizations(),
+			SessionAuth:                    sessionAuth,
 		},
 	}
 	genericConfig.BuildHandlerChainFunc = ret.buildHandlerChainForOAuth
@@ -123,13 +133,13 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 	return ret, nil
 }
 
-func buildSessionAuth(secure bool, config *configapi.SessionConfig) (*session.Authenticator, error) {
+func buildSessionAuth(secure bool, config *configapi.SessionConfig, secretsGetter corev1.SecretsGetter) (*session.Authenticator, error) {
 	secrets, err := getSessionSecrets(config.SessionSecretsFile)
 	if err != nil {
 		return nil, err
 	}
 	sessionStore := session.NewStore(config.SessionName, secure, secrets...)
-	return session.NewAuthenticator(sessionStore, time.Duration(config.SessionMaxAgeSeconds)*time.Second), nil
+	return session.NewAuthenticator(sessionStore, time.Duration(config.SessionMaxAgeSeconds)*time.Second, secretsGetter), nil
 }
 
 func getSessionSecrets(filename string) ([][]byte, error) {

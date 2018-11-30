@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	BootstrapUser = "oauth:admin"
-
+	// BootstrapUser is the magic bootstrap OAuth user that can perform any action
+	BootstrapUser = "kube:admin"
 	// support basic auth which does not allow : in username
-	bootstrapUserBasicAuth = "oauthadmin"
+	bootstrapUserBasicAuth = "kubeadmin"
 )
 
 func New(secrets v1.SecretsGetter) authenticator.Password {
