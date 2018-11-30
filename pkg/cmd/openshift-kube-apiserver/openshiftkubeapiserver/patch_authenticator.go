@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -136,7 +135,7 @@ func newAuthenticator(
 			// if you have an OAuth bearer token, you're a human (usually)
 			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}),
 			// bootstrap oauth user
-			oauth.NewBootstrapAuthenticator(accessTokenGetter, secretsGetter.Secrets(metav1.NamespaceSystem), validators...),
+			oauth.NewBootstrapAuthenticator(accessTokenGetter, secretsGetter, validators...),
 		)
 	}
 

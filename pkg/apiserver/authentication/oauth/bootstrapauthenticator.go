@@ -9,7 +9,6 @@ import (
 
 	userapi "github.com/openshift/api/user/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
-	"github.com/openshift/origin/pkg/cmd/server/apis/config"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 )
 
@@ -19,10 +18,10 @@ type bootstrapAuthenticator struct {
 	validator OAuthTokenValidator
 }
 
-func NewBootstrapAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, secrets v1.SecretInterface, validators ...OAuthTokenValidator) kauthenticator.Token {
+func NewBootstrapAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, secrets v1.SecretsGetter, validators ...OAuthTokenValidator) kauthenticator.Token {
 	return &bootstrapAuthenticator{
 		tokens:    tokens,
-		secrets:   secrets,
+		secrets:   secrets.Secrets(metav1.NamespaceSystem),
 		validator: OAuthTokenValidators(validators),
 	}
 }
@@ -33,7 +32,7 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 		return nil, false, errLookup // mask the error so we do not leak token data in logs
 	}
 
-	if token.UserName != config.BootstrapUser {
+	if token.UserName != bootstrap.BootstrapUser {
 		return nil, false, nil
 	}
 
@@ -55,7 +54,7 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 
 	// we explicitly do not set UID as we do not want to leak any derivative of the password
 	return &kuser.DefaultInfo{
-		Name:   config.BootstrapUser,
+		Name:   bootstrap.BootstrapUser,
 		Groups: []string{kuser.SystemPrivilegedGroup},
 	}, true, nil
 }

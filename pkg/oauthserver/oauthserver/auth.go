@@ -602,8 +602,8 @@ func (c *OAuthServerConfig) getPasswordAuthenticator(identityProvider configapi.
 
 		return keystonepassword.New(identityProvider.Name, connectionInfo.URL, transport, provider.DomainName, identityMapper, provider.UseKeystoneIdentity), nil
 
-	case *configapi.BootstrapIdentityProvider:
-		return bootstrap.New(c.ExtraOAuthConfig.KubeClient.CoreV1().Secrets(metav1.NamespaceSystem)), nil
+	case *bootstrap.BootstrapIdentityProvider:
+		return bootstrap.New(c.ExtraOAuthConfig.KubeClient.CoreV1()), nil
 
 	default:
 		return nil, fmt.Errorf("No password auth found that matches %v.  The OAuth server cannot start!", identityProvider)

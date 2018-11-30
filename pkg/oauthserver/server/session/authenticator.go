@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/openshift/origin/pkg/cmd/server/apis/config"
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -63,7 +63,7 @@ func (a *Authenticator) AuthenticationSucceeded(user user.Info, state string, w 
 func (a *Authenticator) getMaxAge(user user.Info) time.Duration {
 	// since osin is the IDP for this user, we increase the length
 	// of the session to allow for transitions between components
-	if user.GetName() == config.BootstrapUser {
+	if user.GetName() == bootstrap.BootstrapUser {
 		// this means the user could stay authenticated for one hour + OAuth access token lifetime
 		return time.Hour
 	}
@@ -74,7 +74,7 @@ func (a *Authenticator) getMaxAge(user user.Info) time.Duration {
 func (a *Authenticator) InvalidateAuthentication(w http.ResponseWriter, user user.Info) error {
 	// the IDP is responsible for maintaining the user's session
 	// since osin is the IDP for this user, we do not invalidate its session
-	if user.GetName() == config.BootstrapUser {
+	if user.GetName() == bootstrap.BootstrapUser {
 		return nil
 	}
 

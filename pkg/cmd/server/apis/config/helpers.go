@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -345,7 +346,7 @@ func IsPasswordAuthenticator(provider IdentityProvider) bool {
 		*HTPasswdPasswordIdentityProvider,
 		*LDAPPasswordIdentityProvider,
 		*KeystonePasswordIdentityProvider,
-		*BootstrapIdentityProvider:
+		*bootstrap.BootstrapIdentityProvider:
 
 		return true
 	}

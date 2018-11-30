@@ -1,13 +1,13 @@
 package oauthserver
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
-	"github.com/openshift/origin/pkg/oauthserver/userregistry/identitymapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -22,8 +22,6 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 
-	"bytes"
-
 	legacyconfigv1 "github.com/openshift/api/legacyconfig/v1"
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	osinv1 "github.com/openshift/api/osin/v1"
@@ -34,8 +32,10 @@ import (
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/configconversion"
 	"github.com/openshift/origin/pkg/oauth/urls"
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 	"github.com/openshift/origin/pkg/oauthserver/server/session"
+	"github.com/openshift/origin/pkg/oauthserver/userregistry/identitymapper"
 )
 
 var (
@@ -78,11 +78,11 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 		// TODO a knob to disable this may make sense, even once the bootstrap secret is deleted
 		oauthConfig.IdentityProviders = append(oauthConfig.IdentityProviders,
 			configapi.IdentityProvider{
-				Name:            configapi.BootstrapUser,
+				Name:            bootstrap.BootstrapUser,
 				UseAsChallenger: true,
 				UseAsLogin:      true,
 				MappingMethod:   string(identitymapper.MappingMethodClaim),
-				Provider:        &configapi.BootstrapIdentityProvider{},
+				Provider:        &bootstrap.BootstrapIdentityProvider{},
 			},
 		)
 	}

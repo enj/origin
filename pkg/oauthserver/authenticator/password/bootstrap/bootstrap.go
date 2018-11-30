@@ -12,14 +12,19 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes/typed/core/v1"
-
-	"github.com/openshift/origin/pkg/cmd/server/apis/config"
 )
 
-func New(secrets v1.SecretInterface) authenticator.Password {
+const (
+	BootstrapUser = "oauth:admin"
+
+	// support basic auth which does not allow : in username
+	bootstrapUserBasicAuth = "oauthadmin"
+)
+
+func New(secrets v1.SecretsGetter) authenticator.Password {
 	return &bootstrapPassword{
-		secrets: secrets,
-		names:   sets.NewString(config.BootstrapUser, config.BootstrapUserBasicAuth),
+		secrets: secrets.Secrets(metav1.NamespaceSystem),
+		names:   sets.NewString(BootstrapUser, bootstrapUserBasicAuth),
 	}
 }
 
@@ -47,13 +52,13 @@ func (b *bootstrapPassword) AuthenticatePassword(username, password string) (use
 
 	// do not set other fields, see identitymapper.userToInfo func
 	return &user.DefaultInfo{
-		Name: config.BootstrapUser,
+		Name: BootstrapUser,
 		UID:  uid,
 	}, true, nil
 }
 
 func HashAndUID(secrets v1.SecretInterface) ([]byte, string, bool, error) {
-	secret, err := secrets.Get(config.BootstrapUserBasicAuth, metav1.GetOptions{})
+	secret, err := secrets.Get(bootstrapUserBasicAuth, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil, "", false, nil
 	}
@@ -61,7 +66,7 @@ func HashAndUID(secrets v1.SecretInterface) ([]byte, string, bool, error) {
 		return nil, "", false, err
 	}
 
-	hashedPassword := secret.Data[config.BootstrapUserBasicAuth]
+	hashedPassword := secret.Data[bootstrapUserBasicAuth]
 	if len(hashedPassword) == 0 {
 		return nil, "", false, nil
 	}

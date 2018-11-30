@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/openshift/origin/pkg/cmd/server/apis/config"
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -314,7 +314,7 @@ func ValidateUserNameField(value string, fldPath *field.Path) field.ErrorList {
 	if len(value) == 0 {
 		return field.ErrorList{field.Required(fldPath, "")}
 	}
-	if value == config.BootstrapUser {
+	if value == bootstrap.BootstrapUser {
 		return field.ErrorList{}
 	}
 	if reasons := uservalidation.ValidateUserName(value, false); len(reasons) != 0 {
