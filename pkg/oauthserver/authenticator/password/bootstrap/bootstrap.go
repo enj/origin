@@ -67,8 +67,10 @@ func HashAndUID(secrets v1.SecretInterface) ([]byte, string, bool, error) {
 	}
 
 	hashedPassword := secret.Data[bootstrapUserBasicAuth]
-	if len(hashedPassword) == 0 {
-		return nil, "", false, nil
+
+	// make sure the value is a valid bcrypt hash
+	if _, err := bcrypt.Cost(hashedPassword); err != nil {
+		return nil, "", false, err
 	}
 
 	exactSecret := string(secret.UID) + secret.ResourceVersion

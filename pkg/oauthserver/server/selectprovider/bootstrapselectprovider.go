@@ -29,12 +29,9 @@ func (b *bootstrapSelectProvider) SelectAuthentication(providers []api.ProviderI
 		return b.delegate.SelectAuthentication(providers, w, req)
 	}
 
-	_, _, hasBootstrapSecret, err := bootstrap.HashAndUID(b.secrets)
-	if err != nil {
-		return nil, false, err
-	}
+	_, _, ok, err := bootstrap.HashAndUID(b.secrets)
 	// filter out the bootstrap IDP if the secret is not functional
-	if !hasBootstrapSecret {
+	if err != nil || !ok {
 		return b.delegate.SelectAuthentication(providers[1:], w, req)
 	}
 
