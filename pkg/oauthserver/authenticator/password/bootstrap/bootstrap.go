@@ -19,6 +19,9 @@ const (
 	BootstrapUser = "kube:admin"
 	// support basic auth which does not allow : in username
 	bootstrapUserBasicAuth = "kubeadmin"
+	// force the use of a secure password length
+	// expected format is 5char-5char-5char-5char
+	minPasswordLen = 23
 )
 
 func New(secrets v1.SecretsGetter) authenticator.Password {
@@ -34,7 +37,7 @@ type bootstrapPassword struct {
 }
 
 func (b *bootstrapPassword) AuthenticatePassword(username, password string) (user.Info, bool, error) {
-	if !b.names.Has(username) {
+	if !b.names.Has(username) || len(password) < minPasswordLen {
 		return nil, false, nil
 	}
 
