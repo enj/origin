@@ -14,6 +14,8 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/server/tokenrequest"
 )
 
+const thenParam = "then"
+
 func NewLogout(invalidator session.SessionInvalidator) tokenrequest.Endpoints {
 	return &logout{
 		invalidator: invalidator,
@@ -35,18 +37,20 @@ func (l *logout) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// we also do not set these headers on the OAuth endpoints or the token request endpoint...
 	headers.SetStandardHeaders(w)
 
-	// TODO determine if we need to switch based on req.Method
-
-	if err := l.invalidator.InvalidateAuthentication(w, &user.DefaultInfo{}); err != nil {
-		glog.V(5).Infof("error logging out: %v", err)
-	}
-
-	// TODO determine if this redirect logic makes sense
-
-	if then := req.URL.Query().Get("then"); redirect.IsServerRelativeURL(then) {
-		http.Redirect(w, req, then, http.StatusFound)
+	if req.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	http.Redirect(w, req, "/", http.StatusFound)
+	// invalidate with empty user to force session removal
+	if err := l.invalidator.InvalidateAuthentication(w, &user.DefaultInfo{}); err != nil {
+		glog.V(5).Infof("error logging out: %v", err)
+		http.Error(w, "failed to log out", http.StatusInternalServerError)
+		return
+	}
+
+	if then := req.FormValue(thenParam); redirect.IsServerRelativeURL(then) {
+		http.Redirect(w, req, then, http.StatusFound)
+		return
+	}
 }

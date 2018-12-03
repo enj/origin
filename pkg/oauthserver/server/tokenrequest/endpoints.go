@@ -31,6 +31,7 @@ type endpointDetails struct {
 	initLock sync.Mutex
 }
 
+// TODO this interface needs to be moved
 type Endpoints interface {
 	Install(mux oauthserver.Mux, paths ...string)
 }
