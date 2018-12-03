@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"crypto/sha512"
 	"encoding/base64"
+	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -24,6 +25,9 @@ const (
 	minPasswordLen = 23
 )
 
+// make it obvious that we refuse to honor short passwords
+var errPasswordTooShort = fmt.Errorf("%s password must be at least %d characters long", bootstrapUserBasicAuth, minPasswordLen)
+
 func New(secrets v1.SecretsGetter) authenticator.Password {
 	return &bootstrapPassword{
 		secrets: secrets.Secrets(metav1.NamespaceSystem),
@@ -37,13 +41,19 @@ type bootstrapPassword struct {
 }
 
 func (b *bootstrapPassword) AuthenticatePassword(username, password string) (user.Info, bool, error) {
-	if !b.names.Has(username) || len(password) < minPasswordLen {
+	if !b.names.Has(username) {
 		return nil, false, nil
 	}
 
 	hashedPassword, uid, ok, err := HashAndUID(b.secrets)
 	if err != nil || !ok {
 		return nil, ok, err
+	}
+
+	// check length after we know that the secret is functional since
+	// we do not want to complain when the bootstrap user is disabled
+	if len(password) < minPasswordLen {
+		return nil, false, errPasswordTooShort
 	}
 
 	if err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password)); err != nil {
