@@ -33,6 +33,7 @@ import (
 	"github.com/openshift/origin/pkg/configconversion"
 	"github.com/openshift/origin/pkg/oauth/urls"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
+	"github.com/openshift/origin/pkg/oauthserver/config"
 	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 	"github.com/openshift/origin/pkg/oauthserver/server/session"
 	"github.com/openshift/origin/pkg/oauthserver/userregistry/identitymapper"
@@ -102,13 +103,15 @@ func NewOAuthServerConfig(oauthConfig osinv1.OAuthConfig, userClientConfig *rest
 		// this must be the first IDP to make sure that it can handle basic auth challenges first
 		// this mostly avoids weird cases with the allow all IDP
 		oauthConfig.IdentityProviders = append(
-			[]configapi.IdentityProvider{
+			[]osinv1.IdentityProvider{
 				{
 					Name:            bootstrap.BootstrapUser, // will never conflict with other IDPs due to the :
 					UseAsChallenger: true,
 					UseAsLogin:      true,
 					MappingMethod:   string(identitymapper.MappingMethodClaim), // irrelevant, but needs to be valid
-					Provider:        &configapi.BootstrapIdentityProvider{},
+					Provider: runtime.RawExtension{
+						Object: &config.BootstrapIdentityProvider{},
+					},
 				},
 			},
 			oauthConfig.IdentityProviders...,

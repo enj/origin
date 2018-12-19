@@ -615,7 +615,7 @@ func (c *OAuthServerConfig) getPasswordAuthenticator(identityProvider osinv1.Ide
 
 		return keystonepassword.New(identityProvider.Name, connectionInfo.URL, transport, provider.DomainName, identityMapper, provider.UseKeystoneIdentity), nil
 
-	case *configapi.BootstrapIdentityProvider:
+	case *config.BootstrapIdentityProvider:
 		return bootstrap.New(c.ExtraOAuthConfig.KubeClient.CoreV1(), c.ExtraOAuthConfig.KubeClient.CoreV1()), nil
 
 	default:

@@ -26,7 +26,11 @@ func IsPasswordAuthenticator(provider osinv1.IdentityProvider) bool {
 		*osinv1.DenyAllPasswordIdentityProvider,
 		*osinv1.HTPasswdPasswordIdentityProvider,
 		*osinv1.LDAPPasswordIdentityProvider,
-		*osinv1.KeystonePasswordIdentityProvider:
+		*osinv1.KeystonePasswordIdentityProvider,
+		// we explicitly only include the bootstrap type in this function
+		// but not IsIdentityProviderType as this is not a real IDP
+		// it is an implementation detail that is not surfaced to users
+		*BootstrapIdentityProvider:
 
 		return true
 	}
