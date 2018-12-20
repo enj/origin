@@ -1,6 +1,8 @@
 package openshift_osinserver
 
 import (
+	"errors"
+
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
 
@@ -12,6 +14,10 @@ import (
 )
 
 func RunOpenShiftOsinServer(oauthConfig *osinv1.OAuthConfig, kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
+	if oauthConfig == nil {
+		return errors.New("osin server requires non-empty oauthConfig")
+	}
+
 	oauthServerConfig, err := oauthserver.NewOAuthServerConfig(*oauthConfig, kubeClientConfig)
 	if err != nil {
 		return err

@@ -21,7 +21,6 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
-	osinv1 "github.com/openshift/api/osin/v1"
 	"github.com/openshift/library-go/pkg/config/helpers"
 	"github.com/openshift/library-go/pkg/serviceability"
 	"github.com/openshift/origin/pkg/api/legacy"
@@ -102,9 +101,8 @@ func (o *OpenShiftOsinServer) RunOsinServer(stopCh <-chan struct{}) error {
 	// TODO this probably needs to be updated to a container inside openshift/api/osin/v1
 	scheme := runtime.NewScheme()
 	utilruntime.Must(kubecontrolplanev1.Install(scheme))
-	utilruntime.Must(osinv1.Install(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
-	obj, err := runtime.Decode(codecs.UniversalDecoder(kubecontrolplanev1.GroupVersion, configv1.GroupVersion, osinv1.GroupVersion), configContent)
+	obj, err := runtime.Decode(codecs.UniversalDecoder(kubecontrolplanev1.GroupVersion, configv1.GroupVersion), configContent)
 	if err == nil {
 		// Resolve relative to CWD
 		absoluteConfigFile, err := api.MakeAbs(o.ConfigFile, "")
