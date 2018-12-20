@@ -51,14 +51,14 @@ func init() {
 // TODO we need to switch the oauth server to an external type, but that can be done after we get our externally facing flag values fixed
 // TODO remaining bits involve the session file, LDAP util code, validation, ...
 func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userClientConfig *rest.Config) (*OAuthServerConfig, error) {
-	osinConfig, err := InternalOAuthConfigToExternal(oauthConfig)
+	osinConfig, err := internalOAuthConfigToExternal(oauthConfig)
 	if err != nil {
 		return nil, err
 	}
 	return NewOAuthServerConfig(*osinConfig, userClientConfig)
 }
 
-func InternalOAuthConfigToExternal(oauthConfig configapi.OAuthConfig) (*osinv1.OAuthConfig, error) {
+func internalOAuthConfigToExternal(oauthConfig configapi.OAuthConfig) (*osinv1.OAuthConfig, error) {
 	buf := &bytes.Buffer{}
 	internalConfig := &configapi.MasterConfig{OAuthConfig: &oauthConfig}
 	if err := latest.Codec.Encode(internalConfig, buf); err != nil {
