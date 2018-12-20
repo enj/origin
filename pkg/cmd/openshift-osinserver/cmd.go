@@ -8,18 +8,20 @@ import (
 	"os"
 	"path"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	configv1 "github.com/openshift/api/config/v1"
-	openshiftcontrolplanev1 "github.com/openshift/api/openshiftcontrolplane/v1"
+	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
+	osinv1 "github.com/openshift/api/osin/v1"
 	"github.com/openshift/library-go/pkg/config/helpers"
 	"github.com/openshift/library-go/pkg/serviceability"
 	"github.com/openshift/origin/pkg/api/legacy"
@@ -28,9 +30,7 @@ import (
 	configapilatest "github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/cmd/server/apis/config/validation"
 	"github.com/openshift/origin/pkg/configconversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/tools/clientcmd/api"
+	"github.com/openshift/origin/pkg/oauthserver/oauthserver"
 )
 
 type OpenShiftOsinServer struct {
@@ -39,7 +39,7 @@ type OpenShiftOsinServer struct {
 	Output         io.Writer
 }
 
-func NewOpenShiftOsinServer(out, errout io.Writer) *cobra.Command {
+func NewOpenShiftOsinServer(out, errout io.Writer, stopCh <-chan struct{}) *cobra.Command {
 	options := &OpenShiftOsinServer{Output: out}
 
 	cmd := &cobra.Command{
@@ -52,7 +52,7 @@ func NewOpenShiftOsinServer(out, errout io.Writer) *cobra.Command {
 
 			serviceability.StartProfiler()
 
-			if err := options.RunOsinServer(); err != nil {
+			if err := options.RunOsinServer(stopCh); err != nil {
 				if kerrors.IsInvalid(err) {
 					if details := err.(*kerrors.StatusError).ErrStatus.Details; details != nil {
 						fmt.Fprintf(errout, "Invalid %s %s\n", details.Kind, details.Name)
@@ -85,7 +85,7 @@ func (o *OpenShiftOsinServer) Validate() error {
 	return nil
 }
 
-func (o *OpenShiftOsinServer) RunOsinServer() error {
+func (o *OpenShiftOsinServer) RunOsinServer(stopCh <-chan struct{}) error {
 	// try to decode into our new types first.  right now there is no validation, no file path resolution.  this unsticks the operator to start.
 	// TODO add those things
 	configContent, err := ioutil.ReadFile(o.ConfigFile)
@@ -93,11 +93,18 @@ func (o *OpenShiftOsinServer) RunOsinServer() error {
 		return err
 	}
 
+	// TODO You need real overrides for rate limiting
+	kubeClientConfig, err := helpers.GetKubeConfigOrInClusterConfig(o.KubeConfigFile, configv1.ClientConnectionOverrides{QPS: 400, Burst: 400})
+	if err != nil {
+		return err
+	}
+
 	// TODO this probably needs to be updated to a container inside openshift/api/osin/v1
 	scheme := runtime.NewScheme()
-	utilruntime.Must(openshiftcontrolplanev1.Install(scheme))
+	utilruntime.Must(kubecontrolplanev1.Install(scheme))
+	utilruntime.Must(osinv1.Install(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
-	obj, err := runtime.Decode(codecs.UniversalDecoder(openshiftcontrolplanev1.GroupVersion, configv1.GroupVersion), configContent)
+	obj, err := runtime.Decode(codecs.UniversalDecoder(kubecontrolplanev1.GroupVersion, configv1.GroupVersion, osinv1.GroupVersion), configContent)
 	if err == nil {
 		// Resolve relative to CWD
 		absoluteConfigFile, err := api.MakeAbs(o.ConfigFile, "")
@@ -106,13 +113,13 @@ func (o *OpenShiftOsinServer) RunOsinServer() error {
 		}
 		configFileLocation := path.Dir(absoluteConfigFile)
 
-		config := obj.(*openshiftcontrolplanev1.OpenShiftAPIServerConfig)
-		if err := helpers.ResolvePaths(configconversion.GetOpenShiftAPIServerConfigFileReferences(config), configFileLocation); err != nil {
+		config := obj.(*kubecontrolplanev1.KubeAPIServerConfig)
+		if err := helpers.ResolvePaths(configconversion.GetKubeAPIServerConfigFileReferences(config), configFileLocation); err != nil {
 			return err
 		}
-		configdefault.SetRecommendedOpenShiftAPIServerConfigDefaults(config)
+		configdefault.SetRecommendedKubeAPIServerConfigDefaults(config)
 
-		return fmt.Errorf("not yet supported")
+		return RunOpenShiftOsinServer(config.OAuthConfig, kubeClientConfig, stopCh)
 	}
 
 	// TODO this code disappears once the kube-core operator switches to external types
@@ -132,11 +139,10 @@ func (o *OpenShiftOsinServer) RunOsinServer() error {
 		return kerrors.NewInvalid(configapi.Kind("MasterConfig"), "master-config.yaml", validationResults.Errors)
 	}
 
-	// TODO You need real overrides for rate limiting
-	kubeClientConfig, err := helpers.GetKubeConfigOrInClusterConfig(o.KubeConfigFile, configv1.ClientConnectionOverrides{QPS: 400, Burst: 400})
+	osinConfig, err := oauthserver.InternalOAuthConfigToExternal(*masterConfig.OAuthConfig)
 	if err != nil {
 		return err
 	}
 
-	return RunOpenShiftOsinServer(*masterConfig.OAuthConfig, kubeClientConfig, wait.NeverStop)
+	return RunOpenShiftOsinServer(osinConfig, kubeClientConfig, stopCh)
 }

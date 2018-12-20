@@ -44,9 +44,21 @@ var (
 	codecs = serializer.NewCodecFactory(scheme)
 )
 
+func init() {
+	utilruntime.Must(osinv1.Install(scheme))
+}
+
 // TODO we need to switch the oauth server to an external type, but that can be done after we get our externally facing flag values fixed
 // TODO remaining bits involve the session file, LDAP util code, validation, ...
 func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userClientConfig *rest.Config) (*OAuthServerConfig, error) {
+	osinConfig, err := InternalOAuthConfigToExternal(oauthConfig)
+	if err != nil {
+		return nil, err
+	}
+	return NewOAuthServerConfig(*osinConfig, userClientConfig)
+}
+
+func InternalOAuthConfigToExternal(oauthConfig configapi.OAuthConfig) (*osinv1.OAuthConfig, error) {
 	buf := &bytes.Buffer{}
 	internalConfig := &configapi.MasterConfig{OAuthConfig: &oauthConfig}
 	if err := latest.Codec.Encode(internalConfig, buf); err != nil {
@@ -56,14 +68,20 @@ func NewOAuthServerConfigFromInternal(oauthConfig configapi.OAuthConfig, userCli
 	if _, _, err := latest.Codec.Decode(buf.Bytes(), nil, legacyConfig); err != nil {
 		return nil, err
 	}
-	osinConfig := &osinv1.OAuthConfig{}
-	if err := configconversion.Convert_legacyconfigv1_OAuthConfig_to_osinv1_OAuthConfig(legacyConfig.OAuthConfig, osinConfig, nil); err != nil {
-		return nil, err
-	}
-	return NewOAuthServerConfig(*osinConfig, userClientConfig)
+	return configconversion.ToOAuthConfig(legacyConfig.OAuthConfig)
 }
 
 func NewOAuthServerConfig(oauthConfig osinv1.OAuthConfig, userClientConfig *rest.Config) (*OAuthServerConfig, error) {
+	// TODO: there is probably some better way to do this
+	decoder := codecs.UniversalDecoder(osinv1.GroupVersion)
+	for i, idp := range oauthConfig.IdentityProviders {
+		idpObject, err := runtime.Decode(decoder, idp.Provider.Raw)
+		if err != nil {
+			return nil, err
+		}
+		oauthConfig.IdentityProviders[i].Provider.Object = idpObject
+	}
+
 	genericConfig := genericapiserver.NewRecommendedConfig(codecs)
 	genericConfig.LoopbackClientConfig = userClientConfig
 

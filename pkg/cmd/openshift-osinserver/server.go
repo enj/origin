@@ -1,18 +1,18 @@
 package openshift_osinserver
 
 import (
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
 
-	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
+	osinv1 "github.com/openshift/api/osin/v1"
 	"github.com/openshift/origin/pkg/oauthserver/oauthserver"
-	genericapiserver "k8s.io/apiserver/pkg/server"
 
 	// for metrics
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus"
 )
 
-func RunOpenShiftOsinServer(oauthConfig configapi.OAuthConfig, kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
-	oauthServerConfig, err := oauthserver.NewOAuthServerConfigFromInternal(oauthConfig, kubeClientConfig)
+func RunOpenShiftOsinServer(oauthConfig *osinv1.OAuthConfig, kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
+	oauthServerConfig, err := oauthserver.NewOAuthServerConfig(*oauthConfig, kubeClientConfig)
 	if err != nil {
 		return err
 	}
