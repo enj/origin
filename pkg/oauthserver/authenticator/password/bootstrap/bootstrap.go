@@ -20,6 +20,8 @@ import (
 const (
 	// BootstrapUser is the magic bootstrap OAuth user that can perform any action
 	BootstrapUser = "kube:admin"
+	// bootstrapUserPrivilegedGroupPrefix is TODO
+	bootstrapUserPrivilegedGroupPrefix = BootstrapUser + ":group:"
 	// support basic auth which does not allow : in username
 	bootstrapUserBasicAuth = "kubeadmin"
 	// force the use of a secure password length
@@ -82,8 +84,9 @@ func (b *bootstrapPassword) AuthenticatePassword(username, password string) (use
 }
 
 type BootstrapUserData struct {
-	PasswordHash []byte
-	UID          string
+	PasswordHash    []byte
+	UID             string
+	PrivilegedGroup string
 }
 
 type BootstrapUserDataGetter interface {
@@ -138,7 +141,8 @@ func (b *bootstrapUserDataGetter) Get() (*BootstrapUserData, bool, error) {
 	uidBytes := sha512.Sum512(both)
 
 	return &BootstrapUserData{
-		PasswordHash: hashedPassword,
-		UID:          base64.RawURLEncoding.EncodeToString(uidBytes[:]),
+		PasswordHash:    hashedPassword,
+		UID:             base64.RawURLEncoding.EncodeToString(uidBytes[:]),
+		PrivilegedGroup: bootstrapUserPrivilegedGroupPrefix + "",
 	}, true, nil
 }
