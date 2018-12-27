@@ -8,6 +8,8 @@ import (
 
 	userapi "github.com/openshift/api/user/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
+	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 )
 
@@ -55,7 +57,13 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 
 	// we explicitly do not set UID as we do not want to leak any derivative of the password
 	return &kuser.DefaultInfo{
-		Name:   bootstrap.BootstrapUser,
-		Groups: []string{kuser.SystemPrivilegedGroup}, // authorized to do everything
+		Name: bootstrap.BootstrapUser,
+		// we cannot use kuser.SystemPrivilegedGroup because it cannot be properly scoped
+		// see openshift/origin#18922 and how loopback connections are handled upstream via AuthorizeClientBearerToken
+		Groups: []string{bootstrappolicy.ClusterAdminGroup}, // authorized to do everything via RBAC
+		Extra: map[string][]string{
+			// this user still needs scopes because it can be used in OAuth flows
+			authorizationapi.ScopesKey: token.Scopes,
+		},
 	}, true, nil
 }
