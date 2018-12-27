@@ -18,7 +18,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	kclientsetexternal "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 	sacontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -81,8 +80,7 @@ func NewAuthenticator(
 		userClient.User().Users(),
 		apiClientCAs,
 		usercache.NewGroupCache(groupInformer),
-		kubeExternalClient.CoreV1(),
-		kubeExternalClient.CoreV1(),
+		bootstrap.NewBootstrapUserDataGetter(kubeExternalClient.CoreV1(), kubeExternalClient.CoreV1()),
 	)
 }
 
@@ -96,8 +94,7 @@ func newAuthenticator(
 	userGetter usertypedclient.UserInterface,
 	apiClientCAs *x509.CertPool,
 	groupMapper oauth.UserToGroupMapper,
-	secretsGetter v1.SecretsGetter,
-	namespacesGetter v1.NamespacesGetter,
+	bootstrapUserDataGetter bootstrap.BootstrapUserDataGetter,
 ) (authenticator.Request, map[string]genericapiserver.PostStartHookFunc, error) {
 	postStartHooks := map[string]genericapiserver.PostStartHookFunc{}
 	authenticators := []authenticator.Request{}
@@ -150,7 +147,6 @@ func newAuthenticator(
 			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}))
 
 		if oauthConfig.SessionConfig != nil {
-			bootstrapUserDataGetter := bootstrap.NewBootstrapUserDataGetter(secretsGetter, namespacesGetter)
 			tokenAuthenticators = append(tokenAuthenticators,
 				// bootstrap oauth user that can do anything, backed by a secret
 				oauth.NewBootstrapAuthenticator(accessTokenGetter, bootstrapUserDataGetter, validators...))
