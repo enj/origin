@@ -169,7 +169,8 @@ func buildSessionAuth(secure bool, config *osinv1.SessionConfig, secretsGetter c
 	}
 	sessionStore := session.NewStore(config.SessionName, secure, secrets...)
 	sessionAuthenticator := session.NewAuthenticator(sessionStore, time.Duration(config.SessionMaxAgeSeconds)*time.Second)
-	return session.NewBootstrapAuthenticator(sessionAuthenticator, secretsGetter, namespacesGetter, sessionStore), nil
+	bootstrapUserDataGetter := bootstrap.NewBootstrapUserDataGetter(secretsGetter, namespacesGetter)
+	return session.NewBootstrapAuthenticator(sessionAuthenticator, bootstrapUserDataGetter, sessionStore), nil
 }
 
 func getSessionSecrets(filename string) ([][]byte, error) {

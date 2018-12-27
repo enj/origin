@@ -36,6 +36,7 @@ import (
 	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
 	oauthvalidation "github.com/openshift/origin/pkg/oauth/apis/oauth/validation"
+	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/paramtoken"
 	usercache "github.com/openshift/origin/pkg/user/cache"
 )
@@ -149,9 +150,10 @@ func newAuthenticator(
 			group.NewTokenGroupAdder(oauthTokenAuthenticator, []string{bootstrappolicy.AuthenticatedOAuthGroup}))
 
 		if oauthConfig.SessionConfig != nil {
+			bootstrapUserDataGetter := bootstrap.NewBootstrapUserDataGetter(secretsGetter, namespacesGetter)
 			tokenAuthenticators = append(tokenAuthenticators,
 				// bootstrap oauth user that can do anything, backed by a secret
-				oauth.NewBootstrapAuthenticator(accessTokenGetter, secretsGetter, namespacesGetter, validators...))
+				oauth.NewBootstrapAuthenticator(accessTokenGetter, bootstrapUserDataGetter, validators...))
 		}
 	}
 
