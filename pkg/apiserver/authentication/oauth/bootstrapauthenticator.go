@@ -58,7 +58,7 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 	return &kuser.DefaultInfo{
 		Name: bootstrap.BootstrapUser,
 		// we cannot use kuser.SystemPrivilegedGroup because it cannot be properly scoped
-		// see openshift/origin#18922
+		// see openshift/origin#18922 and how loopback connections are handled upstream via AuthorizeClientBearerToken
 		Groups: []string{data.PrivilegedGroup}, // authorized to do everything via a custom authorizer
 		Extra: map[string][]string{
 			// this user still needs scopes because it can be used in OAuth flows
