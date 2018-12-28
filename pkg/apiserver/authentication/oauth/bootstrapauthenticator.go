@@ -61,7 +61,7 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 		// we cannot use kuser.SystemPrivilegedGroup because it cannot be properly scoped.
 		// see openshift/origin#18922 and how loopback connections are handled upstream via AuthorizeClientBearerToken.
 		// api aggregation with delegated authorization makes this impossible to control, see WithAlwaysAllowGroups.
-		// an openshift specific cluster role binding binds this group to the cluster role cluster-admin.
+		// an openshift specific cluster role binding binds ClusterAdminGroup to the cluster role cluster-admin.
 		// thus this group is authorized to do everything via RBAC.
 		// this does make the bootstrap user susceptible to anything that causes the RBAC authorizer to fail.
 		// this is a safe trade-off because scopes must always be evaluated before RBAC for them to work at all.
