@@ -66,8 +66,8 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 		// this does make the bootstrap user susceptible to anything that causes the RBAC authorizer to fail.
 		// this is a safe trade-off because scopes must always be evaluated before RBAC for them to work at all.
 		// a failure in that logic means scopes are broken instead of a specific failure related to the bootstrap user.
-		// if this becomes a problem in the future, we could generate a group name based on the secret content
-		// and store it in BootstrapUserData, similar to how UID is calculated.  this group name would then be wired
+		// if this becomes a problem in the future, we could generate a custom extra value based on the secret content
+		// and store it in BootstrapUserData, similar to how UID is calculated.  this extra value would then be wired
 		// to a custom authorizer that allows all actions.  the problem with such an approach is that since we do not
 		// allow remote authorizers in OpenShift, the BootstrapUserDataGetter logic would have to be shared between the
 		// the kube api server and osin instead of being an implementation detail hidden inside of osin.  currently the
