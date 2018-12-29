@@ -58,7 +58,7 @@ func (a *bootstrapAuthenticator) AuthenticateToken(name string) (kuser.Info, boo
 	// we explicitly do not set UID as we do not want to leak any derivative of the password
 	return &kuser.DefaultInfo{
 		Name: bootstrap.BootstrapUser,
-		// we cannot use kuser.SystemPrivilegedGroup because it cannot be properly scoped.
+		// we cannot use SystemPrivilegedGroup because it cannot be properly scoped.
 		// see openshift/origin#18922 and how loopback connections are handled upstream via AuthorizeClientBearerToken.
 		// api aggregation with delegated authorization makes this impossible to control, see WithAlwaysAllowGroups.
 		// an openshift specific cluster role binding binds ClusterAdminGroup to the cluster role cluster-admin.
