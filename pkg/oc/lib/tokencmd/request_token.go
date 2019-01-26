@@ -17,6 +17,7 @@ import (
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 
@@ -414,9 +415,28 @@ func clientConfigWithSystemRoots(in *restclient.Config) (*restclient.Config, err
 	}
 	_ = pool.AppendCertsFromPEM(caData) // caData could be empty so ignore the returned bool
 
-	// forcibly extract the certs from the pool
+	// these reflect operations are safe and cannot panic
 	certsField := reflect.ValueOf(pool).Elem().FieldByName("certs")
-	certs := *(*[]*x509.Certificate)(unsafe.Pointer(certsField.UnsafeAddr()))
+
+	// avoid unsafe operations that we know will fail
+	if !certsField.IsValid() {
+		glog.V(4).Infof("failed to extract certs from pool: %#v", pool)
+		return in, nil // fallback to our input config
+	}
+
+	// assume the pool has a "certs" field with this type
+	certs := func() []*x509.Certificate {
+		defer runtime.HandleCrash(func(i interface{}) { // prevent oc from crashing
+			glog.V(4).Infof("unsafe cert cast failed: %#v", i)
+		})
+		// forcibly extract the certs from the pool
+		return *(*[]*x509.Certificate)(unsafe.Pointer(certsField.UnsafeAddr()))
+	}()
+
+	// if our unsafe hack failed, fallback to our input config
+	if len(certs) == 0 {
+		return in, nil
+	}
 
 	// re-encode them as PEM, this should never fail as the pool only has valid certs
 	allCerts, err := crypto.EncodeCertificates(certs...)
