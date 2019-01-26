@@ -398,7 +398,12 @@ func request(rt http.RoundTripper, requestURL string, requestHeaders http.Header
 	return rt.RoundTrip(req)
 }
 
-func clientConfigWithSystemRoots(in *restclient.Config) (*restclient.Config, error) {
+func clientConfigWithSystemRoots(in *restclient.Config) (ret *restclient.Config, retErr error) {
+	defer runtime.HandleCrash(func(i interface{}) { // attempt to prevent oc from crashing
+		glog.V(4).Infof("clientConfigWithSystemRoots failed: %#v", i)
+		ret, retErr = in, nil // fallback to our input config
+	})
+
 	// best effort loading of the system roots
 	pool, err := x509.SystemCertPool()
 	if err != nil { // system has no built in certs
