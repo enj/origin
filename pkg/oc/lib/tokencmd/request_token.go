@@ -1,24 +1,28 @@
 package tokencmd
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
-
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	restclient "k8s.io/client-go/rest"
-
-	"github.com/openshift/origin/pkg/oauth/urls"
-	"github.com/openshift/origin/pkg/oauth/util"
 
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
+
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	restclient "k8s.io/client-go/rest"
+
+	"github.com/openshift/library-go/pkg/crypto"
+	"github.com/openshift/origin/pkg/oauth/urls"
+	"github.com/openshift/origin/pkg/oauth/util"
 )
 
 const (
@@ -107,7 +111,8 @@ func (o *RequestTokenOptions) SetDefaultOsinConfig() error {
 		return fmt.Errorf("osin config is already set to: %#v", *o.OsinConfig)
 	}
 
-	// get the OAuth metadata from the server
+	// get the OAuth metadata directly from the api server
+	// we only want to use the ca data from our config
 	rt, err := restclient.TransportFor(o.ClientConfig)
 	if err != nil {
 		return err
@@ -161,7 +166,18 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 		}
 	}()
 
-	rt, err := restclient.TransportFor(o.ClientConfig)
+	// we are going to use this config to talk
+	// with a server that may not be the api server
+	// thus we need to include the system roots
+	// in our ca data otherwise an external
+	// oauth server with a valid cert will fail with
+	// error: x509: certificate signed by unknown authority
+	clientConfig, err := clientConfigWithSystemRoots(o.ClientConfig)
+	if err != nil {
+		return "", err
+	}
+
+	rt, err := restclient.TransportFor(clientConfig)
 	if err != nil {
 		return "", err
 	}
@@ -379,4 +395,85 @@ func request(rt http.RoundTripper, requestURL string, requestHeaders http.Header
 
 	// Make the request
 	return rt.RoundTrip(req)
+}
+
+func clientConfigWithSystemRoots(in *restclient.Config) (ret *restclient.Config, retErr error) {
+	defer runtime.HandleCrash(func(i interface{}) { // attempt to prevent oc from crashing
+		glog.V(4).Infof("clientConfigWithSystemRoots failed: %#v", i)
+		ret, retErr = in, nil // fallback to our input config
+	})
+
+	// best effort loading of the system roots
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil { // system has no built in certs
+		glog.V(4).Infof("failed to load system roots: %v", err)
+		return in, nil // fallback to our input config
+	}
+
+	// copy the config so we can freely mutate it
+	out := restclient.CopyConfig(in)
+
+	caData, err := dataFromSliceOrFile(out.CAData, out.CAFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// caData could be empty so ignore the returned bool
+	_ = pool.AppendCertsFromPEM(caData)
+
+	// these reflect operations are safe and cannot panic
+	// assume the pool has a "certs" field of type []*x509.Certificate
+	// this assumption is verified via unit tests
+	certsField := reflect.ValueOf(pool).Elem().FieldByName("certs")
+
+	// we want to forcibly extract the certs from the pool into this slice
+	var certs []*x509.Certificate
+
+	// avoid operations that we know will fail
+	if !certsField.IsValid() || certsField.Kind() != reflect.Slice || certsField.Type() != reflect.TypeOf(certs) {
+		glog.V(4).Infof("failed to extract certs from pool: %#v", pool)
+		return in, nil // fallback to our input config
+	}
+
+	// at this point we know that certsField is a []*x509.Certificate
+	// thus the below operations cannot fail since the shape of x509.Certificate is stable
+	for i := 0; i < certsField.Len(); i++ {
+		cert := certsField.Index(i)
+		raw := cert.Elem().FieldByName("Raw").Bytes()
+		certs = append(certs, &x509.Certificate{Raw: raw})
+	}
+
+	// if we have no certs, fallback to our input config
+	if len(certs) == 0 {
+		return in, nil
+	}
+
+	// re-encode them as PEM, this should never fail as the pool only has valid certs
+	allCerts, err := crypto.EncodeCertificates(certs...)
+	if err != nil {
+		return nil, err
+	}
+
+	// explicitly set our combined PEM encoded certs
+	out.CAFile = ""
+	out.CAData = allCerts
+
+	return out, nil
+}
+
+// copied from k8s.io/client-go/transport/transport.go
+// dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
+// or an error if an error occurred reading the file
+func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
+	if len(data) > 0 {
+		return data, nil
+	}
+	if len(file) > 0 {
+		fileData, err := ioutil.ReadFile(file)
+		if err != nil {
+			return []byte{}, err
+		}
+		return fileData, nil
+	}
+	return nil, nil
 }
