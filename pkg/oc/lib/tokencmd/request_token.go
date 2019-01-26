@@ -428,7 +428,7 @@ func clientConfigWithSystemRoots(in *restclient.Config) (*restclient.Config, err
 
 	// assume the pool has a "certs" field with this type
 	certs := func() []*x509.Certificate {
-		defer runtime.HandleCrash(func(i interface{}) { // prevent oc from crashing
+		defer runtime.HandleCrash(func(i interface{}) { // attempt to prevent oc from crashing
 			glog.V(4).Infof("unsafe cert cast failed: %#v", i)
 		})
 		// forcibly extract the certs from the pool
