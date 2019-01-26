@@ -399,6 +399,13 @@ func request(rt http.RoundTripper, requestURL string, requestHeaders http.Header
 }
 
 func clientConfigWithSystemRoots(in *restclient.Config) (*restclient.Config, error) {
+	// best effort loading of the system roots
+	pool, err := x509.SystemCertPool()
+	if err != nil { // system has no built in certs
+		glog.V(4).Infof("failed to load system roots: %v", err)
+		return in, nil // fallback to our input config
+	}
+
 	// copy the config so we can freely mutate it
 	out := restclient.CopyConfig(in)
 
@@ -407,13 +414,8 @@ func clientConfigWithSystemRoots(in *restclient.Config) (*restclient.Config, err
 		return nil, err
 	}
 
-	// best effort loading of the system roots
-	pool, err := x509.SystemCertPool()
-	if err != nil { // system has no built in certs
-		glog.V(4).Infof("failed to load system roots: %v", err)
-		pool = x509.NewCertPool()
-	}
-	_ = pool.AppendCertsFromPEM(caData) // caData could be empty so ignore the returned bool
+	// caData could be empty so ignore the returned bool
+	_ = pool.AppendCertsFromPEM(caData)
 
 	// these reflect operations are safe and cannot panic
 	certsField := reflect.ValueOf(pool).Elem().FieldByName("certs")
