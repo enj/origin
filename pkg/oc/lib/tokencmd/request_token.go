@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"unsafe"
 
 	"github.com/RangelReale/osincli"
 	"github.com/golang/glog"
@@ -423,24 +422,28 @@ func clientConfigWithSystemRoots(in *restclient.Config) (ret *restclient.Config,
 	_ = pool.AppendCertsFromPEM(caData)
 
 	// these reflect operations are safe and cannot panic
+	// assume the pool has a "certs" field of type []*x509.Certificate
+	// this assumption is verified via unit tests
 	certsField := reflect.ValueOf(pool).Elem().FieldByName("certs")
 
-	// avoid unsafe operations that we know will fail
-	if !certsField.IsValid() {
+	// we want to forcibly extract the certs from the pool into this slice
+	var certs []*x509.Certificate
+
+	// avoid operations that we know will fail
+	if !certsField.IsValid() || certsField.Kind() != reflect.Slice || certsField.Type() != reflect.TypeOf(certs) {
 		glog.V(4).Infof("failed to extract certs from pool: %#v", pool)
 		return in, nil // fallback to our input config
 	}
 
-	// assume the pool has a "certs" field with this type
-	certs := func() []*x509.Certificate {
-		defer runtime.HandleCrash(func(i interface{}) { // attempt to prevent oc from crashing
-			glog.V(4).Infof("unsafe cert cast failed: %#v", i)
-		})
-		// forcibly extract the certs from the pool
-		return *(*[]*x509.Certificate)(unsafe.Pointer(certsField.UnsafeAddr()))
-	}()
+	// at this point we know that certsField is a []*x509.Certificate
+	// thus the below operations cannot fail since the shape of x509.Certificate is stable
+	for i := 0; i < certsField.Len(); i++ {
+		cert := certsField.Index(i)
+		raw := cert.Elem().FieldByName("Raw").Bytes()
+		certs = append(certs, &x509.Certificate{Raw: raw})
+	}
 
-	// if our unsafe hack failed, fallback to our input config
+	// if we have no certs, fallback to our input config
 	if len(certs) == 0 {
 		return in, nil
 	}
