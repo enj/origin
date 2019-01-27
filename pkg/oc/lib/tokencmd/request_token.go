@@ -405,7 +405,7 @@ func clientConfigWithSystemRoots(in *restclient.Config) (ret *restclient.Config,
 
 	// best effort loading of the system roots
 	pool, err := x509.SystemCertPool()
-	if err != nil { // system has no built in certs
+	if err != nil || pool == nil { // system has no built in certs
 		glog.V(4).Infof("failed to load system roots: %v", err)
 		return in, nil // fallback to our input config
 	}
