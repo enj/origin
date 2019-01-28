@@ -1,10 +1,13 @@
 package tokencmd
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -393,6 +396,10 @@ func transportWithSystemRoots(osinConfig *osincli.ClientConfig, clientConfig *re
 	configWithSystemRoots := restclient.CopyConfig(clientConfig)
 
 	// explicitly unset CA cert information
+	// this will make the transport use the system roots or OS specific verification
+	// this is required to have reasonable behavior on windows (cannot get system roots)
+	// in general there is no good with to say "I want system roots plus this CA bundle"
+	// so we just try system roots first before using the kubeconfig CA bundle
 	configWithSystemRoots.CAFile = ""
 	configWithSystemRoots.CAData = nil
 
@@ -401,15 +408,27 @@ func transportWithSystemRoots(osinConfig *osincli.ClientConfig, clientConfig *re
 		return nil, err
 	}
 
+	// build a request to probe the OAuth server CA
 	req, err := http.NewRequest(http.MethodHead, osinConfig.RedirectUrl, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := systemRootsRT.RoundTrip(req); err == nil {
+	// see if get a certificate error when using the system roots
+	// we perform the check using this transport (instead of the kubeconfig based one)
+	// because it is most likely to work with a route (which is what the OAuth server uses in 4.0+)
+	_, err = systemRootsRT.RoundTrip(req)
+	switch err.(type) {
+	case nil:
+		// no error meaning the system roots work with the OAuth server
 		return systemRootsRT, nil
+	case x509.UnknownAuthorityError, x509.HostnameError, x509.CertificateInvalidError, x509.SystemRootsError,
+		tls.RecordHeaderError, *net.OpError:
+		// fallback to the CA in the kubeconfig since the system roots did not work
+		// we are very broad on the errors here to avoid failing when we should fallback
+		return restclient.TransportFor(clientConfig)
+	default:
+		// unknown error, fail (ideally should never occur)
+		return nil, err
 	}
-
-	// fallback
-	return restclient.TransportFor(clientConfig)
 }
