@@ -446,6 +446,7 @@ func TestRequestToken(t *testing.T) {
 			}
 			rr := tc.Requests[i]
 			i++
+
 			method := rr.expectedRequest.method
 			if len(method) == 0 {
 				method = http.MethodGet
@@ -454,6 +455,7 @@ func TestRequestToken(t *testing.T) {
 				t.Errorf("%s: %d: Expected %s, got %s", k, i, method, req.Method)
 				return
 			}
+
 			path := rr.expectedRequest.path
 			if len(path) == 0 {
 				path = "/oauth/authorize"
@@ -462,10 +464,12 @@ func TestRequestToken(t *testing.T) {
 				t.Errorf("%s: %d: Expected %s, got %s", k, i, path, req.URL.Path)
 				return
 			}
+
 			if e, a := rr.expectedRequest.authorization, req.Header.Get("Authorization"); e != a {
 				t.Errorf("%s: %d: expected 'Authorization: %s', got 'Authorization: %s'", k, i, e, a)
 				return
 			}
+
 			if len(rr.serverResponse.location) > 0 {
 				w.Header().Add("Location", rr.serverResponse.location)
 			}
