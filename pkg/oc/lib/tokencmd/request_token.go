@@ -171,7 +171,7 @@ func (o *RequestTokenOptions) RequestToken() (string, error) {
 		}
 	}
 
-	// we are going to use this config to talk
+	// we are going to use this transport to talk
 	// with a server that may not be the api server
 	// thus we need to include the system roots
 	// in our ca data otherwise an external
@@ -421,14 +421,23 @@ func transportWithSystemRoots(osinConfig *osincli.ClientConfig, clientConfig *re
 	switch err.(type) {
 	case nil:
 		// no error meaning the system roots work with the OAuth server
+		glog.V(4).Info("using system roots as no error was encountered")
 		return systemRootsRT, nil
 	case x509.UnknownAuthorityError, x509.HostnameError, x509.CertificateInvalidError, x509.SystemRootsError,
 		tls.RecordHeaderError, *net.OpError:
 		// fallback to the CA in the kubeconfig since the system roots did not work
 		// we are very broad on the errors here to avoid failing when we should fallback
+		glog.V(4).Infof("falling back to kubeconfig CA due to possible x509 error: %v", err)
 		return restclient.TransportFor(clientConfig)
 	default:
+		switch err {
+		case io.EOF, io.ErrUnexpectedEOF, io.ErrNoProgress:
+			// also fallback on various io errors
+			glog.V(4).Infof("falling back to kubeconfig CA due to possible IO error: %v", err)
+			return restclient.TransportFor(clientConfig)
+		}
 		// unknown error, fail (ideally should never occur)
+		glog.V(4).Infof("unexpected error during system roots probe: %v", err)
 		return nil, err
 	}
 }
