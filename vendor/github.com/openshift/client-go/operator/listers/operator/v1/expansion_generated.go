@@ -2,6 +2,18 @@
 
 package v1
 
+// AuthenticationListerExpansion allows custom methods to be added to
+// AuthenticationLister.
+type AuthenticationListerExpansion interface{}
+
+// ConsoleListerExpansion allows custom methods to be added to
+// ConsoleLister.
+type ConsoleListerExpansion interface{}
+
+// EtcdListerExpansion allows custom methods to be added to
+// EtcdLister.
+type EtcdListerExpansion interface{}
+
 // KubeAPIServerListerExpansion allows custom methods to be added to
 // KubeAPIServerLister.
 type KubeAPIServerListerExpansion interface{}
