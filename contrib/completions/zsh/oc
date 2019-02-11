@@ -250,7 +250,13 @@ __oc_handle_reply()
     fi
 
     if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
-        declare -F __custom_func >/dev/null && __custom_func
+		if declare -F __oc_custom_func >/dev/null; then
+			# try command name qualified custom func
+			__oc_custom_func
+		else
+			# otherwise fall back to unqualified for compatibility
+			declare -F __custom_func >/dev/null && __custom_func
+		fi
     fi
 
     # available in bash-completion >= 2, not always present on macOS
@@ -372,6 +378,14 @@ __oc_handle_word()
         __oc_handle_command
     elif [[ $c -eq 0 ]]; then
         __oc_handle_command
+    elif __oc_contains_word "${words[c]}" "${command_aliases[@]}"; then
+        # aliashash variable is an associative array which is only supported in bash > 3.
+        if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+            words[c]=${aliashash[${words[c]}]}
+            __oc_handle_command
+        else
+            __oc_handle_noun
+        fi
     else
         __oc_handle_noun
     fi
@@ -531,6 +545,9 @@ __custom_func() {
 _oc_adm_build-chain()
 {
     last_command="oc_adm_build-chain"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -582,6 +599,9 @@ _oc_adm_build-chain()
 _oc_adm_ca_create-key-pair()
 {
     last_command="oc_adm_ca_create-key-pair"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -634,6 +654,9 @@ _oc_adm_ca_create-key-pair()
 _oc_adm_ca_create-master-certs()
 {
     last_command="oc_adm_ca_create-master-certs"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -694,6 +717,9 @@ _oc_adm_ca_create-master-certs()
 _oc_adm_ca_create-server-cert()
 {
     last_command="oc_adm_ca_create-server-cert"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -762,6 +788,9 @@ _oc_adm_ca_create-server-cert()
 _oc_adm_ca_create-signer-cert()
 {
     last_command="oc_adm_ca_create-signer-cert"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -822,6 +851,9 @@ _oc_adm_ca_create-signer-cert()
 _oc_adm_ca_decrypt()
 {
     last_command="oc_adm_ca_decrypt"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -876,6 +908,9 @@ _oc_adm_ca_decrypt()
 _oc_adm_ca_encrypt()
 {
     last_command="oc_adm_ca_encrypt"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -934,6 +969,9 @@ _oc_adm_ca_encrypt()
 _oc_adm_ca()
 {
     last_command="oc_adm_ca"
+
+    command_aliases=()
+
     commands=()
     commands+=("create-key-pair")
     commands+=("create-master-certs")
@@ -982,6 +1020,9 @@ _oc_adm_ca()
 _oc_adm_certificate_approve()
 {
     last_command="oc_adm_certificate_approve"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1045,6 +1086,9 @@ _oc_adm_certificate_approve()
 _oc_adm_certificate_deny()
 {
     last_command="oc_adm_certificate_deny"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1108,6 +1152,9 @@ _oc_adm_certificate_deny()
 _oc_adm_certificate()
 {
     last_command="oc_adm_certificate"
+
+    command_aliases=()
+
     commands=()
     commands+=("approve")
     commands+=("deny")
@@ -1152,6 +1199,9 @@ _oc_adm_certificate()
 _oc_adm_completion()
 {
     last_command="oc_adm_completion"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1196,6 +1246,9 @@ _oc_adm_completion()
 _oc_adm_config_current-context()
 {
     last_command="oc_adm_config_current-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1238,6 +1291,9 @@ _oc_adm_config_current-context()
 _oc_adm_config_delete-cluster()
 {
     last_command="oc_adm_config_delete-cluster"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1280,6 +1336,9 @@ _oc_adm_config_delete-cluster()
 _oc_adm_config_delete-context()
 {
     last_command="oc_adm_config_delete-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1322,6 +1381,9 @@ _oc_adm_config_delete-context()
 _oc_adm_config_get-clusters()
 {
     last_command="oc_adm_config_get-clusters"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1364,6 +1426,9 @@ _oc_adm_config_get-clusters()
 _oc_adm_config_get-contexts()
 {
     last_command="oc_adm_config_get-contexts"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1411,6 +1476,9 @@ _oc_adm_config_get-contexts()
 _oc_adm_config_rename-context()
 {
     last_command="oc_adm_config_rename-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1453,6 +1521,9 @@ _oc_adm_config_rename-context()
 _oc_adm_config_set()
 {
     last_command="oc_adm_config_set"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1497,6 +1568,9 @@ _oc_adm_config_set()
 _oc_adm_config_set-cluster()
 {
     last_command="oc_adm_config_set-cluster"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1541,6 +1615,9 @@ _oc_adm_config_set-cluster()
 _oc_adm_config_set-context()
 {
     last_command="oc_adm_config_set-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1585,6 +1662,9 @@ _oc_adm_config_set-context()
 _oc_adm_config_set-credentials()
 {
     last_command="oc_adm_config_set-credentials"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1637,6 +1717,9 @@ _oc_adm_config_set-credentials()
 _oc_adm_config_unset()
 {
     last_command="oc_adm_config_unset"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1679,6 +1762,9 @@ _oc_adm_config_unset()
 _oc_adm_config_use-context()
 {
     last_command="oc_adm_config_use-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1721,6 +1807,9 @@ _oc_adm_config_use-context()
 _oc_adm_config_view()
 {
     last_command="oc_adm_config_view"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1780,6 +1869,9 @@ _oc_adm_config_view()
 _oc_adm_config()
 {
     last_command="oc_adm_config"
+
+    command_aliases=()
+
     commands=()
     commands+=("current-context")
     commands+=("delete-cluster")
@@ -1793,6 +1885,10 @@ _oc_adm_config()
     commands+=("set-credentials")
     commands+=("unset")
     commands+=("use-context")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("use")
+        aliashash["use"]="use-context"
+    fi
     commands+=("view")
 
     flags=()
@@ -1835,6 +1931,9 @@ _oc_adm_config()
 _oc_adm_cordon()
 {
     last_command="oc_adm_cordon"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1882,6 +1981,9 @@ _oc_adm_cordon()
 _oc_adm_create-api-client-config()
 {
     last_command="oc_adm_create-api-client-config"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1950,6 +2052,9 @@ _oc_adm_create-api-client-config()
 _oc_adm_create-bootstrap-policy-file()
 {
     last_command="oc_adm_create-bootstrap-policy-file"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -1996,6 +2101,9 @@ _oc_adm_create-bootstrap-policy-file()
 _oc_adm_create-bootstrap-project-template()
 {
     last_command="oc_adm_create-bootstrap-project-template"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2049,6 +2157,9 @@ _oc_adm_create-bootstrap-project-template()
 _oc_adm_create-error-template()
 {
     last_command="oc_adm_create-error-template"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2091,6 +2202,9 @@ _oc_adm_create-error-template()
 _oc_adm_create-kubeconfig()
 {
     last_command="oc_adm_create-kubeconfig"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2137,6 +2251,9 @@ _oc_adm_create-kubeconfig()
 _oc_adm_create-login-template()
 {
     last_command="oc_adm_create-login-template"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2179,6 +2296,9 @@ _oc_adm_create-login-template()
 _oc_adm_create-provider-selection-template()
 {
     last_command="oc_adm_create-provider-selection-template"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2221,6 +2341,9 @@ _oc_adm_create-provider-selection-template()
 _oc_adm_drain()
 {
     last_command="oc_adm_drain"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2280,6 +2403,9 @@ _oc_adm_drain()
 _oc_adm_groups_add-users()
 {
     last_command="oc_adm_groups_add-users"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2333,6 +2459,9 @@ _oc_adm_groups_add-users()
 _oc_adm_groups_new()
 {
     last_command="oc_adm_groups_new"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2386,6 +2515,9 @@ _oc_adm_groups_new()
 _oc_adm_groups_prune()
 {
     last_command="oc_adm_groups_prune"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2442,6 +2574,9 @@ _oc_adm_groups_prune()
 _oc_adm_groups_remove-users()
 {
     last_command="oc_adm_groups_remove-users"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2495,6 +2630,9 @@ _oc_adm_groups_remove-users()
 _oc_adm_groups_sync()
 {
     last_command="oc_adm_groups_sync"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2553,6 +2691,9 @@ _oc_adm_groups_sync()
 _oc_adm_groups()
 {
     last_command="oc_adm_groups"
+
+    command_aliases=()
+
     commands=()
     commands+=("add-users")
     commands+=("new")
@@ -2600,6 +2741,9 @@ _oc_adm_groups()
 _oc_adm_migrate_etcd-ttl()
 {
     last_command="oc_adm_migrate_etcd-ttl"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2654,6 +2798,9 @@ _oc_adm_migrate_etcd-ttl()
 _oc_adm_migrate_image-references()
 {
     last_command="oc_adm_migrate_image-references"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2722,6 +2869,9 @@ _oc_adm_migrate_image-references()
 _oc_adm_migrate_legacy-hpa()
 {
     last_command="oc_adm_migrate_legacy-hpa"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2790,6 +2940,9 @@ _oc_adm_migrate_legacy-hpa()
 _oc_adm_migrate_storage()
 {
     last_command="oc_adm_migrate_storage"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2855,6 +3008,9 @@ _oc_adm_migrate_storage()
 _oc_adm_migrate_template-instances()
 {
     last_command="oc_adm_migrate_template-instances"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -2923,6 +3079,9 @@ _oc_adm_migrate_template-instances()
 _oc_adm_migrate()
 {
     last_command="oc_adm_migrate"
+
+    command_aliases=()
+
     commands=()
     commands+=("etcd-ttl")
     commands+=("image-references")
@@ -2970,6 +3129,9 @@ _oc_adm_migrate()
 _oc_adm_new-project()
 {
     last_command="oc_adm_new-project"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3022,6 +3184,9 @@ _oc_adm_new-project()
 _oc_adm_node-logs()
 {
     last_command="oc_adm_node-logs"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3092,6 +3257,9 @@ _oc_adm_node-logs()
 _oc_adm_options()
 {
     last_command="oc_adm_options"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3134,6 +3302,9 @@ _oc_adm_options()
 _oc_adm_pod-network_isolate-projects()
 {
     last_command="oc_adm_pod-network_isolate-projects"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3178,6 +3349,9 @@ _oc_adm_pod-network_isolate-projects()
 _oc_adm_pod-network_join-projects()
 {
     last_command="oc_adm_pod-network_join-projects"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3224,6 +3398,9 @@ _oc_adm_pod-network_join-projects()
 _oc_adm_pod-network_make-projects-global()
 {
     last_command="oc_adm_pod-network_make-projects-global"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3268,6 +3445,9 @@ _oc_adm_pod-network_make-projects-global()
 _oc_adm_pod-network()
 {
     last_command="oc_adm_pod-network"
+
+    command_aliases=()
+
     commands=()
     commands+=("isolate-projects")
     commands+=("join-projects")
@@ -3313,6 +3493,9 @@ _oc_adm_pod-network()
 _oc_adm_policy_add-cluster-role-to-group()
 {
     last_command="oc_adm_policy_add-cluster-role-to-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3368,6 +3551,9 @@ _oc_adm_policy_add-cluster-role-to-group()
 _oc_adm_policy_add-cluster-role-to-user()
 {
     last_command="oc_adm_policy_add-cluster-role-to-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3426,6 +3612,9 @@ _oc_adm_policy_add-cluster-role-to-user()
 _oc_adm_policy_add-role-to-group()
 {
     last_command="oc_adm_policy_add-role-to-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3483,6 +3672,9 @@ _oc_adm_policy_add-role-to-group()
 _oc_adm_policy_add-role-to-user()
 {
     last_command="oc_adm_policy_add-role-to-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3543,6 +3735,9 @@ _oc_adm_policy_add-role-to-user()
 _oc_adm_policy_add-scc-to-group()
 {
     last_command="oc_adm_policy_add-scc-to-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3596,6 +3791,9 @@ _oc_adm_policy_add-scc-to-group()
 _oc_adm_policy_add-scc-to-user()
 {
     last_command="oc_adm_policy_add-scc-to-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3652,6 +3850,9 @@ _oc_adm_policy_add-scc-to-user()
 _oc_adm_policy_reconcile-sccs()
 {
     last_command="oc_adm_policy_reconcile-sccs"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3709,6 +3910,9 @@ _oc_adm_policy_reconcile-sccs()
 _oc_adm_policy_remove-cluster-role-from-group()
 {
     last_command="oc_adm_policy_remove-cluster-role-from-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3764,6 +3968,9 @@ _oc_adm_policy_remove-cluster-role-from-group()
 _oc_adm_policy_remove-cluster-role-from-user()
 {
     last_command="oc_adm_policy_remove-cluster-role-from-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3822,6 +4029,9 @@ _oc_adm_policy_remove-cluster-role-from-user()
 _oc_adm_policy_remove-group()
 {
     last_command="oc_adm_policy_remove-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3875,6 +4085,9 @@ _oc_adm_policy_remove-group()
 _oc_adm_policy_remove-role-from-group()
 {
     last_command="oc_adm_policy_remove-role-from-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3932,6 +4145,9 @@ _oc_adm_policy_remove-role-from-group()
 _oc_adm_policy_remove-role-from-user()
 {
     last_command="oc_adm_policy_remove-role-from-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -3992,6 +4208,9 @@ _oc_adm_policy_remove-role-from-user()
 _oc_adm_policy_remove-scc-from-group()
 {
     last_command="oc_adm_policy_remove-scc-from-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4045,6 +4264,9 @@ _oc_adm_policy_remove-scc-from-group()
 _oc_adm_policy_remove-scc-from-user()
 {
     last_command="oc_adm_policy_remove-scc-from-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4101,6 +4323,9 @@ _oc_adm_policy_remove-scc-from-user()
 _oc_adm_policy_remove-user()
 {
     last_command="oc_adm_policy_remove-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4154,6 +4379,9 @@ _oc_adm_policy_remove-user()
 _oc_adm_policy_scc-review()
 {
     last_command="oc_adm_policy_scc-review"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4220,6 +4448,9 @@ _oc_adm_policy_scc-review()
 _oc_adm_policy_scc-subject-review()
 {
     last_command="oc_adm_policy_scc-subject-review"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4289,6 +4520,9 @@ _oc_adm_policy_scc-subject-review()
 _oc_adm_policy_who-can()
 {
     last_command="oc_adm_policy_who-can"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4342,6 +4576,9 @@ _oc_adm_policy_who-can()
 _oc_adm_policy()
 {
     last_command="oc_adm_policy"
+
+    command_aliases=()
+
     commands=()
     commands+=("add-cluster-role-to-group")
     commands+=("add-cluster-role-to-user")
@@ -4402,6 +4639,9 @@ _oc_adm_policy()
 _oc_adm_prune_auth()
 {
     last_command="oc_adm_prune_auth"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4459,6 +4699,9 @@ _oc_adm_prune_auth()
 _oc_adm_prune_builds()
 {
     last_command="oc_adm_prune_builds"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4511,6 +4754,9 @@ _oc_adm_prune_builds()
 _oc_adm_prune_deployments()
 {
     last_command="oc_adm_prune_deployments"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4563,6 +4809,9 @@ _oc_adm_prune_deployments()
 _oc_adm_prune_groups()
 {
     last_command="oc_adm_prune_groups"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4619,6 +4868,9 @@ _oc_adm_prune_groups()
 _oc_adm_prune_images()
 {
     last_command="oc_adm_prune_images"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4679,6 +4931,9 @@ _oc_adm_prune_images()
 _oc_adm_prune()
 {
     last_command="oc_adm_prune"
+
+    command_aliases=()
+
     commands=()
     commands+=("auth")
     commands+=("builds")
@@ -4726,6 +4981,9 @@ _oc_adm_prune()
 _oc_adm_release_extract()
 {
     last_command="oc_adm_release_extract"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4777,6 +5035,9 @@ _oc_adm_release_extract()
 _oc_adm_release_info()
 {
     last_command="oc_adm_release_info"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4833,6 +5094,9 @@ _oc_adm_release_info()
 _oc_adm_release_mirror()
 {
     last_command="oc_adm_release_mirror"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4888,6 +5152,9 @@ _oc_adm_release_mirror()
 _oc_adm_release_new()
 {
     last_command="oc_adm_release_new"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -4981,6 +5248,9 @@ _oc_adm_release_new()
 _oc_adm_release()
 {
     last_command="oc_adm_release"
+
+    command_aliases=()
+
     commands=()
     commands+=("extract")
     commands+=("info")
@@ -5027,6 +5297,9 @@ _oc_adm_release()
 _oc_adm_taint()
 {
     last_command="oc_adm_taint"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5088,6 +5361,9 @@ _oc_adm_taint()
 _oc_adm_top_images()
 {
     last_command="oc_adm_top_images"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5130,6 +5406,9 @@ _oc_adm_top_images()
 _oc_adm_top_imagestreams()
 {
     last_command="oc_adm_top_imagestreams"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5172,6 +5451,9 @@ _oc_adm_top_imagestreams()
 _oc_adm_top_node()
 {
     last_command="oc_adm_top_node"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5225,6 +5507,9 @@ _oc_adm_top_node()
 _oc_adm_top_pod()
 {
     last_command="oc_adm_top_pod"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5282,11 +5567,26 @@ _oc_adm_top_pod()
 _oc_adm_top()
 {
     last_command="oc_adm_top"
+
+    command_aliases=()
+
     commands=()
     commands+=("images")
     commands+=("imagestreams")
     commands+=("node")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("no")
+        aliashash["no"]="node"
+        command_aliases+=("nodes")
+        aliashash["nodes"]="node"
+    fi
     commands+=("pod")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("po")
+        aliashash["po"]="pod"
+        command_aliases+=("pods")
+        aliashash["pods"]="pod"
+    fi
 
     flags=()
     two_word_flags=()
@@ -5328,6 +5628,9 @@ _oc_adm_top()
 _oc_adm_uncordon()
 {
     last_command="oc_adm_uncordon"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5375,6 +5678,9 @@ _oc_adm_uncordon()
 _oc_adm_upgrade()
 {
     last_command="oc_adm_upgrade"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5427,6 +5733,9 @@ _oc_adm_upgrade()
 _oc_adm_verify-image-signature()
 {
     last_command="oc_adm_verify-image-signature"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5481,6 +5790,9 @@ _oc_adm_verify-image-signature()
 _oc_adm()
 {
     last_command="oc_adm"
+
+    command_aliases=()
+
     commands=()
     commands+=("build-chain")
     commands+=("ca")
@@ -5551,6 +5863,9 @@ _oc_adm()
 _oc_annotate()
 {
     last_command="oc_annotate"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5631,6 +5946,9 @@ _oc_annotate()
 _oc_api-resources()
 {
     last_command="oc_api-resources"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5686,6 +6004,9 @@ _oc_api-resources()
 _oc_api-versions()
 {
     last_command="oc_api-versions"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5728,6 +6049,9 @@ _oc_api-versions()
 _oc_apply_edit-last-applied()
 {
     last_command="oc_apply_edit-last-applied"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5795,6 +6119,9 @@ _oc_apply_edit-last-applied()
 _oc_apply_set-last-applied()
 {
     last_command="oc_apply_set-last-applied"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5857,6 +6184,9 @@ _oc_apply_set-last-applied()
 _oc_apply_view-last-applied()
 {
     last_command="oc_apply_view-last-applied"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -5917,6 +6247,9 @@ _oc_apply_view-last-applied()
 _oc_apply()
 {
     last_command="oc_apply"
+
+    command_aliases=()
+
     commands=()
     commands+=("edit-last-applied")
     commands+=("set-last-applied")
@@ -6016,6 +6349,9 @@ _oc_apply()
 _oc_attach()
 {
     last_command="oc_attach"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6069,6 +6405,9 @@ _oc_attach()
 _oc_auth_can-i()
 {
     last_command="oc_auth_can-i"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6118,6 +6457,9 @@ _oc_auth_can-i()
 _oc_auth_reconcile()
 {
     last_command="oc_auth_reconcile"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6187,6 +6529,9 @@ _oc_auth_reconcile()
 _oc_auth()
 {
     last_command="oc_auth"
+
+    command_aliases=()
+
     commands=()
     commands+=("can-i")
     commands+=("reconcile")
@@ -6231,6 +6576,9 @@ _oc_auth()
 _oc_autoscale()
 {
     last_command="oc_autoscale"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6313,6 +6661,9 @@ _oc_autoscale()
 _oc_cancel-build()
 {
     last_command="oc_cancel-build"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6361,6 +6712,9 @@ _oc_cancel-build()
 _oc_cluster-info_dump()
 {
     last_command="oc_cluster-info_dump"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6420,6 +6774,9 @@ _oc_cluster-info_dump()
 _oc_cluster-info()
 {
     last_command="oc_cluster-info"
+
+    command_aliases=()
+
     commands=()
     commands+=("dump")
 
@@ -6463,6 +6820,9 @@ _oc_cluster-info()
 _oc_completion()
 {
     last_command="oc_completion"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6510,6 +6870,9 @@ _oc_completion()
 _oc_config_current-context()
 {
     last_command="oc_config_current-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6552,6 +6915,9 @@ _oc_config_current-context()
 _oc_config_delete-cluster()
 {
     last_command="oc_config_delete-cluster"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6594,6 +6960,9 @@ _oc_config_delete-cluster()
 _oc_config_delete-context()
 {
     last_command="oc_config_delete-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6636,6 +7005,9 @@ _oc_config_delete-context()
 _oc_config_get-clusters()
 {
     last_command="oc_config_get-clusters"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6678,6 +7050,9 @@ _oc_config_get-clusters()
 _oc_config_get-contexts()
 {
     last_command="oc_config_get-contexts"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6725,6 +7100,9 @@ _oc_config_get-contexts()
 _oc_config_rename-context()
 {
     last_command="oc_config_rename-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6767,6 +7145,9 @@ _oc_config_rename-context()
 _oc_config_set()
 {
     last_command="oc_config_set"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6811,6 +7192,9 @@ _oc_config_set()
 _oc_config_set-cluster()
 {
     last_command="oc_config_set-cluster"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6855,6 +7239,9 @@ _oc_config_set-cluster()
 _oc_config_set-context()
 {
     last_command="oc_config_set-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6899,6 +7286,9 @@ _oc_config_set-context()
 _oc_config_set-credentials()
 {
     last_command="oc_config_set-credentials"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6951,6 +7341,9 @@ _oc_config_set-credentials()
 _oc_config_unset()
 {
     last_command="oc_config_unset"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -6993,6 +7386,9 @@ _oc_config_unset()
 _oc_config_use-context()
 {
     last_command="oc_config_use-context"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7035,6 +7431,9 @@ _oc_config_use-context()
 _oc_config_view()
 {
     last_command="oc_config_view"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7094,6 +7493,9 @@ _oc_config_view()
 _oc_config()
 {
     last_command="oc_config"
+
+    command_aliases=()
+
     commands=()
     commands+=("current-context")
     commands+=("delete-cluster")
@@ -7107,6 +7509,10 @@ _oc_config()
     commands+=("set-credentials")
     commands+=("unset")
     commands+=("use-context")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("use")
+        aliashash["use"]="use-context"
+    fi
     commands+=("view")
 
     flags=()
@@ -7149,6 +7555,9 @@ _oc_config()
 _oc_convert()
 {
     last_command="oc_convert"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7218,6 +7627,9 @@ _oc_convert()
 _oc_cp()
 {
     last_command="oc_cp"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7263,6 +7675,9 @@ _oc_cp()
 _oc_create_clusterresourcequota()
 {
     last_command="oc_create_clusterresourcequota"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7322,6 +7737,9 @@ _oc_create_clusterresourcequota()
 _oc_create_clusterrole()
 {
     last_command="oc_create_clusterrole"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7389,6 +7807,9 @@ _oc_create_clusterrole()
 _oc_create_clusterrolebinding()
 {
     last_command="oc_create_clusterrolebinding"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7456,6 +7877,9 @@ _oc_create_clusterrolebinding()
 _oc_create_configmap()
 {
     last_command="oc_create_configmap"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7523,6 +7947,9 @@ _oc_create_configmap()
 _oc_create_deployment()
 {
     last_command="oc_create_deployment"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7585,6 +8012,9 @@ _oc_create_deployment()
 _oc_create_deploymentconfig()
 {
     last_command="oc_create_deploymentconfig"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7641,6 +8071,9 @@ _oc_create_deploymentconfig()
 _oc_create_identity()
 {
     last_command="oc_create_identity"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7694,6 +8127,9 @@ _oc_create_identity()
 _oc_create_imagestream()
 {
     last_command="oc_create_imagestream"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7749,6 +8185,9 @@ _oc_create_imagestream()
 _oc_create_imagestreamtag()
 {
     last_command="oc_create_imagestreamtag"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7817,6 +8256,9 @@ _oc_create_imagestreamtag()
 _oc_create_job()
 {
     last_command="oc_create_job"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7878,6 +8320,9 @@ _oc_create_job()
 _oc_create_namespace()
 {
     last_command="oc_create_namespace"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -7937,6 +8382,9 @@ _oc_create_namespace()
 _oc_create_poddisruptionbudget()
 {
     last_command="oc_create_poddisruptionbudget"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8002,6 +8450,9 @@ _oc_create_poddisruptionbudget()
 _oc_create_priorityclass()
 {
     last_command="oc_create_priorityclass"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8067,6 +8518,9 @@ _oc_create_priorityclass()
 _oc_create_quota()
 {
     last_command="oc_create_quota"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8130,6 +8584,9 @@ _oc_create_quota()
 _oc_create_role()
 {
     last_command="oc_create_role"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8193,6 +8650,9 @@ _oc_create_role()
 _oc_create_rolebinding()
 {
     last_command="oc_create_rolebinding"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8260,6 +8720,9 @@ _oc_create_rolebinding()
 _oc_create_route_edge()
 {
     last_command="oc_create_route_edge"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8340,6 +8803,9 @@ _oc_create_route_edge()
 _oc_create_route_passthrough()
 {
     last_command="oc_create_route_passthrough"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8406,6 +8872,9 @@ _oc_create_route_passthrough()
 _oc_create_route_reencrypt()
 {
     last_command="oc_create_route_reencrypt"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8490,6 +8959,9 @@ _oc_create_route_reencrypt()
 _oc_create_route()
 {
     last_command="oc_create_route"
+
+    command_aliases=()
+
     commands=()
     commands+=("edge")
     commands+=("passthrough")
@@ -8535,6 +9007,9 @@ _oc_create_route()
 _oc_create_secret_docker-registry()
 {
     last_command="oc_create_secret_docker-registry"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8608,6 +9083,9 @@ _oc_create_secret_docker-registry()
 _oc_create_secret_generic()
 {
     last_command="oc_create_secret_generic"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8677,6 +9155,9 @@ _oc_create_secret_generic()
 _oc_create_secret_tls()
 {
     last_command="oc_create_secret_tls"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8742,6 +9223,9 @@ _oc_create_secret_tls()
 _oc_create_secret()
 {
     last_command="oc_create_secret"
+
+    command_aliases=()
+
     commands=()
     commands+=("docker-registry")
     commands+=("generic")
@@ -8787,6 +9271,9 @@ _oc_create_secret()
 _oc_create_service_clusterip()
 {
     last_command="oc_create_service_clusterip"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8850,6 +9337,9 @@ _oc_create_service_clusterip()
 _oc_create_service_externalname()
 {
     last_command="oc_create_service_externalname"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8914,6 +9404,9 @@ _oc_create_service_externalname()
 _oc_create_service_loadbalancer()
 {
     last_command="oc_create_service_loadbalancer"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -8975,6 +9468,9 @@ _oc_create_service_loadbalancer()
 _oc_create_service_nodeport()
 {
     last_command="oc_create_service_nodeport"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9038,6 +9534,9 @@ _oc_create_service_nodeport()
 _oc_create_service()
 {
     last_command="oc_create_service"
+
+    command_aliases=()
+
     commands=()
     commands+=("clusterip")
     commands+=("externalname")
@@ -9084,6 +9583,9 @@ _oc_create_service()
 _oc_create_serviceaccount()
 {
     last_command="oc_create_serviceaccount"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9143,6 +9645,9 @@ _oc_create_serviceaccount()
 _oc_create_user()
 {
     last_command="oc_create_user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9198,6 +9703,9 @@ _oc_create_user()
 _oc_create_useridentitymapping()
 {
     last_command="oc_create_useridentitymapping"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9251,27 +9759,78 @@ _oc_create_useridentitymapping()
 _oc_create()
 {
     last_command="oc_create"
+
+    command_aliases=()
+
     commands=()
     commands+=("clusterresourcequota")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("clusterquota")
+        aliashash["clusterquota"]="clusterresourcequota"
+    fi
     commands+=("clusterrole")
     commands+=("clusterrolebinding")
     commands+=("configmap")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("cm")
+        aliashash["cm"]="configmap"
+    fi
     commands+=("deployment")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("deploy")
+        aliashash["deploy"]="deployment"
+    fi
     commands+=("deploymentconfig")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("dc")
+        aliashash["dc"]="deploymentconfig"
+    fi
     commands+=("identity")
     commands+=("imagestream")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("is")
+        aliashash["is"]="imagestream"
+    fi
     commands+=("imagestreamtag")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("istag")
+        aliashash["istag"]="imagestreamtag"
+    fi
     commands+=("job")
     commands+=("namespace")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("ns")
+        aliashash["ns"]="namespace"
+    fi
     commands+=("poddisruptionbudget")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("pdb")
+        aliashash["pdb"]="poddisruptionbudget"
+    fi
     commands+=("priorityclass")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("pc")
+        aliashash["pc"]="priorityclass"
+    fi
     commands+=("quota")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("resourcequota")
+        aliashash["resourcequota"]="quota"
+    fi
     commands+=("role")
     commands+=("rolebinding")
     commands+=("route")
     commands+=("secret")
     commands+=("service")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("svc")
+        aliashash["svc"]="service"
+    fi
     commands+=("serviceaccount")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("sa")
+        aliashash["sa"]="serviceaccount"
+    fi
     commands+=("user")
     commands+=("useridentitymapping")
 
@@ -9353,6 +9912,9 @@ _oc_create()
 _oc_debug()
 {
     last_command="oc_debug"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9446,6 +10008,9 @@ _oc_debug()
 _oc_delete()
 {
     last_command="oc_delete"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9524,6 +10089,9 @@ _oc_delete()
 _oc_describe()
 {
     last_command="oc_describe"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9585,6 +10153,9 @@ _oc_describe()
 _oc_edit()
 {
     last_command="oc_edit"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9658,6 +10229,9 @@ _oc_edit()
 _oc_ex_build-chain()
 {
     last_command="oc_ex_build-chain"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9709,6 +10283,9 @@ _oc_ex_build-chain()
 _oc_ex_dockergc()
 {
     last_command="oc_ex_dockergc"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9759,6 +10336,9 @@ _oc_ex_dockergc()
 _oc_ex_ipfailover()
 {
     last_command="oc_ex_ipfailover"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9850,6 +10430,9 @@ _oc_ex_ipfailover()
 _oc_ex_options()
 {
     last_command="oc_ex_options"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9892,6 +10475,9 @@ _oc_ex_options()
 _oc_ex_prune-groups()
 {
     last_command="oc_ex_prune-groups"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -9948,6 +10534,9 @@ _oc_ex_prune-groups()
 _oc_ex_sync-groups()
 {
     last_command="oc_ex_sync-groups"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10006,6 +10595,9 @@ _oc_ex_sync-groups()
 _oc_ex()
 {
     last_command="oc_ex"
+
+    command_aliases=()
+
     commands=()
     commands+=("build-chain")
     commands+=("dockergc")
@@ -10054,6 +10646,9 @@ _oc_ex()
 _oc_exec()
 {
     last_command="oc_exec"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10105,6 +10700,9 @@ _oc_exec()
 _oc_explain()
 {
     last_command="oc_explain"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10151,6 +10749,9 @@ _oc_explain()
 _oc_expose()
 {
     last_command="oc_expose"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10256,6 +10857,9 @@ _oc_expose()
 _oc_extract()
 {
     last_command="oc_extract"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10311,6 +10915,9 @@ _oc_extract()
 _oc_get()
 {
     last_command="oc_get"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10407,6 +11014,9 @@ _oc_get()
 _oc_idle()
 {
     last_command="oc_idle"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10462,6 +11072,9 @@ _oc_idle()
 _oc_image_append()
 {
     last_command="oc_image_append"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10529,6 +11142,9 @@ _oc_image_append()
 _oc_image_extract()
 {
     last_command="oc_image_extract"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10593,6 +11209,9 @@ _oc_image_extract()
 _oc_image_info()
 {
     last_command="oc_image_info"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10645,6 +11264,9 @@ _oc_image_info()
 _oc_image_mirror()
 {
     last_command="oc_image_mirror"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10713,6 +11335,9 @@ _oc_image_mirror()
 _oc_image()
 {
     last_command="oc_image"
+
+    command_aliases=()
+
     commands=()
     commands+=("append")
     commands+=("extract")
@@ -10759,6 +11384,9 @@ _oc_image()
 _oc_import_app.json()
 {
     last_command="oc_import_app.json"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10825,6 +11453,9 @@ _oc_import_app.json()
 _oc_import()
 {
     last_command="oc_import"
+
+    command_aliases=()
+
     commands=()
     commands+=("app.json")
 
@@ -10868,6 +11499,9 @@ _oc_import()
 _oc_import-image()
 {
     last_command="oc_import-image"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -10933,6 +11567,9 @@ _oc_import-image()
 _oc_label()
 {
     last_command="oc_label"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11015,6 +11652,9 @@ _oc_label()
 _oc_login()
 {
     last_command="oc_login"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11063,6 +11703,9 @@ _oc_login()
 _oc_logout()
 {
     last_command="oc_logout"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11105,6 +11748,9 @@ _oc_logout()
 _oc_logs()
 {
     last_command="oc_logs"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11175,6 +11821,9 @@ _oc_logs()
 _oc_new-app()
 {
     last_command="oc_new-app"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11304,6 +11953,9 @@ _oc_new-app()
 _oc_new-build()
 {
     last_command="oc_new-build"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11418,6 +12070,9 @@ _oc_new-build()
 _oc_new-project()
 {
     last_command="oc_new-project"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11466,6 +12121,9 @@ _oc_new-project()
 _oc_observe()
 {
     last_command="oc_observe"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11544,6 +12202,9 @@ _oc_observe()
 _oc_options()
 {
     last_command="oc_options"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11586,6 +12247,9 @@ _oc_options()
 _oc_patch()
 {
     last_command="oc_patch"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11660,6 +12324,9 @@ _oc_patch()
 _oc_plugin_list()
 {
     last_command="oc_plugin_list"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11704,6 +12371,9 @@ _oc_plugin_list()
 _oc_plugin()
 {
     last_command="oc_plugin"
+
+    command_aliases=()
+
     commands=()
     commands+=("list")
 
@@ -11747,6 +12417,9 @@ _oc_plugin()
 _oc_policy_add-role-to-group()
 {
     last_command="oc_policy_add-role-to-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11804,6 +12477,9 @@ _oc_policy_add-role-to-group()
 _oc_policy_add-role-to-user()
 {
     last_command="oc_policy_add-role-to-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11864,6 +12540,9 @@ _oc_policy_add-role-to-user()
 _oc_policy_remove-group()
 {
     last_command="oc_policy_remove-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11917,6 +12596,9 @@ _oc_policy_remove-group()
 _oc_policy_remove-role-from-group()
 {
     last_command="oc_policy_remove-role-from-group"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -11974,6 +12656,9 @@ _oc_policy_remove-role-from-group()
 _oc_policy_remove-role-from-user()
 {
     last_command="oc_policy_remove-role-from-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12034,6 +12719,9 @@ _oc_policy_remove-role-from-user()
 _oc_policy_remove-user()
 {
     last_command="oc_policy_remove-user"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12087,6 +12775,9 @@ _oc_policy_remove-user()
 _oc_policy_scc-review()
 {
     last_command="oc_policy_scc-review"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12153,6 +12844,9 @@ _oc_policy_scc-review()
 _oc_policy_scc-subject-review()
 {
     last_command="oc_policy_scc-subject-review"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12222,6 +12916,9 @@ _oc_policy_scc-subject-review()
 _oc_policy_who-can()
 {
     last_command="oc_policy_who-can"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12275,6 +12972,9 @@ _oc_policy_who-can()
 _oc_policy()
 {
     last_command="oc_policy"
+
+    command_aliases=()
+
     commands=()
     commands+=("add-role-to-group")
     commands+=("add-role-to-user")
@@ -12326,6 +13026,9 @@ _oc_policy()
 _oc_port-forward()
 {
     last_command="oc_port-forward"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12370,6 +13073,9 @@ _oc_port-forward()
 _oc_process()
 {
     last_command="oc_process"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12449,6 +13155,9 @@ _oc_process()
 _oc_project()
 {
     last_command="oc_project"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12494,6 +13203,9 @@ _oc_project()
 _oc_projects()
 {
     last_command="oc_projects"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12539,6 +13251,9 @@ _oc_projects()
 _oc_proxy()
 {
     last_command="oc_proxy"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12609,6 +13324,9 @@ _oc_proxy()
 _oc_registry_info()
 {
     last_command="oc_registry_info"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12660,6 +13378,9 @@ _oc_registry_info()
 _oc_registry_login()
 {
     last_command="oc_registry_login"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12713,6 +13434,9 @@ _oc_registry_login()
 _oc_registry()
 {
     last_command="oc_registry"
+
+    command_aliases=()
+
     commands=()
     commands+=("info")
     commands+=("login")
@@ -12757,6 +13481,9 @@ _oc_registry()
 _oc_replace()
 {
     last_command="oc_replace"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12834,6 +13561,9 @@ _oc_replace()
 _oc_rollback()
 {
     last_command="oc_rollback"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12896,6 +13626,9 @@ _oc_rollback()
 _oc_rollout_cancel()
 {
     last_command="oc_rollout_cancel"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -12958,6 +13691,9 @@ _oc_rollout_cancel()
 _oc_rollout_history()
 {
     last_command="oc_rollout_history"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13025,6 +13761,9 @@ _oc_rollout_history()
 _oc_rollout_latest()
 {
     last_command="oc_rollout_latest"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13080,6 +13819,9 @@ _oc_rollout_latest()
 _oc_rollout_pause()
 {
     last_command="oc_rollout_pause"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13143,6 +13885,9 @@ _oc_rollout_pause()
 _oc_rollout_resume()
 {
     last_command="oc_rollout_resume"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13206,6 +13951,9 @@ _oc_rollout_resume()
 _oc_rollout_retry()
 {
     last_command="oc_rollout_retry"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13267,6 +14015,9 @@ _oc_rollout_retry()
 _oc_rollout_status()
 {
     last_command="oc_rollout_status"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13329,6 +14080,9 @@ _oc_rollout_status()
 _oc_rollout_undo()
 {
     last_command="oc_rollout_undo"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13398,6 +14152,9 @@ _oc_rollout_undo()
 _oc_rollout()
 {
     last_command="oc_rollout"
+
+    command_aliases=()
+
     commands=()
     commands+=("cancel")
     commands+=("history")
@@ -13448,6 +14205,9 @@ _oc_rollout()
 _oc_rsh()
 {
     last_command="oc_rsh"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13503,6 +14263,9 @@ _oc_rsh()
 _oc_rsync()
 {
     last_command="oc_rsync"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13568,6 +14331,9 @@ _oc_rsync()
 _oc_run()
 {
     last_command="oc_run"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13700,6 +14466,9 @@ _oc_run()
 _oc_scale()
 {
     last_command="oc_scale"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13782,6 +14551,9 @@ _oc_scale()
 _oc_secrets_add()
 {
     last_command="oc_secrets_add"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13826,6 +14598,9 @@ _oc_secrets_add()
 _oc_secrets_link()
 {
     last_command="oc_secrets_link"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13870,6 +14645,9 @@ _oc_secrets_link()
 _oc_secrets_unlink()
 {
     last_command="oc_secrets_unlink"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -13921,6 +14699,9 @@ _oc_secrets_unlink()
 _oc_secrets()
 {
     last_command="oc_secrets"
+
+    command_aliases=()
+
     commands=()
     commands+=("add")
     commands+=("link")
@@ -13966,6 +14747,9 @@ _oc_secrets()
 _oc_serviceaccounts_create-kubeconfig()
 {
     last_command="oc_serviceaccounts_create-kubeconfig"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14010,6 +14794,9 @@ _oc_serviceaccounts_create-kubeconfig()
 _oc_serviceaccounts_get-token()
 {
     last_command="oc_serviceaccounts_get-token"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14052,6 +14839,9 @@ _oc_serviceaccounts_get-token()
 _oc_serviceaccounts_new-token()
 {
     last_command="oc_serviceaccounts_new-token"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14099,6 +14889,9 @@ _oc_serviceaccounts_new-token()
 _oc_serviceaccounts()
 {
     last_command="oc_serviceaccounts"
+
+    command_aliases=()
+
     commands=()
     commands+=("create-kubeconfig")
     commands+=("get-token")
@@ -14144,6 +14937,9 @@ _oc_serviceaccounts()
 _oc_set_build-hook()
 {
     last_command="oc_set_build-hook"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14222,6 +15018,9 @@ _oc_set_build-hook()
 _oc_set_build-secret()
 {
     last_command="oc_set_build-secret"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14300,6 +15099,9 @@ _oc_set_build-secret()
 _oc_set_deployment-hook()
 {
     last_command="oc_set_deployment-hook"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14388,6 +15190,9 @@ _oc_set_deployment-hook()
 _oc_set_env()
 {
     last_command="oc_set_env"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14476,6 +15281,9 @@ _oc_set_env()
 _oc_set_image()
 {
     last_command="oc_set_image"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14552,6 +15360,9 @@ _oc_set_image()
 _oc_set_image-lookup()
 {
     last_command="oc_set_image-lookup"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14626,6 +15437,9 @@ _oc_set_image-lookup()
 _oc_set_probe()
 {
     last_command="oc_set_probe"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14719,6 +15533,9 @@ _oc_set_probe()
 _oc_set_resources()
 {
     last_command="oc_set_resources"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14800,6 +15617,9 @@ _oc_set_resources()
 _oc_set_route-backends()
 {
     last_command="oc_set_route-backends"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14876,6 +15696,9 @@ _oc_set_route-backends()
 _oc_set_selector()
 {
     last_command="oc_set_selector"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -14949,6 +15772,9 @@ _oc_set_selector()
 _oc_set_serviceaccount()
 {
     last_command="oc_set_serviceaccount"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15020,6 +15846,9 @@ _oc_set_serviceaccount()
 _oc_set_subject()
 {
     last_command="oc_set_subject"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15096,6 +15925,9 @@ _oc_set_subject()
 _oc_set_triggers()
 {
     last_command="oc_set_triggers"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15191,6 +16023,9 @@ _oc_set_triggers()
 _oc_set_volumes()
 {
     last_command="oc_set_volumes"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15302,6 +16137,9 @@ _oc_set_volumes()
 _oc_set()
 {
     last_command="oc_set"
+
+    command_aliases=()
+
     commands=()
     commands+=("build-hook")
     commands+=("build-secret")
@@ -15314,9 +16152,17 @@ _oc_set()
     commands+=("route-backends")
     commands+=("selector")
     commands+=("serviceaccount")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("sa")
+        aliashash["sa"]="serviceaccount"
+    fi
     commands+=("subject")
     commands+=("triggers")
     commands+=("volumes")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("volume")
+        aliashash["volume"]="volumes"
+    fi
 
     flags=()
     two_word_flags=()
@@ -15358,6 +16204,9 @@ _oc_set()
 _oc_start-build()
 {
     last_command="oc_start-build"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15446,6 +16295,9 @@ _oc_start-build()
 _oc_status()
 {
     last_command="oc_status"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15495,6 +16347,9 @@ _oc_status()
 _oc_tag()
 {
     last_command="oc_tag"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15552,6 +16407,9 @@ _oc_tag()
 _oc_version()
 {
     last_command="oc_version"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15594,6 +16452,9 @@ _oc_version()
 _oc_wait()
 {
     last_command="oc_wait"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15664,6 +16525,9 @@ _oc_wait()
 _oc_whoami()
 {
     last_command="oc_whoami"
+
+    command_aliases=()
+
     commands=()
 
     flags=()
@@ -15714,6 +16578,9 @@ _oc_whoami()
 _oc_root_command()
 {
     last_command="oc"
+
+    command_aliases=()
+
     commands=()
     commands+=("adm")
     commands+=("annotate")
@@ -15748,6 +16615,10 @@ _oc_root_command()
     commands+=("login")
     commands+=("logout")
     commands+=("logs")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("log")
+        aliashash["log"]="logs"
+    fi
     commands+=("new-app")
     commands+=("new-build")
     commands+=("new-project")
@@ -15770,7 +16641,15 @@ _oc_root_command()
     commands+=("run")
     commands+=("scale")
     commands+=("secrets")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("secret")
+        aliashash["secret"]="secrets"
+    fi
     commands+=("serviceaccounts")
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        command_aliases+=("sa")
+        aliashash["sa"]="serviceaccounts"
+    fi
     commands+=("set")
     commands+=("start-build")
     commands+=("status")
@@ -15820,6 +16699,7 @@ __start_oc()
 {
     local cur prev words cword
     declare -A flaghash 2>/dev/null || :
+    declare -A aliashash 2>/dev/null || :
     if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -s || return
     else
