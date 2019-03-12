@@ -78,7 +78,7 @@ const (
 // WithOAuth decorates the given handler by serving the OAuth2 endpoints while
 // passing through all other requests to the given handler.
 func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error) {
-	mux := http.NewServeMux()
+	mux := oauthserver.NewMuxWithStandardHeaders()
 
 	// pass through all other requests
 	mux.Handle("/", handler)
