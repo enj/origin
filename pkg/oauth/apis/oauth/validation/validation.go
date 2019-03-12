@@ -12,6 +12,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 
+	routev1 "github.com/openshift/api/route/v1"
 	authorizerscopes "github.com/openshift/origin/pkg/authorization/authorizer/scope"
 	oauthapi "github.com/openshift/origin/pkg/oauth/apis/oauth"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/password/bootstrap"
@@ -197,6 +198,19 @@ func ValidateClient(client *oauthapi.OAuthClient) field.ErrorList {
 		}
 	}
 
+	if len(client.GrantMethod) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("grantMethod"), "may not be empty"))
+	} else {
+		switch client.GrantMethod {
+		case oauthapi.GrantHandlerAuto, oauthapi.GrantHandlerPrompt, oauthapi.GrantHandlerDeny:
+			// valid grant methods
+		default:
+			allErrs = append(allErrs, field.NotSupported(field.NewPath("grantMethod"), string(client.GrantMethod),
+				[]string{string(oauthapi.GrantHandlerAuto), string(oauthapi.GrantHandlerPrompt), string(oauthapi.GrantHandlerDeny)},
+			))
+		}
+	}
+
 	return allErrs
 }
 
@@ -329,6 +343,10 @@ func ValidateUserNameField(value string, fldPath *field.Path) field.ErrorList {
 func ValidateScopes(scopes []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	if len(scopes) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "may not be empty"))
+	}
+
 	for i, scope := range scopes {
 		illegalCharacter := false
 		// https://tools.ietf.org/html/rfc6749#section-3.3 (full list of allowed chars is %x21 / %x23-5B / %x5D-7E)
@@ -370,26 +388,31 @@ func ValidateScopes(scopes []string, fldPath *field.Path) field.ErrorList {
 
 func ValidateOAuthRedirectReference(sref *oauthapi.OAuthRedirectReference) field.ErrorList {
 	allErrs := validation.ValidateObjectMeta(&sref.ObjectMeta, true, path.ValidatePathSegmentName, field.NewPath("metadata"))
-	return append(allErrs, validateRedirectReference(&sref.Reference)...)
+	return append(allErrs, validateRedirectReference(&sref.Reference, field.NewPath("reference"))...)
 }
 
-func validateRedirectReference(ref *oauthapi.RedirectReference) field.ErrorList {
+func validateRedirectReference(ref *oauthapi.RedirectReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(ref.Name) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("name"), "may not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "may not be empty"))
 	} else {
 		for _, msg := range path.ValidatePathSegmentName(ref.Name, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("name"), ref.Name, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
 		}
 	}
 	switch ref.Kind {
 	case "":
-		allErrs = append(allErrs, field.Required(field.NewPath("kind"), "may not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "may not be empty"))
 	case "Route":
 		// Valid, TODO add ingress once we support it and update error message
 	default:
-		allErrs = append(allErrs, field.Invalid(field.NewPath("kind"), ref.Kind, "must be Route"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, "must be Route"))
 	}
-	// TODO validate group once we start using it
+	switch ref.Group {
+	case "", routev1.GroupName:
+	// valid group names
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("group"), ref.Group, []string{"", routev1.GroupName}))
+	}
 	return allErrs
 }
