@@ -147,6 +147,9 @@ func (t *tokenRequest) displayTokenPost(osinOAuthClient *osincli.Client, w http.
 func displayTokenStart(osinOAuthClient *osincli.Client, w http.ResponseWriter, req *http.Request, data *sharedData) (*osincli.AuthorizeData, bool) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 
+	requestURL := urls.OpenShiftOAuthTokenRequestURL("") // relative url to token request endpoint
+	data.RequestURL = requestURL                         // always set this field even on error cases
+
 	authorizeReq := osinOAuthClient.NewAuthorizeRequest(osincli.CODE)
 	authorizeData, err := authorizeReq.HandleRequest(req)
 	if err != nil {
@@ -154,9 +157,6 @@ func displayTokenStart(osinOAuthClient *osincli.Client, w http.ResponseWriter, r
 		data.Error = fmt.Sprintf("Error handling auth request: %v", err)
 		return nil, false
 	}
-
-	requestURL := urls.OpenShiftOAuthTokenRequestURL("") // relative url to token request endpoint
-	data.RequestURL = requestURL
 
 	return authorizeData, true
 }
