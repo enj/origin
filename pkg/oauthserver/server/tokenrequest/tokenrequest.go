@@ -84,15 +84,9 @@ func (t *tokenRequest) displayToken(osinOAuthClient *osincli.Client, w http.Resp
 }
 
 func (t *tokenRequest) displayTokenGet(osinOAuthClient *osincli.Client, w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	requestURL := urls.OpenShiftOAuthTokenRequestURL("") // relative url to token request endpoint
-	data := formData{RequestURL: requestURL}
-
-	authorizeReq := osinOAuthClient.NewAuthorizeRequest(osincli.CODE)
-	authorizeData, err := authorizeReq.HandleRequest(req)
-	if err != nil {
-		data.Error = fmt.Sprintf("Error handling auth request: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
+	data := formData{}
+	authorizeData, ok := displayTokenStart(osinOAuthClient, w, req, &data.sharedData)
+	if !ok {
 		renderForm(w, data)
 		return
 	}
@@ -117,15 +111,9 @@ func (t *tokenRequest) displayTokenPost(osinOAuthClient *osincli.Client, w http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	requestURL := urls.OpenShiftOAuthTokenRequestURL("") // relative url to token request endpoint
-	data := tokenData{RequestURL: requestURL, PublicMasterURL: t.publicMasterURL}
-
-	authorizeReq := osinOAuthClient.NewAuthorizeRequest(osincli.CODE)
-	authorizeData, err := authorizeReq.HandleRequest(req)
-	if err != nil {
-		data.Error = fmt.Sprintf("Error handling auth request: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
+	data := tokenData{PublicMasterURL: t.publicMasterURL}
+	authorizeData, ok := displayTokenStart(osinOAuthClient, w, req, &data.sharedData)
+	if !ok {
 		renderToken(w, data)
 		return
 	}
@@ -156,16 +144,38 @@ func (t *tokenRequest) displayTokenPost(osinOAuthClient *osincli.Client, w http.
 	renderToken(w, data)
 }
 
+func displayTokenStart(osinOAuthClient *osincli.Client, w http.ResponseWriter, req *http.Request, data *sharedData) (*osincli.AuthorizeData, bool) {
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	authorizeReq := osinOAuthClient.NewAuthorizeRequest(osincli.CODE)
+	authorizeData, err := authorizeReq.HandleRequest(req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		data.Error = fmt.Sprintf("Error handling auth request: %v", err)
+		return nil, false
+	}
+
+	requestURL := urls.OpenShiftOAuthTokenRequestURL("") // relative url to token request endpoint
+	data.RequestURL = requestURL
+
+	return authorizeData, true
+}
+
 func renderToken(w io.Writer, data tokenData) {
 	if err := tokenTemplate.Execute(w, data); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to render token template: %v", err))
 	}
 }
 
+type sharedData struct {
+	Error      string
+	RequestURL string
+}
+
 type tokenData struct {
-	Error           string
+	sharedData
+
 	AccessToken     string
-	RequestURL      string
 	PublicMasterURL string
 	LogoutURL       string
 }
@@ -180,11 +190,11 @@ func getBaseURL(req *http.Request) (*url.URL, error) {
 }
 
 type formData struct {
-	RequestURL string
-	Error      string
-	Action     string
-	Code       string
-	CSRF       string
+	sharedData
+
+	Action string
+	Code   string
+	CSRF   string
 }
 
 func renderForm(w io.Writer, data formData) {
