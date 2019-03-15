@@ -85,7 +85,8 @@ func (t *tokenRequest) displayToken(osinOAuthClient *osincli.Client, w http.Resp
 
 func (t *tokenRequest) displayTokenGet(osinOAuthClient *osincli.Client, w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	data := formData{}
+	requestURL := urls.OpenShiftOAuthTokenRequestURL("") // relative url to token request endpoint
+	data := formData{RequestURL: requestURL}
 
 	authorizeReq := osinOAuthClient.NewAuthorizeRequest(osincli.CODE)
 	authorizeData, err := authorizeReq.HandleRequest(req)
@@ -179,10 +180,11 @@ func getBaseURL(req *http.Request) (*url.URL, error) {
 }
 
 type formData struct {
-	Error  string
-	Action string
-	Code   string
-	CSRF   string
+	RequestURL string
+	Error      string
+	Action     string
+	Code       string
+	CSRF       string
 }
 
 func renderForm(w io.Writer, data formData) {
@@ -242,6 +244,8 @@ var formTemplate = template.Must(template.New("formTemplate").Parse(
 	cssStyle + `
 {{ if .Error }}
   {{ .Error }}
+  <br><br>
+  <a href="{{.RequestURL}}">Request another token</a>
 {{ else }}
   <form method="post" action="{{.Action}}">
     <input type="hidden" name="code" value="{{.Code}}">
