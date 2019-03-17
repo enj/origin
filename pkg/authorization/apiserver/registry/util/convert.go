@@ -12,6 +12,7 @@ import (
 // ClusterRoleToRBAC turns an OpenShift ClusterRole into a Kubernetes RBAC
 // ClusterRole, the returned object is safe to mutate
 func ClusterRoleToRBAC(obj *authorizationapi.ClusterRole) (*rbacv1.ClusterRole, error) {
+	//  TODO copy
 	convertedObjInternal := &rbac.ClusterRole{}
 	if err := rbacconversion.Convert_authorization_ClusterRole_To_rbac_ClusterRole(obj, convertedObjInternal, nil); err != nil {
 		return nil, err
