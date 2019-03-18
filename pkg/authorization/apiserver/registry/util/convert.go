@@ -12,9 +12,11 @@ import (
 // ClusterRoleToRBAC turns an OpenShift ClusterRole into a Kubernetes RBAC
 // ClusterRole, the returned object is safe to mutate
 func ClusterRoleToRBAC(obj *authorizationapi.ClusterRole) (*rbacv1.ClusterRole, error) {
-	//  TODO copy
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.ClusterRole{}
-	if err := rbacconversion.Convert_authorization_ClusterRole_To_rbac_ClusterRole(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacconversion.Convert_authorization_ClusterRole_To_rbac_ClusterRole(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -23,15 +25,17 @@ func ClusterRoleToRBAC(obj *authorizationapi.ClusterRole) (*rbacv1.ClusterRole, 
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // ClusterRoleBindingToRBAC turns an OpenShift ClusterRoleBinding into a Kubernetes
 // RBAC ClusterRoleBinding, the returned object is safe to mutate
 func ClusterRoleBindingToRBAC(obj *authorizationapi.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.ClusterRoleBinding{}
-	if err := rbacconversion.Convert_authorization_ClusterRoleBinding_To_rbac_ClusterRoleBinding(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacconversion.Convert_authorization_ClusterRoleBinding_To_rbac_ClusterRoleBinding(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -40,15 +44,17 @@ func ClusterRoleBindingToRBAC(obj *authorizationapi.ClusterRoleBinding) (*rbacv1
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // RoleToRBAC turns an OpenShift Role into a Kubernetes RBAC Role,
 // the returned object is safe to mutate
 func RoleToRBAC(obj *authorizationapi.Role) (*rbacv1.Role, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.Role{}
-	if err := rbacconversion.Convert_authorization_Role_To_rbac_Role(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacconversion.Convert_authorization_Role_To_rbac_Role(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -57,15 +63,17 @@ func RoleToRBAC(obj *authorizationapi.Role) (*rbacv1.Role, error) {
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // RoleBindingToRBAC turns an OpenShift RoleBinding into a Kubernetes RBAC
 // Rolebinding, the returned object is safe to mutate
 func RoleBindingToRBAC(obj *authorizationapi.RoleBinding) (*rbacv1.RoleBinding, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.RoleBinding{}
-	if err := rbacconversion.Convert_authorization_RoleBinding_To_rbac_RoleBinding(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacconversion.Convert_authorization_RoleBinding_To_rbac_RoleBinding(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -74,15 +82,17 @@ func RoleBindingToRBAC(obj *authorizationapi.RoleBinding) (*rbacv1.RoleBinding, 
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // ClusterRoleFromRBAC turns a Kubernetes RBAC ClusterRole into an Openshift
 // ClusterRole, the returned object is safe to mutate
 func ClusterRoleFromRBAC(obj *rbacv1.ClusterRole) (*authorizationapi.ClusterRole, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.ClusterRole{}
-	if err := rbacv1helpers.Convert_v1_ClusterRole_To_rbac_ClusterRole(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacv1helpers.Convert_v1_ClusterRole_To_rbac_ClusterRole(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -91,15 +101,17 @@ func ClusterRoleFromRBAC(obj *rbacv1.ClusterRole) (*authorizationapi.ClusterRole
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // ClusterRoleBindingFromRBAC turns a Kuberenets RBAC ClusterRoleBinding into
 // an Openshift ClusterRoleBinding, the returned object is safe to mutate
 func ClusterRoleBindingFromRBAC(obj *rbacv1.ClusterRoleBinding) (*authorizationapi.ClusterRoleBinding, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.ClusterRoleBinding{}
-	if err := rbacv1helpers.Convert_v1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacv1helpers.Convert_v1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -108,15 +120,17 @@ func ClusterRoleBindingFromRBAC(obj *rbacv1.ClusterRoleBinding) (*authorizationa
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // RoleFromRBAC turns a Kubernetes RBAC Role into an OpenShift Role,
 // the returned object is safe to mutate
 func RoleFromRBAC(obj *rbacv1.Role) (*authorizationapi.Role, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.Role{}
-	if err := rbacv1helpers.Convert_v1_Role_To_rbac_Role(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacv1helpers.Convert_v1_Role_To_rbac_Role(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -125,15 +139,17 @@ func RoleFromRBAC(obj *rbacv1.Role) (*authorizationapi.Role, error) {
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
 
 // RoleBindingFromRBAC turns a Kubernetes RBAC RoleBinding into an OpenShift
 // Rolebinding, the returned object is safe to mutate
 func RoleBindingFromRBAC(obj *rbacv1.RoleBinding) (*authorizationapi.RoleBinding, error) {
+	// do a deep copy here since conversion does not guarantee a new object.
+	objCopy := obj.DeepCopy()
+
 	convertedObjInternal := &rbac.RoleBinding{}
-	if err := rbacv1helpers.Convert_v1_RoleBinding_To_rbac_RoleBinding(obj, convertedObjInternal, nil); err != nil {
+	if err := rbacv1helpers.Convert_v1_RoleBinding_To_rbac_RoleBinding(objCopy, convertedObjInternal, nil); err != nil {
 		return nil, err
 	}
 
@@ -142,6 +158,5 @@ func RoleBindingFromRBAC(obj *rbacv1.RoleBinding) (*authorizationapi.RoleBinding
 		return nil, err
 	}
 
-	// do a deep copy here since conversion does not guarantee a new object.
-	return convertedObj.DeepCopy(), nil
+	return convertedObj, nil
 }
