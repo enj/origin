@@ -44,14 +44,11 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clusterAdminAuthorizationClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
-	clusterAdminRBACClient := rbacv1client.NewForConfigOrDie(clusterAdminClientConfig)
-
 	namespace := "testproject"
 	testBindingName := "testrole"
 
-	clusterAdminRoleBindingsClient := clusterAdminAuthorizationClient.RoleBindings(namespace)
-	clusterAdminRBACRoleBindingsClient := clusterAdminRBACClient.RoleBindings(namespace)
+	clusterAdminRoleBindingsClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig).RoleBindings(namespace)
+	clusterAdminRBACRoleBindingsClient := rbacv1client.NewForConfigOrDie(clusterAdminClientConfig).RoleBindings(namespace)
 
 	_, _, err = testserver.CreateNewProject(clusterAdminClientConfig, namespace, "testuser")
 	if err != nil {
@@ -222,17 +219,14 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clusterAdmin := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
 
-	// install the legacy types into the client for decoding
-	legacy.InstallInternalLegacyAuthorization(authorizationclientscheme.Scheme)
-
-	clusterRoleBindingsPath := "/apis/authorization.openshift.io/v1/clusterrolebindings"
 	testBindingName := "testbinding"
 
+	clusterAdminClusterRoleBindingsClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig).ClusterRoleBindings()
+	clusterAdminRBACClusterRoleBindingsClient := rbacv1client.NewForConfigOrDie(clusterAdminClientConfig).ClusterRoleBindings()
+
 	// list clusterrole bindings
-	clusterRoleBindingList := &authorizationv1.ClusterRoleBindingList{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRoleBindingsPath).Do().Into(clusterRoleBindingList)
+	clusterRoleBindingList, err := clusterAdminClusterRoleBindingsClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,13 +257,8 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 			Name: "edit",
 		},
 	}
-	clusterRoleBindingToCreateBytes, err := runtime.Encode(authorizationV1Encoder, clusterRoleBindingToCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	clusterRoleBindingCreated := &authorizationv1.ClusterRoleBinding{}
-	err = clusterAdmin.RESTClient().Post().AbsPath(clusterRoleBindingsPath).Body(clusterRoleBindingToCreateBytes).Do().Into(clusterRoleBindingCreated)
+	clusterRoleBindingCreated, err := clusterAdminClusterRoleBindingsClient.Create(clusterRoleBindingToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,8 +292,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clusterRoleBindingEdited := &authorizationv1.ClusterRoleBinding{}
-	err = clusterAdmin.RESTClient().Patch(types.StrategicMergePatchType).AbsPath(clusterRoleBindingsPath).Name(clusterRoleBindingToEdit.Name).Body(clusterRoleBindingToEditBytes).Do().Into(clusterRoleBindingEdited)
+	clusterRoleBindingEdited, err := clusterAdminClusterRoleBindingsClient.Patch(testBindingName, types.StrategicMergePatchType, clusterRoleBindingToEditBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,24 +310,37 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// get clusterrolebinding by name
-	getRoleBinding := &authorizationv1.ClusterRoleBinding{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRoleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
+	getRoleBinding, err := clusterAdminClusterRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if getRoleBinding.Name != testBindingName {
 		t.Fatalf("expected clusterrolebinding %s, got %s", testBindingName, getRoleBinding.Name)
 	}
+	// get clusterrolebinding by name via RBAC endpoint
+	getRoleBindingRBAC, err := clusterAdminRBACClusterRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if getRoleBindingRBAC.Name != testBindingName {
+		t.Fatalf("expected clusterrolebinding %s, got %s", testBindingName, getRoleBindingRBAC.Name)
+	}
 
 	// delete clusterrolebinding
-	err = clusterAdmin.RESTClient().Delete().AbsPath(clusterRoleBindingsPath).Name(testBindingName).Do().Error()
+	err = clusterAdminClusterRoleBindingsClient.Delete(testBindingName, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// confirm deletion
-	getRoleBinding = &authorizationv1.ClusterRoleBinding{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRoleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
+	_, err = clusterAdminClusterRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("expected error")
+	} else if !kapierror.IsNotFound(err) {
+		t.Fatal(err)
+	}
+	// confirm deletion via RBAC endpoint
+	_, err = clusterAdminRBACClusterRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
