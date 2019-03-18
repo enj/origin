@@ -3,6 +3,8 @@ package integration
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	kapierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -10,10 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	kapi "k8s.io/kubernetes/pkg/apis/core"
 
+	authorizationv1 "github.com/openshift/api/authorization/v1"
 	"github.com/openshift/origin/pkg/api/legacy"
-	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
 	authorizationclient "github.com/openshift/origin/pkg/authorization/generated/internalclientset"
 	authorizationclientscheme "github.com/openshift/origin/pkg/authorization/generated/internalclientset/scheme"
 	testutil "github.com/openshift/origin/test/util"
@@ -47,17 +48,17 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	legacy.InstallInternalLegacyAuthorization(authorizationclientscheme.Scheme)
 
 	// create rolebinding
-	roleBindingToCreate := &authorizationapi.RoleBinding{
+	roleBindingToCreate := &authorizationv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testBindingName,
 		},
-		Subjects: []kapi.ObjectReference{
+		Subjects: []corev1.ObjectReference{
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser",
 			},
 		},
-		RoleRef: kapi.ObjectReference{
+		RoleRef: corev1.ObjectReference{
 			Kind:      "Role",
 			Name:      "edit",
 			Namespace: namespace,
@@ -68,7 +69,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	roleBindingCreated := &authorizationapi.RoleBinding{}
+	roleBindingCreated := &authorizationv1.RoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Post().AbsPath(roleBindingsPath).Body(roleBindingToCreateBytes).Do().Into(roleBindingCreated)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -79,7 +80,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// list rolebindings
-	roleBindingList := &authorizationapi.RoleBindingList{}
+	roleBindingList := &authorizationv1.RoleBindingList{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(roleBindingsPath).Do().Into(roleBindingList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -96,21 +97,21 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// edit rolebinding
-	roleBindingToEdit := &authorizationapi.RoleBinding{
+	roleBindingToEdit := &authorizationv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testBindingName,
 		},
-		Subjects: []kapi.ObjectReference{
+		Subjects: []corev1.ObjectReference{
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser",
 			},
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser2",
 			},
 		},
-		RoleRef: kapi.ObjectReference{
+		RoleRef: corev1.ObjectReference{
 			Kind:      "Role",
 			Name:      "edit",
 			Namespace: namespace,
@@ -121,7 +122,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	roleBindingEdited := &authorizationapi.RoleBinding{}
+	roleBindingEdited := &authorizationv1.RoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Patch(types.StrategicMergePatchType).AbsPath(roleBindingsPath).Name(roleBindingToEdit.Name).Body(roleBindingToEditBytes).Do().Into(roleBindingEdited)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -140,7 +141,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// get rolebinding by name
-	getRoleBinding := &authorizationapi.RoleBinding{}
+	getRoleBinding := &authorizationv1.RoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(roleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -156,7 +157,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// confirm deletion
-	getRoleBinding = &authorizationapi.RoleBinding{}
+	getRoleBinding = &authorizationv1.RoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(roleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
 	if err == nil {
 		t.Errorf("expected error")
@@ -165,18 +166,18 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// create local rolebinding for cluster role
-	localClusterRoleBindingToCreate := &authorizationapi.RoleBinding{
+	localClusterRoleBindingToCreate := &authorizationv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-crb",
 			Namespace: namespace,
 		},
-		Subjects: []kapi.ObjectReference{
+		Subjects: []corev1.ObjectReference{
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser",
 			},
 		},
-		RoleRef: kapi.ObjectReference{
+		RoleRef: corev1.ObjectReference{
 			Kind: "ClusterRole",
 			Name: "edit",
 		},
@@ -186,7 +187,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	localClusterRoleBindingCreated := &authorizationapi.RoleBinding{}
+	localClusterRoleBindingCreated := &authorizationv1.RoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Post().AbsPath(roleBindingsPath).Body(localClusterRoleBindingToCreateBytes).Do().Into(localClusterRoleBindingCreated)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -219,7 +220,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	testBindingName := "testbinding"
 
 	// list clusterrole bindings
-	clusterRoleBindingList := &authorizationapi.ClusterRoleBindingList{}
+	clusterRoleBindingList := &authorizationv1.ClusterRoleBindingList{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(clusterRoleBindingsPath).Do().Into(clusterRoleBindingList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -236,17 +237,17 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// create clusterrole binding
-	clusterRoleBindingToCreate := &authorizationapi.ClusterRoleBinding{
+	clusterRoleBindingToCreate := &authorizationv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testBindingName,
 		},
-		Subjects: []kapi.ObjectReference{
+		Subjects: []corev1.ObjectReference{
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser",
 			},
 		},
-		RoleRef: kapi.ObjectReference{
+		RoleRef: corev1.ObjectReference{
 			Kind: "ClusterRole",
 			Name: "edit",
 		},
@@ -256,7 +257,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clusterRoleBindingCreated := &authorizationapi.ClusterRoleBinding{}
+	clusterRoleBindingCreated := &authorizationv1.ClusterRoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Post().AbsPath(clusterRoleBindingsPath).Body(clusterRoleBindingToCreateBytes).Do().Into(clusterRoleBindingCreated)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -267,21 +268,21 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// edit clusterrole binding
-	clusterRoleBindingToEdit := &authorizationapi.ClusterRoleBinding{
+	clusterRoleBindingToEdit := &authorizationv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testBindingName,
 		},
-		Subjects: []kapi.ObjectReference{
+		Subjects: []corev1.ObjectReference{
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser",
 			},
 			{
-				Kind: authorizationapi.UserKind,
+				Kind: rbacv1.UserKind,
 				Name: "testuser2",
 			},
 		},
-		RoleRef: kapi.ObjectReference{
+		RoleRef: corev1.ObjectReference{
 			Kind: "ClusterRole",
 			Name: "edit",
 		},
@@ -291,7 +292,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clusterRoleBindingEdited := &authorizationapi.ClusterRoleBinding{}
+	clusterRoleBindingEdited := &authorizationv1.ClusterRoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Patch(types.StrategicMergePatchType).AbsPath(clusterRoleBindingsPath).Name(clusterRoleBindingToEdit.Name).Body(clusterRoleBindingToEditBytes).Do().Into(clusterRoleBindingEdited)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -310,7 +311,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// get clusterrolebinding by name
-	getRoleBinding := &authorizationapi.ClusterRoleBinding{}
+	getRoleBinding := &authorizationv1.ClusterRoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(clusterRoleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -326,7 +327,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	// confirm deletion
-	getRoleBinding = &authorizationapi.ClusterRoleBinding{}
+	getRoleBinding = &authorizationv1.ClusterRoleBinding{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(clusterRoleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
 	if err == nil {
 		t.Errorf("expected error")
@@ -357,7 +358,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	testRole := "testrole"
 
 	// list clusterroles
-	clusterRoleList := &authorizationapi.ClusterRoleList{}
+	clusterRoleList := &authorizationv1.ClusterRoleList{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(clusterRolesPath).Do().Into(clusterRoleList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -373,17 +374,21 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	}
 
 	// create clusterrole
-	clusterRoleToCreate := &authorizationapi.ClusterRole{
+	clusterRoleToCreate := &authorizationv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: testRole},
-		Rules: []authorizationapi.PolicyRule{
-			authorizationapi.NewRule("get").Groups("").Resources("services").RuleOrDie(),
+		Rules: []authorizationv1.PolicyRule{
+			{
+				Verbs:     []string{"get"},
+				APIGroups: []string{""},
+				Resources: []string{"services"},
+			},
 		},
 	}
 	clusterRoleToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), clusterRoleToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdClusterRole := &authorizationapi.ClusterRole{}
+	createdClusterRole := &authorizationv1.ClusterRole{}
 	err = clusterAdmin.Authorization().RESTClient().Post().AbsPath(clusterRolesPath).Body(clusterRoleToCreateBytes).Do().Into(createdClusterRole)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -393,15 +398,19 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		t.Errorf("expected to create %v, got %v", clusterRoleToCreate.Name, createdClusterRole.Name)
 	}
 
-	if !createdClusterRole.Rules[0].Verbs.Has("get") {
+	if !sets.NewString(createdClusterRole.Rules[0].Verbs...).Has("get") {
 		t.Errorf("expected clusterrole to have a get rule")
 	}
 
 	// update clusterrole
-	clusterRoleUpdate := &authorizationapi.ClusterRole{
+	clusterRoleUpdate := &authorizationv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: testRole},
-		Rules: []authorizationapi.PolicyRule{
-			authorizationapi.NewRule("get", "list").Groups("").Resources("services").RuleOrDie(),
+		Rules: []authorizationv1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list"},
+				APIGroups: []string{""},
+				Resources: []string{"services"},
+			},
 		},
 	}
 
@@ -410,7 +419,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updatedClusterRole := &authorizationapi.ClusterRole{}
+	updatedClusterRole := &authorizationv1.ClusterRole{}
 	err = clusterAdmin.Authorization().RESTClient().Patch(types.StrategicMergePatchType).AbsPath(clusterRolesPath).Name(testRole).Body(clusterRoleUpdateBytes).Do().Into(updatedClusterRole)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -420,12 +429,12 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		t.Errorf("expected to update %s, got %s", clusterRoleUpdate.Name, updatedClusterRole.Name)
 	}
 
-	if !updatedClusterRole.Rules[0].Verbs.HasAll("get", "list") {
+	if !sets.NewString(updatedClusterRole.Rules[0].Verbs...).HasAll("get", "list") {
 		t.Errorf("expected clusterrole to have a get and list rule")
 	}
 
 	// get clusterrole
-	getRole := &authorizationapi.ClusterRole{}
+	getRole := &authorizationv1.ClusterRole{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(clusterRolesPath).Name(testRole).Do().Into(getRole)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -441,7 +450,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	}
 
 	// confirm deletion
-	getRole = &authorizationapi.ClusterRole{}
+	getRole = &authorizationv1.ClusterRole{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(clusterRolesPath).Name(testRole).Do().Into(getRole)
 	if err == nil {
 		t.Errorf("expected error")
@@ -478,20 +487,24 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	testRole := "testrole"
 
 	// create role
-	roleToCreate := &authorizationapi.Role{
+	roleToCreate := &authorizationv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testRole,
 			Namespace: namespace,
 		},
-		Rules: []authorizationapi.PolicyRule{
-			authorizationapi.NewRule("get").Groups("").Resources("services").RuleOrDie(),
+		Rules: []authorizationv1.PolicyRule{
+			{
+				Verbs:     []string{"get"},
+				APIGroups: []string{""},
+				Resources: []string{"services"},
+			},
 		},
 	}
 	roleToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), roleToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdRole := &authorizationapi.Role{}
+	createdRole := &authorizationv1.Role{}
 	err = clusterAdmin.Authorization().RESTClient().Post().AbsPath(rolesPath).Body(roleToCreateBytes).Do().Into(createdRole)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -501,12 +514,12 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Errorf("expected to create %v, got %v", roleToCreate.Name, createdRole.Name)
 	}
 
-	if !createdRole.Rules[0].Verbs.Has("get") {
+	if !sets.NewString(createdRole.Rules[0].Verbs...).Has("get") {
 		t.Errorf("expected clusterRole to have a get rule")
 	}
 
 	// list roles
-	roleList := &authorizationapi.RoleList{}
+	roleList := &authorizationv1.RoleList{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(rolesPath).Do().Into(roleList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -522,13 +535,17 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 
 	// update role
-	roleUpdate := &authorizationapi.Role{
+	roleUpdate := &authorizationv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testRole,
 			Namespace: namespace,
 		},
-		Rules: []authorizationapi.PolicyRule{
-			authorizationapi.NewRule("get", "list").Groups("").Resources("services").RuleOrDie(),
+		Rules: []authorizationv1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list"},
+				APIGroups: []string{""},
+				Resources: []string{"services"},
+			},
 		},
 	}
 
@@ -537,7 +554,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updatedRole := &authorizationapi.Role{}
+	updatedRole := &authorizationv1.Role{}
 	err = clusterAdmin.Authorization().RESTClient().Patch(types.StrategicMergePatchType).AbsPath(rolesPath).Name(testRole).Body(roleUpdateBytes).Do().Into(updatedRole)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -547,12 +564,12 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Errorf("expected to update %s, got %s", roleUpdate.Name, updatedRole.Name)
 	}
 
-	if !updatedRole.Rules[0].Verbs.HasAll("get", "list") {
+	if !sets.NewString(updatedRole.Rules[0].Verbs...).HasAll("get", "list") {
 		t.Errorf("expected role to have a get and list rule")
 	}
 
 	// get role
-	getRole := &authorizationapi.Role{}
+	getRole := &authorizationv1.Role{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(rolesPath).Name(testRole).Do().Into(getRole)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -568,7 +585,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 
 	// confirm deletion
-	getRole = &authorizationapi.Role{}
+	getRole = &authorizationv1.Role{}
 	err = clusterAdmin.Authorization().RESTClient().Get().AbsPath(rolesPath).Name(testRole).Do().Into(getRole)
 	if err == nil {
 		t.Errorf("expected error")
