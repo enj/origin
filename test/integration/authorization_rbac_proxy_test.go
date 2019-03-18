@@ -8,10 +8,11 @@ import (
 	kapierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	authorizationv1client "github.com/openshift/client-go/authorization/clientset/versioned/typed/authorization/v1"
@@ -20,6 +21,15 @@ import (
 	testutil "github.com/openshift/origin/test/util"
 	testserver "github.com/openshift/origin/test/util/server"
 )
+
+var authorizationV1Encoder runtime.Encoder
+
+func init() {
+	authorizationV1Scheme := runtime.NewScheme()
+	utilruntime.Must(authorizationv1.Install(authorizationV1Scheme))
+	authorizationV1Codecs := serializer.NewCodecFactory(authorizationV1Scheme)
+	authorizationV1Encoder = authorizationV1Codecs.LegacyCodec(authorizationv1.GroupVersion)
+}
 
 // TestLegacyLocalRoleBindingEndpoint exercises the legacy rolebinding endpoint that is proxied to rbac
 func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
@@ -33,19 +43,20 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clusterAdmin := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
+
+	clusterAdminAuthorizationClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
+	clusterAdminRBACClient := rbacv1client.NewForConfigOrDie(clusterAdminClientConfig)
 
 	namespace := "testproject"
+	testBindingName := "testrole"
+
+	clusterAdminRoleBindingsClient := clusterAdminAuthorizationClient.RoleBindings(namespace)
+	clusterAdminRBACRoleBindingsClient := clusterAdminRBACClient.RoleBindings(namespace)
+
 	_, _, err = testserver.CreateNewProject(clusterAdminClientConfig, namespace, "testuser")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	roleBindingsPath := "/apis/authorization.openshift.io/v1/namespaces/" + namespace + "/rolebindings"
-	testBindingName := "testrole"
-
-	// install the legacy types into the client for decoding
-	legacy.InstallInternalLegacyAuthorization(authorizationclientscheme.Scheme)
 
 	// create rolebinding
 	roleBindingToCreate := &authorizationv1.RoleBinding{
@@ -64,24 +75,18 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 			Namespace: namespace,
 		},
 	}
-	roleBindingToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), roleBindingToCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	roleBindingCreated := &authorizationv1.RoleBinding{}
-	err = clusterAdmin.RESTClient().Post().AbsPath(roleBindingsPath).Body(roleBindingToCreateBytes).Do().Into(roleBindingCreated)
+	roleBindingCreated, err := clusterAdminRoleBindingsClient.Create(roleBindingToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if roleBindingCreated.Name != roleBindingToCreate.Name {
-		t.Errorf("expected rolebinding %s, got %s", roleBindingToCreate.Name, roleBindingCreated.Name)
+		t.Fatalf("expected rolebinding %s, got %s", roleBindingToCreate.Name, roleBindingCreated.Name)
 	}
 
 	// list rolebindings
-	roleBindingList := &authorizationv1.RoleBindingList{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(roleBindingsPath).Do().Into(roleBindingList)
+	roleBindingList, err := clusterAdminRoleBindingsClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +98,7 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 
 	// check for the created rolebinding in the list
 	if !checkBindings.HasAll(testBindingName) {
-		t.Errorf("rolebinding list does not have the expected bindings")
+		t.Fatalf("rolebinding list does not have the expected bindings")
 	}
 
 	// edit rolebinding
@@ -117,19 +122,18 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 			Namespace: namespace,
 		},
 	}
-	roleBindingToEditBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), roleBindingToEdit)
+	roleBindingToEditBytes, err := runtime.Encode(authorizationV1Encoder, roleBindingToEdit)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	roleBindingEdited := &authorizationv1.RoleBinding{}
-	err = clusterAdmin.RESTClient().Patch(types.StrategicMergePatchType).AbsPath(roleBindingsPath).Name(roleBindingToEdit.Name).Body(roleBindingToEditBytes).Do().Into(roleBindingEdited)
+	roleBindingEdited, err := clusterAdminRoleBindingsClient.Patch(testBindingName, types.StrategicMergePatchType, roleBindingToEditBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if roleBindingEdited.Name != roleBindingToEdit.Name {
-		t.Errorf("expected rolebinding %s, got %s", roleBindingToEdit.Name, roleBindingEdited.Name)
+		t.Fatalf("expected rolebinding %s, got %s", roleBindingToEdit.Name, roleBindingEdited.Name)
 	}
 
 	checkSubjects := sets.String{}
@@ -137,30 +141,43 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 		checkSubjects.Insert(subj.Name)
 	}
 	if !checkSubjects.HasAll("testuser", "testuser2") {
-		t.Errorf("rolebinding not edited")
+		t.Fatalf("rolebinding not edited")
 	}
 
 	// get rolebinding by name
-	getRoleBinding := &authorizationv1.RoleBinding{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(roleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
+	getRoleBinding, err := clusterAdminRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if getRoleBinding.Name != testBindingName {
-		t.Errorf("expected rolebinding %s, got %s", testBindingName, getRoleBinding.Name)
+		t.Fatalf("expected rolebinding %s, got %s", testBindingName, getRoleBinding.Name)
+	}
+	// get rolebinding by name via RBAC endpoint
+	getRoleBindingRBAC, err := clusterAdminRBACRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if getRoleBindingRBAC.Name != testBindingName {
+		t.Fatalf("expected rolebinding %s, got %s", testBindingName, getRoleBindingRBAC.Name)
 	}
 
 	// delete rolebinding
-	err = clusterAdmin.RESTClient().Delete().AbsPath(roleBindingsPath).Name(testBindingName).Do().Error()
+	err = clusterAdminRoleBindingsClient.Delete(testBindingName, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// confirm deletion
-	getRoleBinding = &authorizationv1.RoleBinding{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(roleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
+	_, err = clusterAdminRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
 	if err == nil {
-		t.Errorf("expected error")
+		t.Fatal("expected error")
+	} else if !kapierror.IsNotFound(err) {
+		t.Fatal(err)
+	}
+	// confirm deletion via RBAC endpoint
+	_, err = clusterAdminRBACRoleBindingsClient.Get(testBindingName, metav1.GetOptions{})
+	if err == nil {
+		t.Fatal("expected error")
 	} else if !kapierror.IsNotFound(err) {
 		t.Fatal(err)
 	}
@@ -182,21 +199,15 @@ func TestLegacyLocalRoleBindingEndpoint(t *testing.T) {
 			Name: "edit",
 		},
 	}
-	localClusterRoleBindingToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), localClusterRoleBindingToCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	localClusterRoleBindingCreated := &authorizationv1.RoleBinding{}
-	err = clusterAdmin.RESTClient().Post().AbsPath(roleBindingsPath).Body(localClusterRoleBindingToCreateBytes).Do().Into(localClusterRoleBindingCreated)
+	localClusterRoleBindingCreated, err := clusterAdminRoleBindingsClient.Create(localClusterRoleBindingToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if localClusterRoleBindingCreated.Name != localClusterRoleBindingToCreate.Name {
-		t.Errorf("expected clusterrolebinding %s, got %s", localClusterRoleBindingToCreate.Name, localClusterRoleBindingCreated.Name)
+		t.Fatalf("expected clusterrolebinding %s, got %s", localClusterRoleBindingToCreate.Name, localClusterRoleBindingCreated.Name)
 	}
-
 }
 
 // TestLegacyClusterRoleBindingEndpoint exercises the legacy clusterrolebinding endpoint that is proxied to rbac
@@ -233,7 +244,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 
 	// ensure there are at least some of the expected bindings in the list
 	if !checkBindings.HasAll("basic-users", "cluster-admin", "cluster-admins", "cluster-readers") {
-		t.Errorf("clusterrolebinding list does not have the expected bindings")
+		t.Fatalf("clusterrolebinding list does not have the expected bindings")
 	}
 
 	// create clusterrole binding
@@ -252,7 +263,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 			Name: "edit",
 		},
 	}
-	clusterRoleBindingToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), clusterRoleBindingToCreate)
+	clusterRoleBindingToCreateBytes, err := runtime.Encode(authorizationV1Encoder, clusterRoleBindingToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +275,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	if clusterRoleBindingCreated.Name != clusterRoleBindingToCreate.Name {
-		t.Errorf("expected clusterrolebinding %s, got %s", clusterRoleBindingToCreate.Name, clusterRoleBindingCreated.Name)
+		t.Fatalf("expected clusterrolebinding %s, got %s", clusterRoleBindingToCreate.Name, clusterRoleBindingCreated.Name)
 	}
 
 	// edit clusterrole binding
@@ -287,7 +298,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 			Name: "edit",
 		},
 	}
-	clusterRoleBindingToEditBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), clusterRoleBindingToEdit)
+	clusterRoleBindingToEditBytes, err := runtime.Encode(authorizationV1Encoder, clusterRoleBindingToEdit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +310,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	}
 
 	if clusterRoleBindingEdited.Name != clusterRoleBindingToEdit.Name {
-		t.Errorf("expected clusterrolebinding %s, got %s", clusterRoleBindingToEdit.Name, clusterRoleBindingEdited.Name)
+		t.Fatalf("expected clusterrolebinding %s, got %s", clusterRoleBindingToEdit.Name, clusterRoleBindingEdited.Name)
 	}
 
 	checkSubjects := sets.String{}
@@ -307,7 +318,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 		checkSubjects.Insert(subj.Name)
 	}
 	if !checkSubjects.HasAll("testuser", "testuser2") {
-		t.Errorf("clusterrolebinding not edited")
+		t.Fatalf("clusterrolebinding not edited")
 	}
 
 	// get clusterrolebinding by name
@@ -317,7 +328,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	if getRoleBinding.Name != testBindingName {
-		t.Errorf("expected clusterrolebinding %s, got %s", testBindingName, getRoleBinding.Name)
+		t.Fatalf("expected clusterrolebinding %s, got %s", testBindingName, getRoleBinding.Name)
 	}
 
 	// delete clusterrolebinding
@@ -330,7 +341,7 @@ func TestLegacyClusterRoleBindingEndpoint(t *testing.T) {
 	getRoleBinding = &authorizationv1.ClusterRoleBinding{}
 	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRoleBindingsPath).Name(testBindingName).Do().Into(getRoleBinding)
 	if err == nil {
-		t.Errorf("expected error")
+		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
 		t.Fatal(err)
 	}
@@ -370,7 +381,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	}
 	// ensure there are at least some of the expected roles in the clusterrole list
 	if !checkRoles.HasAll("admin", "basic-user", "cluster-admin", "edit", "sudoer") {
-		t.Errorf("clusterrole list does not have the expected roles")
+		t.Fatalf("clusterrole list does not have the expected roles")
 	}
 
 	// create clusterrole
@@ -384,7 +395,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 			},
 		},
 	}
-	clusterRoleToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), clusterRoleToCreate)
+	clusterRoleToCreateBytes, err := runtime.Encode(authorizationV1Encoder, clusterRoleToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,11 +406,11 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	}
 
 	if createdClusterRole.Name != clusterRoleToCreate.Name {
-		t.Errorf("expected to create %v, got %v", clusterRoleToCreate.Name, createdClusterRole.Name)
+		t.Fatalf("expected to create %v, got %v", clusterRoleToCreate.Name, createdClusterRole.Name)
 	}
 
 	if !sets.NewString(createdClusterRole.Rules[0].Verbs...).Has("get") {
-		t.Errorf("expected clusterrole to have a get rule")
+		t.Fatalf("expected clusterrole to have a get rule")
 	}
 
 	// update clusterrole
@@ -414,7 +425,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		},
 	}
 
-	clusterRoleUpdateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), clusterRoleUpdate)
+	clusterRoleUpdateBytes, err := runtime.Encode(authorizationV1Encoder, clusterRoleUpdate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,11 +437,11 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	}
 
 	if updatedClusterRole.Name != clusterRoleUpdate.Name {
-		t.Errorf("expected to update %s, got %s", clusterRoleUpdate.Name, updatedClusterRole.Name)
+		t.Fatalf("expected to update %s, got %s", clusterRoleUpdate.Name, updatedClusterRole.Name)
 	}
 
 	if !sets.NewString(updatedClusterRole.Rules[0].Verbs...).HasAll("get", "list") {
-		t.Errorf("expected clusterrole to have a get and list rule")
+		t.Fatalf("expected clusterrole to have a get and list rule")
 	}
 
 	// get clusterrole
@@ -440,7 +451,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	if getRole.Name != testRole {
-		t.Errorf("expected %s role, got %s instead", testRole, getRole.Name)
+		t.Fatalf("expected %s role, got %s instead", testRole, getRole.Name)
 	}
 
 	// delete clusterrole
@@ -453,7 +464,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	getRole = &authorizationv1.ClusterRole{}
 	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRolesPath).Name(testRole).Do().Into(getRole)
 	if err == nil {
-		t.Errorf("expected error")
+		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
 		t.Fatal(err)
 	}
@@ -500,7 +511,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 			},
 		},
 	}
-	roleToCreateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), roleToCreate)
+	roleToCreateBytes, err := runtime.Encode(authorizationV1Encoder, roleToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -511,11 +522,11 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 
 	if createdRole.Name != roleToCreate.Name {
-		t.Errorf("expected to create %v, got %v", roleToCreate.Name, createdRole.Name)
+		t.Fatalf("expected to create %v, got %v", roleToCreate.Name, createdRole.Name)
 	}
 
 	if !sets.NewString(createdRole.Rules[0].Verbs...).Has("get") {
-		t.Errorf("expected clusterRole to have a get rule")
+		t.Fatalf("expected clusterRole to have a get rule")
 	}
 
 	// list roles
@@ -531,7 +542,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 	// ensure the role list has the created role
 	if !checkRoles.HasAll(testRole) {
-		t.Errorf("role list does not have the expected roles")
+		t.Fatalf("role list does not have the expected roles")
 	}
 
 	// update role
@@ -549,7 +560,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		},
 	}
 
-	roleUpdateBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), roleUpdate)
+	roleUpdateBytes, err := runtime.Encode(authorizationV1Encoder, roleUpdate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -561,11 +572,11 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 
 	if updatedRole.Name != roleUpdate.Name {
-		t.Errorf("expected to update %s, got %s", roleUpdate.Name, updatedRole.Name)
+		t.Fatalf("expected to update %s, got %s", roleUpdate.Name, updatedRole.Name)
 	}
 
 	if !sets.NewString(updatedRole.Rules[0].Verbs...).HasAll("get", "list") {
-		t.Errorf("expected role to have a get and list rule")
+		t.Fatalf("expected role to have a get and list rule")
 	}
 
 	// get role
@@ -575,7 +586,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	if getRole.Name != testRole {
-		t.Errorf("expected %s role, got %s instead", testRole, getRole.Name)
+		t.Fatalf("expected %s role, got %s instead", testRole, getRole.Name)
 	}
 
 	// delete role
@@ -588,7 +599,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	getRole = &authorizationv1.Role{}
 	err = clusterAdmin.RESTClient().Get().AbsPath(rolesPath).Name(testRole).Do().Into(getRole)
 	if err == nil {
-		t.Errorf("expected error")
+		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
 		t.Fatal(err)
 	}
