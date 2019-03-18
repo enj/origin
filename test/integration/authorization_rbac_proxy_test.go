@@ -16,8 +16,6 @@ import (
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	authorizationv1client "github.com/openshift/client-go/authorization/clientset/versioned/typed/authorization/v1"
-	"github.com/openshift/origin/pkg/api/legacy"
-	authorizationclientscheme "github.com/openshift/origin/pkg/authorization/generated/internalclientset/scheme"
 	testutil "github.com/openshift/origin/test/util"
 	testserver "github.com/openshift/origin/test/util/server"
 )
@@ -361,17 +359,13 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clusterAdmin := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
-
-	// install the legacy types into the client for decoding
-	legacy.InstallInternalLegacyAuthorization(authorizationclientscheme.Scheme)
-
-	clusterRolesPath := "/apis/authorization.openshift.io/v1/clusterroles"
 	testRole := "testrole"
 
+	clusterAdminClusterRoleClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig).ClusterRoles()
+	clusterAdminRBACClusterRoleClient := rbacv1client.NewForConfigOrDie(clusterAdminClientConfig).ClusterRoles()
+
 	// list clusterroles
-	clusterRoleList := &authorizationv1.ClusterRoleList{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRolesPath).Do().Into(clusterRoleList)
+	clusterRoleList, err := clusterAdminClusterRoleClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,12 +390,8 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 			},
 		},
 	}
-	clusterRoleToCreateBytes, err := runtime.Encode(authorizationV1Encoder, clusterRoleToCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	createdClusterRole := &authorizationv1.ClusterRole{}
-	err = clusterAdmin.RESTClient().Post().AbsPath(clusterRolesPath).Body(clusterRoleToCreateBytes).Do().Into(createdClusterRole)
+
+	createdClusterRole, err := clusterAdminClusterRoleClient.Create(clusterRoleToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,8 +421,7 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updatedClusterRole := &authorizationv1.ClusterRole{}
-	err = clusterAdmin.RESTClient().Patch(types.StrategicMergePatchType).AbsPath(clusterRolesPath).Name(testRole).Body(clusterRoleUpdateBytes).Do().Into(updatedClusterRole)
+	updatedClusterRole, err := clusterAdminClusterRoleClient.Patch(testRole, types.StrategicMergePatchType, clusterRoleUpdateBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,24 +435,37 @@ func TestLegacyClusterRoleEndpoint(t *testing.T) {
 	}
 
 	// get clusterrole
-	getRole := &authorizationv1.ClusterRole{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRolesPath).Name(testRole).Do().Into(getRole)
+	getRole, err := clusterAdminClusterRoleClient.Get(testRole, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if getRole.Name != testRole {
 		t.Fatalf("expected %s role, got %s instead", testRole, getRole.Name)
 	}
+	// get clusterrole via RBAC
+	getRoleRBAC, err := clusterAdminRBACClusterRoleClient.Get(testRole, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if getRoleRBAC.Name != testRole {
+		t.Fatalf("expected %s role, got %s instead", testRole, getRoleRBAC.Name)
+	}
 
 	// delete clusterrole
-	err = clusterAdmin.RESTClient().Delete().AbsPath(clusterRolesPath).Name(testRole).Do().Error()
+	err = clusterAdminClusterRoleClient.Delete(testRole, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// confirm deletion
-	getRole = &authorizationv1.ClusterRole{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(clusterRolesPath).Name(testRole).Do().Into(getRole)
+	_, err = clusterAdminClusterRoleClient.Get(testRole, metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("expected error")
+	} else if !kapierror.IsNotFound(err) {
+		t.Fatal(err)
+	}
+	// confirm deletion via RBAC
+	_, err = clusterAdminRBACClusterRoleClient.Get(testRole, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
@@ -484,19 +486,16 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clusterAdmin := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
-
 	namespace := "testproject"
+	testRole := "testrole"
+
+	clusterAdminRoleClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig).Roles(namespace)
+	clusterAdminRBACRoleClient := rbacv1client.NewForConfigOrDie(clusterAdminClientConfig).Roles(namespace)
+
 	_, _, err = testserver.CreateNewProject(clusterAdminClientConfig, namespace, "testuser")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// install the legacy types into the client for decoding
-	legacy.InstallInternalLegacyAuthorization(authorizationclientscheme.Scheme)
-
-	rolesPath := "/apis/authorization.openshift.io/v1/namespaces/" + namespace + "/roles"
-	testRole := "testrole"
 
 	// create role
 	roleToCreate := &authorizationv1.Role{
@@ -512,12 +511,8 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 			},
 		},
 	}
-	roleToCreateBytes, err := runtime.Encode(authorizationV1Encoder, roleToCreate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	createdRole := &authorizationv1.Role{}
-	err = clusterAdmin.RESTClient().Post().AbsPath(rolesPath).Body(roleToCreateBytes).Do().Into(createdRole)
+
+	createdRole, err := clusterAdminRoleClient.Create(roleToCreate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -531,8 +526,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 
 	// list roles
-	roleList := &authorizationv1.RoleList{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(rolesPath).Do().Into(roleList)
+	roleList, err := clusterAdminRoleClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,8 +560,7 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updatedRole := &authorizationv1.Role{}
-	err = clusterAdmin.RESTClient().Patch(types.StrategicMergePatchType).AbsPath(rolesPath).Name(testRole).Body(roleUpdateBytes).Do().Into(updatedRole)
+	updatedRole, err := clusterAdminRoleClient.Patch(testRole, types.StrategicMergePatchType, roleUpdateBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,24 +574,37 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 	}
 
 	// get role
-	getRole := &authorizationv1.Role{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(rolesPath).Name(testRole).Do().Into(getRole)
+	getRole, err := clusterAdminRoleClient.Get(testRole, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if getRole.Name != testRole {
 		t.Fatalf("expected %s role, got %s instead", testRole, getRole.Name)
 	}
+	// get role via RBAC
+	getRoleRBAC, err := clusterAdminRBACRoleClient.Get(testRole, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if getRoleRBAC.Name != testRole {
+		t.Fatalf("expected %s role, got %s instead", testRole, getRoleRBAC.Name)
+	}
 
 	// delete role
-	err = clusterAdmin.RESTClient().Delete().AbsPath(rolesPath).Name(testRole).Do().Error()
+	err = clusterAdminRoleClient.Delete(testRole, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// confirm deletion
-	getRole = &authorizationv1.Role{}
-	err = clusterAdmin.RESTClient().Get().AbsPath(rolesPath).Name(testRole).Do().Into(getRole)
+	_, err = clusterAdminRoleClient.Get(testRole, metav1.GetOptions{})
+	if err == nil {
+		t.Fatalf("expected error")
+	} else if !kapierror.IsNotFound(err) {
+		t.Fatal(err)
+	}
+	// confirm deletion via RBAC
+	_, err = clusterAdminRBACRoleClient.Get(testRole, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
