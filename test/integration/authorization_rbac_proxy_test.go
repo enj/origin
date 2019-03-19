@@ -19,6 +19,7 @@ import (
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	authorizationv1client "github.com/openshift/client-go/authorization/clientset/versioned/typed/authorization/v1"
+	"github.com/openshift/origin/pkg/cmd/server/bootstrappolicy"
 	testutil "github.com/openshift/origin/test/util"
 	testserver "github.com/openshift/origin/test/util/server"
 )
@@ -653,6 +654,7 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 		t.Fatal(err)
 	}
 	userAuthorizationClient := authorizationv1client.NewForConfigOrDie(userConfig)
+	clusterAdminAuthorizationClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
 
 	tests := []struct {
 		name     string
@@ -681,8 +683,59 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("failed to create role: %v", err)
 				}
+
 				role.Rules = escalatingRules
 				_, err = userAuthorizationClient.Roles(namespace).Update(role)
+				return err
+			},
+		},
+		{
+			name:     "role binding create",
+			resource: "rolebindings",
+			run: func() error {
+				_, err := userAuthorizationClient.RoleBindings(namespace).Create(&authorizationv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Subjects: []corev1.ObjectReference{
+						{
+							Kind: rbacv1.UserKind,
+							Name: userName,
+						},
+					},
+					RoleRef: corev1.ObjectReference{
+						Name: bootstrappolicy.ClusterAdminRoleName,
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:     "role binding update",
+			resource: "rolebindings",
+			run: func() error {
+				roleBinding, err := clusterAdminAuthorizationClient.RoleBindings(namespace).Create(&authorizationv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Subjects: []corev1.ObjectReference{
+						{
+							Kind: rbacv1.UserKind,
+							Name: "some-other-user",
+						},
+					},
+					RoleRef: corev1.ObjectReference{
+						Name: bootstrappolicy.ClusterAdminRoleName,
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create role binding: %v", err)
+				}
+
+				roleBinding.Subjects = []corev1.ObjectReference{
+					{
+						Kind: rbacv1.UserKind,
+						Name: userName,
+					},
+				}
+				roleBinding.UserNames = nil // if set, this field will overwrite subjects
+				_, err = userAuthorizationClient.RoleBindings(namespace).Update(roleBinding)
 				return err
 			},
 		},
