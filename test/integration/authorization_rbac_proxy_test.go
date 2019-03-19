@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -609,5 +611,96 @@ func TestLegacyLocalRoleEndpoint(t *testing.T) {
 		t.Fatalf("expected error")
 	} else if !kapierror.IsNotFound(err) {
 		t.Fatal(err)
+	}
+}
+
+// TestLegacyEndpointConfirmNoEscalation tests that the authorization proxy endpoints cannot be used to bypass
+// the RBAC escalation checks.  It also makes sure that the GR in the returned error matches authorization v1.
+func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
+	masterConfig, clusterAdminKubeConfig, err := testserver.StartTestMasterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testserver.CleanupMasterEtcd(t, masterConfig)
+
+	clusterAdminClientConfig, err := testutil.GetClusterAdminClientConfig(clusterAdminKubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	namespace := "test-project-no-escalation"
+	resourceName := "test-resource-no-escalation"
+	userName := "test-user"
+	escalationFormat := `%s %q is forbidden: user %q (groups=["system:authenticated:oauth" "system:authenticated"]) is attempting to grant RBAC permissions not currently held:`
+	escalatingRules := []authorizationv1.PolicyRule{
+		{
+			Verbs:     []string{"hug"},
+			APIGroups: []string{"bear"},
+			Resources: []string{"pandas"},
+		},
+	}
+	nonEscalatingRules := []authorizationv1.PolicyRule{
+		{
+			Verbs:     []string{"get"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		},
+	}
+
+	_, userConfig, err := testserver.CreateNewProject(clusterAdminClientConfig, namespace, userName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userAuthorizationClient := authorizationv1client.NewForConfigOrDie(userConfig)
+
+	tests := []struct {
+		name     string
+		resource string
+		run      func() error
+	}{
+		{
+			name:     "role create",
+			resource: "roles",
+			run: func() error {
+				_, err := userAuthorizationClient.Roles(namespace).Create(&authorizationv1.Role{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Rules:      escalatingRules,
+				})
+				return err
+			},
+		},
+		{
+			name:     "role update",
+			resource: "roles",
+			run: func() error {
+				role, err := userAuthorizationClient.Roles(namespace).Create(&authorizationv1.Role{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Rules:      nonEscalatingRules,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create role: %v", err)
+				}
+				role.Rules = escalatingRules
+				_, err = userAuthorizationClient.Roles(namespace).Update(role)
+				return err
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.run()
+			if err == nil {
+				t.Fatal("got nil instead of escalation error")
+			}
+			if !kapierror.IsForbidden(err) {
+				t.Fatalf("expected forbidden error, got: %v", err)
+			}
+			gr := authorizationv1.GroupVersion.WithResource(tt.resource).GroupResource()
+			want := fmt.Sprintf(escalationFormat, gr.String(), resourceName, userName)
+			got := err.Error()
+			if !strings.HasPrefix(got, want) {
+				t.Fatalf("expected escalation message prefix %q got %q", want, got)
+			}
+		})
 	}
 }
