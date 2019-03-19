@@ -10,6 +10,7 @@ import (
 	kapierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -689,17 +690,31 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.run()
+
 			if err == nil {
 				t.Fatal("got nil instead of escalation error")
 			}
+
 			if !kapierror.IsForbidden(err) {
 				t.Fatalf("expected forbidden error, got: %v", err)
 			}
-			gr := authorizationv1.GroupVersion.WithResource(tt.resource).GroupResource()
-			want := fmt.Sprintf(escalationFormat, gr.String(), resourceName, userName)
-			got := err.Error()
-			if !strings.HasPrefix(got, want) {
-				t.Fatalf("expected escalation message prefix %q got %q", want, got)
+
+			details := *err.(kapierror.APIStatus).Status().Details
+
+			if resourceName != details.Name {
+				t.Fatalf("expected resource name %q got %q", resourceName, details.Name)
+			}
+
+			wantGR := authorizationv1.GroupVersion.WithResource(tt.resource).GroupResource()
+			gotGR := schema.GroupResource{Group: details.Group, Resource: details.Kind}
+			if wantGR != gotGR {
+				t.Fatalf("expected group resource %s got %s", wantGR, gotGR)
+			}
+
+			wantErr := fmt.Sprintf(escalationFormat, wantGR.String(), resourceName, userName)
+			gotErr := err.Error()
+			if !strings.HasPrefix(gotErr, wantErr) {
+				t.Fatalf("expected escalation message prefix %q got %q", wantErr, gotErr)
 			}
 		})
 	}
