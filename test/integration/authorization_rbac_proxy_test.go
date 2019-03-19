@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	kauthorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	kapierror "k8s.io/apimachinery/pkg/api/errors"
@@ -633,6 +634,12 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 	namespace := "test-project-no-escalation"
 	resourceName := "test-resource-no-escalation"
 	userName := "test-user"
+	userSubjects := []corev1.ObjectReference{
+		{
+			Kind: rbacv1.UserKind,
+			Name: userName,
+		},
+	}
 	escalationFormat := `%s %q is forbidden: user %q (groups=["system:authenticated:oauth" "system:authenticated"]) is attempting to grant RBAC permissions not currently held:`
 	escalatingRules := []authorizationv1.PolicyRule{
 		{
@@ -643,18 +650,59 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 	}
 	nonEscalatingRules := []authorizationv1.PolicyRule{
 		{
-			Verbs:     []string{"get"},
-			APIGroups: []string{""},
-			Resources: []string{"pods"},
+			Verbs:     []string{"create"},
+			APIGroups: []string{kauthorizationv1.GroupName},
+			Resources: []string{"selfsubjectaccessreviews"},
 		},
 	}
 
-	_, userConfig, err := testserver.CreateNewProject(clusterAdminClientConfig, namespace, userName)
+	userInternalClient, userConfig, err := testserver.CreateNewProject(clusterAdminClientConfig, namespace, userName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	userAuthorizationClient := authorizationv1client.NewForConfigOrDie(userConfig)
 	clusterAdminAuthorizationClient := authorizationv1client.NewForConfigOrDie(clusterAdminClientConfig)
+
+	clusterRoleName := "test-cluster-role"
+	clusterRoleObj, err := clusterAdminAuthorizationClient.ClusterRoles().Create(&authorizationv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
+		Rules: []authorizationv1.PolicyRule{
+			{
+				Verbs:     []string{"get", "create", "update"},
+				APIGroups: []string{authorizationv1.GroupName, rbacv1.GroupName},
+				Resources: []string{"clusterroles", "clusterrolebindings"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := clusterAdminAuthorizationClient.ClusterRoleBindings().Create(&authorizationv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
+		Subjects:   userSubjects,
+		RoleRef: corev1.ObjectReference{
+			Name: clusterRoleName,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, rule := range clusterRoleObj.Rules {
+		for _, verb := range rule.Verbs {
+			for _, group := range rule.APIGroups {
+				for _, resource := range rule.Resources {
+					if err := testutil.WaitForClusterPolicyUpdate(
+						userInternalClient.Authorization(),
+						verb,
+						schema.GroupResource{Group: group, Resource: resource},
+						true,
+					); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+		}
+	}
 
 	tests := []struct {
 		name     string
@@ -695,12 +743,7 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 			run: func() error {
 				_, err := userAuthorizationClient.RoleBindings(namespace).Create(&authorizationv1.RoleBinding{
 					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
-					Subjects: []corev1.ObjectReference{
-						{
-							Kind: rbacv1.UserKind,
-							Name: userName,
-						},
-					},
+					Subjects:   userSubjects,
 					RoleRef: corev1.ObjectReference{
 						Name: bootstrappolicy.ClusterAdminRoleName,
 					},
@@ -728,14 +771,77 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 					return fmt.Errorf("failed to create role binding: %v", err)
 				}
 
-				roleBinding.Subjects = []corev1.ObjectReference{
-					{
-						Kind: rbacv1.UserKind,
-						Name: userName,
-					},
-				}
+				roleBinding.Subjects = userSubjects
 				roleBinding.UserNames = nil // if set, this field will overwrite subjects
 				_, err = userAuthorizationClient.RoleBindings(namespace).Update(roleBinding)
+				return err
+			},
+		},
+		{
+			name:     "cluster role create",
+			resource: "clusterroles",
+			run: func() error {
+				_, err := userAuthorizationClient.ClusterRoles().Create(&authorizationv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Rules:      escalatingRules,
+				})
+				return err
+			},
+		},
+		{
+			name:     "cluster role update",
+			resource: "clusterroles",
+			run: func() error {
+				clusterRole, err := userAuthorizationClient.ClusterRoles().Create(&authorizationv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Rules:      nonEscalatingRules,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create cluster role: %v", err)
+				}
+
+				clusterRole.Rules = escalatingRules
+				_, err = userAuthorizationClient.ClusterRoles().Update(clusterRole)
+				return err
+			},
+		},
+		{
+			name:     "cluster role binding create",
+			resource: "clusterrolebindings",
+			run: func() error {
+				_, err := userAuthorizationClient.ClusterRoleBindings().Create(&authorizationv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Subjects:   userSubjects,
+					RoleRef: corev1.ObjectReference{
+						Name: bootstrappolicy.ClusterAdminRoleName,
+					},
+				})
+				return err
+			},
+		},
+		{
+			name:     "cluster role binding update",
+			resource: "clusterrolebindings",
+			run: func() error {
+				clusterRoleBinding, err := clusterAdminAuthorizationClient.ClusterRoleBindings().Create(&authorizationv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: resourceName},
+					Subjects: []corev1.ObjectReference{
+						{
+							Kind: rbacv1.UserKind,
+							Name: "some-other-user",
+						},
+					},
+					RoleRef: corev1.ObjectReference{
+						Name: bootstrappolicy.ClusterAdminRoleName,
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create cluster role binding: %v", err)
+				}
+
+				clusterRoleBinding.Subjects = userSubjects
+				clusterRoleBinding.UserNames = nil // if set, this field will overwrite subjects
+				_, err = userAuthorizationClient.ClusterRoleBindings().Update(clusterRoleBinding)
 				return err
 			},
 		},
@@ -755,19 +861,19 @@ func TestLegacyEndpointConfirmNoEscalation(t *testing.T) {
 			details := *err.(kapierror.APIStatus).Status().Details
 
 			if resourceName != details.Name {
-				t.Fatalf("expected resource name %q got %q", resourceName, details.Name)
+				t.Errorf("expected resource name %q got %q", resourceName, details.Name)
 			}
 
 			wantGR := authorizationv1.GroupVersion.WithResource(tt.resource).GroupResource()
 			gotGR := schema.GroupResource{Group: details.Group, Resource: details.Kind}
 			if wantGR != gotGR {
-				t.Fatalf("expected group resource %s got %s", wantGR, gotGR)
+				t.Errorf("expected group resource %s got %s", wantGR, gotGR)
 			}
 
 			wantErr := fmt.Sprintf(escalationFormat, wantGR.String(), resourceName, userName)
 			gotErr := err.Error()
 			if !strings.HasPrefix(gotErr, wantErr) {
-				t.Fatalf("expected escalation message prefix %q got %q", wantErr, gotErr)
+				t.Errorf("expected escalation message prefix %q got %q", wantErr, gotErr)
 			}
 		})
 	}
