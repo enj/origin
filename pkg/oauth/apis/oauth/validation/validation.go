@@ -206,14 +206,15 @@ func ValidateClient(client *oauthapi.OAuthClient) field.ErrorList {
 	}
 
 	if len(client.GrantMethod) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("grantMethod"), "may not be empty"))
+		allErrs = append(allErrs, field.Required(field.NewPath("grantMethod"),
+			fmt.Sprintf("must be %s or %s", oauthapi.GrantHandlerAuto, oauthapi.GrantHandlerPrompt)))
 	} else {
 		switch client.GrantMethod {
-		case oauthapi.GrantHandlerAuto, oauthapi.GrantHandlerPrompt, oauthapi.GrantHandlerDeny:
+		case oauthapi.GrantHandlerAuto, oauthapi.GrantHandlerPrompt:
 			// valid grant methods
 		default:
 			allErrs = append(allErrs, field.NotSupported(field.NewPath("grantMethod"), string(client.GrantMethod),
-				[]string{string(oauthapi.GrantHandlerAuto), string(oauthapi.GrantHandlerPrompt), string(oauthapi.GrantHandlerDeny)},
+				[]string{string(oauthapi.GrantHandlerAuto), string(oauthapi.GrantHandlerPrompt)},
 			))
 		}
 	}
