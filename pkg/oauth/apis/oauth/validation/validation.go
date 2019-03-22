@@ -50,7 +50,7 @@ func ValidateTokenName(name string, prefix bool) []string {
 
 func ValidateRedirectURI(redirect string) (bool, string) {
 	if len(redirect) == 0 {
-		return true, ""
+		return false, "may not be empty"
 	}
 
 	u, err := url.Parse(redirect)
@@ -82,8 +82,7 @@ func ValidateAccessToken(accessToken *oauthapi.OAuthAccessToken) field.ErrorList
 	}
 	// negative values are not allowed
 	if accessToken.InactivityTimeoutSeconds < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("inactivityTimeoutSeconds"),
-			accessToken.InactivityTimeoutSeconds, "cannot be a negative value"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("inactivityTimeoutSeconds"), accessToken.InactivityTimeoutSeconds, "cannot be a negative value"))
 	}
 	if ok, msg := ValidateRedirectURI(accessToken.RedirectURI); !ok {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("redirectURI"), accessToken.RedirectURI, msg))
