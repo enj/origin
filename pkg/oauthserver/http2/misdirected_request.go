@@ -22,6 +22,7 @@ func WithMisdirectedRequest(handler http.Handler) http.Handler {
 			glog.Infof("misdirected request detected from %s to %s %s %d instead of %s",
 				r.RemoteAddr, r.Method, r.Host, r.ContentLength, r.TLS.ServerName)
 			w.WriteHeader(statusMisdirectedRequest)
+			_, _ = w.Write([]byte("misdirected request"))
 			return
 		}
 		handler.ServeHTTP(w, r)
