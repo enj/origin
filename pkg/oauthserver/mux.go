@@ -3,6 +3,8 @@ package oauthserver
 import (
 	"net/http"
 
+	"github.com/golang/glog"
+
 	"github.com/openshift/origin/pkg/oauthserver/server/headers"
 )
 
@@ -23,8 +25,26 @@ type Endpoints interface {
 func NewMuxWithStandardHeaders() Mux {
 	return &muxWrapper{
 		mux: http.NewServeMux(),
-		wrapper: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		wrapper: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headers.SetStandardHeaders(w)
+
+			tlsServerName := "<no_tls>"
+			if r.TLS != nil {
+				tlsServerName = r.TLS.ServerName
+				if len(tlsServerName) == 0 {
+					tlsServerName = "<empty_name>"
+				}
+			}
+
+			glog.Infof("%s FROM %s TO %s %s%s LEN %d TLS_NAME %s",
+				r.Proto, r.RemoteAddr, r.Method, r.Host, r.URL.String(), r.ContentLength, tlsServerName)
+			glog.Infof("Request Headers:")
+			for key, values := range r.Header {
+				for _, value := range values {
+					glog.Infof("    %s: %s", key, value)
+				}
+			}
+
 		}),
 	}
 }
