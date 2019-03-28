@@ -6,7 +6,11 @@ import (
 	"github.com/golang/glog"
 )
 
-// This package handles an edge case in our passthrough route handling of HTTP2 endpoints. Given the following conditions:
+// This package handles an edge case in our passthrough route handling of HTTP2 endpoints.
+//
+// Per Dan Mace (@ironcladlou):
+//
+// Given the following conditions:
 //
 // * A wildcard ingress certificate (eg. *.apps.openshift.example.com)
 // * A DNS wildcard (eg. *.apps.openshift.example.com) with A records resolving to a static set of ingress load balancer IPs
