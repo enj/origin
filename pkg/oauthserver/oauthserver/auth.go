@@ -313,6 +313,13 @@ func (c *OAuthServerConfig) getAuthenticationFinalizer() osinserver.AuthorizeHan
 			if err := c.ExtraOAuthConfig.SessionAuth.InvalidateAuthentication(w, user); err != nil {
 				klog.V(5).Infof("error invaliding cookie session: %v", err)
 			}
+
+			// if this is the end of a completed OAuth flow and we are using
+			// HTTP2, send the client a graceful close connection via GOAWAY
+			if ar.HttpRequest.ProtoMajor == 2 {
+				w.Header().Set("Connection", "close")
+			}
+
 			// do not fail the OAuth flow if we cannot invalidate the cookie
 			// it will expire on its own regardless
 			return false, nil
