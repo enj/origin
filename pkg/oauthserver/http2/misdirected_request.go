@@ -30,24 +30,29 @@ func WithMisdirectedRequest(handler http.Handler) http.Handler {
 }
 
 func isMisdirectedRequest(r *http.Request) bool {
+	// ignore non-HTTP2 requests
 	if r.ProtoMajor != 2 {
 		return false
 	}
 
+	// check if have a value for the :authority pseudo header field
 	host := r.Host
 	if len(host) == 0 {
 		return false
 	}
 
+	// ignore non-TLS requests
 	tls := r.TLS
 	if tls == nil {
 		return false
 	}
 
+	// check if we know the server name requested by client
 	serverName := tls.ServerName
 	if len(serverName) == 0 {
 		return false
 	}
 
+	// if :authority does not match server name, this request is not meant for us
 	return host != serverName
 }
