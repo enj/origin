@@ -3,7 +3,10 @@ package http2
 import (
 	"net/http"
 
+	"github.com/RangelReale/osin"
 	"github.com/golang/glog"
+
+	"github.com/openshift/origin/pkg/oauthserver/osinserver"
 )
 
 // This package handles an edge case in our passthrough route handling of HTTP2 endpoints.
@@ -109,4 +112,17 @@ func isMisdirectedRequest(r *http.Request) bool {
 
 	// if :authority does not match server name, this request is not meant for us
 	return host != serverName
+}
+
+func MisdirectedRequestAuthorizeCloser() osinserver.AuthorizeHandler {
+	return osinserver.AuthorizeHandlerFunc(func(ar *osin.AuthorizeRequest, _ *osin.Response, w http.ResponseWriter) (bool, error) {
+		// if this is the end of a completed OAuth flow and we are using
+		// HTTP2, send the client a graceful close connection via GOAWAY
+		// this combined with MaxStreamsPerConnection should limit the
+		// number of misdirected requests for 302 code exchanges
+		if ar.HttpRequest.ProtoMajor == 2 {
+			w.Header().Set("Connection", "close")
+		}
+		return false, nil
+	})
 }
