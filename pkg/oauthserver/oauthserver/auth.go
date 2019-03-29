@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"runtime"
 
 	"github.com/RangelReale/osin"
 	"github.com/RangelReale/osincli"
@@ -78,6 +79,8 @@ const (
 // WithOAuth decorates the given handler by serving the OAuth2 endpoints while
 // passing through all other requests to the given handler.
 func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error) {
+	glog.Infof("OAuth server compiled using go version %s", runtime.Version())
+
 	mux := http.NewServeMux()
 
 	// pass through all other requests
