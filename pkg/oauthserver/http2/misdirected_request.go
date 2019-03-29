@@ -70,9 +70,6 @@ func WithMisdirectedRequest(handler http.Handler) http.Handler {
 			// send the client a graceful close connection via GOAWAY
 			w.Header().Set("Connection", "close")
 
-			// render HTML so the error is obvious to any human
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
 			// set 421 code so that well behaved clients retry the request
 			w.WriteHeader(statusMisdirectedRequest)
 
