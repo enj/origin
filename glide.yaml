@@ -182,6 +182,9 @@ import:
 # auth (for sally)
 - package: github.com/gorilla/sessions
   version: a3acf13e802c358d65f249324d14ed24aac11370
+# auth (for sally)
+- package: golang.org/x/net
+  version: master
 # auth (for oc kerberos on linux + mac)
 - package: github.com/apcera/gssapi
   version: release-2.6.3
