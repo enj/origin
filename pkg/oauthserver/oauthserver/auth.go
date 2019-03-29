@@ -46,6 +46,7 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/basicauthrequest"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/headerrequest"
 	"github.com/openshift/origin/pkg/oauthserver/config"
+	"github.com/openshift/origin/pkg/oauthserver/http2"
 	"github.com/openshift/origin/pkg/oauthserver/ldaputil"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external/github"
@@ -139,6 +140,7 @@ func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error
 				errorPageHandler,
 			),
 			authFinalizer,
+			http2.MisdirectedRequestAuthorizeCloser(),
 		},
 		osinserver.AccessHandlers{
 			handlers.NewDenyAccessAuthenticator(),
@@ -316,13 +318,6 @@ func (c *OAuthServerConfig) getAuthenticationFinalizer() osinserver.AuthorizeHan
 			if err := c.ExtraOAuthConfig.SessionAuth.InvalidateAuthentication(w, user); err != nil {
 				glog.V(5).Infof("error invaliding cookie session: %v", err)
 			}
-
-			// if this is the end of a completed OAuth flow and we are using
-			// HTTP2, send the client a graceful close connection via GOAWAY
-			if ar.HttpRequest.ProtoMajor == 2 {
-				w.Header().Set("Connection", "close")
-			}
-
 			// do not fail the OAuth flow if we cannot invalidate the cookie
 			// it will expire on its own regardless
 			return false, nil
