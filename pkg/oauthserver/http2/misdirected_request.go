@@ -93,6 +93,7 @@ func isMisdirectedRequest(r *http.Request) bool {
 	}
 
 	// check if have a value for the :authority pseudo header field
+	// see golang.org/x/net/http2/server.go serverConn.newWriterAndRequest / newWriterAndRequestNoBody
 	host := r.Host
 	if len(host) == 0 {
 		return false
