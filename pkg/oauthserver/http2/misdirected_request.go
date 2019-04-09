@@ -68,24 +68,26 @@ const (
 
 func WithMisdirectedRequest(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isMisdirectedRequest(r) {
-			// log only the safe metadata for this misdirected request
-			klog.Infof("misdirected request detected from %s to %s %s %d instead of %s",
-				r.RemoteAddr, r.Method, r.Host, r.ContentLength, r.TLS.ServerName)
-
-			// send the client a graceful close connection via GOAWAY
-			w.Header().Set("Connection", "close")
-
-			// set 421 code so that well behaved clients retry the request
-			w.WriteHeader(statusMisdirectedRequest)
-
-			// try to force a browser refresh for misbehaving clients
-			_, _ = w.Write([]byte(responseMisdirectedRequest))
+		// happy path
+		if !isMisdirectedRequest(r) {
+			handler.ServeHTTP(w, r)
 
 			// stop processing the request
 			return
 		}
-		handler.ServeHTTP(w, r)
+
+		// log only the safe metadata for this misdirected request
+		klog.Infof("misdirected request detected from %s to %s %s %d instead of %s",
+			r.RemoteAddr, r.Method, r.Host, r.ContentLength, r.TLS.ServerName)
+
+		// send the client a graceful close connection via GOAWAY
+		w.Header().Set("Connection", "close")
+
+		// set 421 code so that well behaved clients retry the request
+		w.WriteHeader(statusMisdirectedRequest)
+
+		// try to force a browser refresh for misbehaving clients
+		_, _ = w.Write([]byte(responseMisdirectedRequest))
 	})
 }
 
@@ -167,7 +169,7 @@ func WithHTTP2ConnectionClose(handler http.Handler) http.Handler {
 			b.w.WriteHeader(b.code)
 		}
 
-		// ... and the body
+		// ... and the response
 		_, _ = b.w.Write(b.buf.Bytes())
 	})
 }
