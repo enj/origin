@@ -290,6 +290,7 @@ func (c *OAuthServerConfig) buildHandlerChainForOAuth(startingHandler http.Handl
 	handler = genericfilters.WithCORS(handler, genericConfig.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, genericConfig.LongRunningFunc, genericConfig.RequestTimeout)
 	handler = genericapifilters.WithRequestInfo(handler, genericapiserver.NewRequestInfoResolver(genericConfig))
+	handler = http2.WithHTTP2ConnectionClose(handler)
 	handler = http2.WithMisdirectedRequest(handler)
 	handler = genericfilters.WithPanicRecovery(handler)
 	return handler

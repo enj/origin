@@ -1,12 +1,13 @@
 package http2
 
 import (
+	"bytes"
 	"net/http"
+	"net/url"
 
-	"github.com/RangelReale/osin"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	"github.com/openshift/origin/pkg/oauthserver/osinserver"
+	"github.com/openshift/origin/pkg/oauthserver/server/redirect"
 )
 
 // This package handles an edge case in our passthrough route handling of HTTP2 endpoints.
@@ -49,6 +50,8 @@ const (
 	// an attempt to reduce the chance that we get misdirected requests.
 	MaxStreamsPerConnection = 1
 
+	http2ProtoMajor = 2
+
 	// TODO replace with Go std lib constant when we upgrade
 	statusMisdirectedRequest = 421 // RFC 7540, 9.1.2
 
@@ -67,7 +70,7 @@ func WithMisdirectedRequest(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isMisdirectedRequest(r) {
 			// log only the safe metadata for this misdirected request
-			glog.Infof("misdirected request detected from %s to %s %s %d instead of %s",
+			klog.Infof("misdirected request detected from %s to %s %s %d instead of %s",
 				r.RemoteAddr, r.Method, r.Host, r.ContentLength, r.TLS.ServerName)
 
 			// send the client a graceful close connection via GOAWAY
@@ -88,7 +91,7 @@ func WithMisdirectedRequest(handler http.Handler) http.Handler {
 
 func isMisdirectedRequest(r *http.Request) bool {
 	// ignore non-HTTP2 requests
-	if r.ProtoMajor != 2 {
+	if r.ProtoMajor != http2ProtoMajor {
 		return false
 	}
 
@@ -105,7 +108,7 @@ func isMisdirectedRequest(r *http.Request) bool {
 		return false
 	}
 
-	// check if we know the server name requested by client
+	// check if we know the server name requested by the client
 	serverName := tls.ServerName
 	if len(serverName) == 0 {
 		return false
@@ -115,15 +118,108 @@ func isMisdirectedRequest(r *http.Request) bool {
 	return host != serverName
 }
 
-func MisdirectedRequestAuthorizeCloser() osinserver.AuthorizeHandler {
-	return osinserver.AuthorizeHandlerFunc(func(ar *osin.AuthorizeRequest, _ *osin.Response, w http.ResponseWriter) (bool, error) {
-		// if this is the end of a completed OAuth flow and we are using
-		// HTTP2, send the client a graceful close connection via GOAWAY
+type buffer struct {
+	w    http.ResponseWriter
+	code int
+	buf  bytes.Buffer
+}
+
+func (b *buffer) Header() http.Header {
+	return b.w.Header()
+}
+
+func (b *buffer) WriteHeader(statusCode int) {
+	b.code = statusCode
+}
+
+func (b *buffer) Write(p []byte) (int, error) {
+	return b.buf.Write(p)
+}
+
+func WithHTTP2ConnectionClose(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// determine if we need to delay response writing
+		requiresBuffer := canMisdirectRequest(r)
+		if requiresBuffer {
+			w = &buffer{w: w}
+		}
+
+		// run the input handler first and let it modify the response
+		handler.ServeHTTP(w, r)
+
+		// if we did not delay response writing, we are done
+		if !requiresBuffer {
+			return
+		}
+
+		b := w.(*buffer)
+
+		// aggressively close the connection when we are using HTTP2 by
+		// sending the client a graceful close connection via GOAWAY
 		// this combined with MaxStreamsPerConnection should limit the
 		// number of misdirected requests for 302 code exchanges
-		if ar.HttpRequest.ProtoMajor == 2 {
-			w.Header().Set("Connection", "close")
+		if shouldCloseConnection(b, r) {
+			b.Header().Set("Connection", "close")
 		}
-		return false, nil
+
+		// now that we are done mutating the header, write the code ...
+		if b.code != 0 {
+			b.w.WriteHeader(b.code)
+		}
+
+		// ... and the body
+		_, _ = b.w.Write(b.buf.Bytes())
 	})
+}
+
+func canMisdirectRequest(r *http.Request) bool {
+	// ignore non-HTTP2 requests
+	if r.ProtoMajor != http2ProtoMajor {
+		return false
+	}
+
+	// ignore non-TLS requests
+	tls := r.TLS
+	if tls == nil {
+		return false
+	}
+
+	// terrible things can happen now
+	return true
+}
+
+func shouldCloseConnection(w *buffer, r *http.Request) bool {
+	// see if we are trying to redirect the client (a favorite of OAuth)
+	location := w.Header().Get("Location")
+	if len(location) == 0 {
+		// fail closed and assume we are done with an OAuth flow
+		// we will end up closing connections early for grant flows,
+		// but it is better than reusing connections incorrectly
+		return true
+	}
+
+	// no need to close the connection if were are redirecting to ourselves
+	if redirect.IsServerRelativeURL(location) {
+		return false
+	}
+
+	// check if we know the server name requested by the client
+	serverName := r.TLS.ServerName
+	if len(serverName) == 0 {
+		return true // fail closed
+	}
+
+	u, err := url.Parse(location)
+	if err != nil {
+		return true // fail closed
+	}
+
+	// no need to close the connection if were are redirecting to ourselves
+	if u.Host == serverName || u.Hostname() == serverName {
+		return false
+	}
+
+	// external redirect, close the connection to prevent
+	// misdirected requests on other components hosted in the cluster
+	return true
 }

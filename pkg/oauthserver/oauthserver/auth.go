@@ -45,7 +45,6 @@ import (
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/basicauthrequest"
 	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/headerrequest"
 	"github.com/openshift/origin/pkg/oauthserver/config"
-	"github.com/openshift/origin/pkg/oauthserver/http2"
 	"github.com/openshift/origin/pkg/oauthserver/ldaputil"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external"
 	"github.com/openshift/origin/pkg/oauthserver/oauth/external/github"
@@ -137,7 +136,6 @@ func (c *OAuthServerConfig) WithOAuth(handler http.Handler) (http.Handler, error
 				errorPageHandler,
 			),
 			authFinalizer,
-			http2.MisdirectedRequestAuthorizeCloser(),
 		},
 		osinserver.AccessHandlers{
 			handlers.NewDenyAccessAuthenticator(),
