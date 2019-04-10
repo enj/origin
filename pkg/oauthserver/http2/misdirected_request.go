@@ -120,6 +120,8 @@ func isMisdirectedRequest(r *http.Request) bool {
 	return host != serverName
 }
 
+// buffer is a ResponseWriter wrapper that allows us to delay calls to
+// WriteHeader and Write for the purpose of allowing Header to be mutated
 type buffer struct {
 	w    http.ResponseWriter
 	code int
@@ -170,7 +172,9 @@ func WithHTTP2ConnectionClose(handler http.Handler) http.Handler {
 		}
 
 		// ... and the response
-		_, _ = b.w.Write(b.buf.Bytes())
+		if b.buf.Len() != 0 {
+			_, _ = b.w.Write(b.buf.Bytes())
+		}
 	})
 }
 
