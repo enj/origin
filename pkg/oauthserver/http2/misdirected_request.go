@@ -52,9 +52,6 @@ const (
 
 	http2ProtoMajor = 2
 
-	// TODO replace with Go std lib constant when we upgrade
-	statusMisdirectedRequest = 421 // RFC 7540, 9.1.2
-
 	responseMisdirectedRequest = `
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
@@ -84,7 +81,7 @@ func WithMisdirectedRequest(handler http.Handler) http.Handler {
 		w.Header().Set("Connection", "close")
 
 		// set 421 code so that well behaved clients retry the request
-		w.WriteHeader(statusMisdirectedRequest)
+		w.WriteHeader(http.StatusMisdirectedRequest)
 
 		// try to force a browser refresh for misbehaving clients
 		_, _ = w.Write([]byte(responseMisdirectedRequest))
