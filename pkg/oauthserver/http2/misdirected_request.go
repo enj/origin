@@ -143,20 +143,18 @@ func (b *buffer) Write(p []byte) (int, error) {
 func WithHTTP2ConnectionClose(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// determine if we need to delay response writing
-		requiresBuffer := canMisdirectRequest(r)
-		if requiresBuffer {
-			w = &buffer{w: w}
-		}
+		if !canMisdirectRequest(r) {
+			handler.ServeHTTP(w, r)
 
-		// run the input handler first and let it modify the response
-		handler.ServeHTTP(w, r)
-
-		// if we did not delay response writing, we are done
-		if !requiresBuffer {
+			// if we did not delay response writing, we are done
 			return
 		}
 
-		b := w.(*buffer)
+		// delay WriteHeader and Write calls
+		b := &buffer{w: w}
+
+		// run the input handler first and let it modify the response
+		handler.ServeHTTP(b, r)
 
 		// aggressively close the connection when we are using HTTP2 by
 		// sending the client a graceful close connection via GOAWAY
