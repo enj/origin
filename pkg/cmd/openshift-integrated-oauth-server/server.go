@@ -64,7 +64,7 @@ func newOAuthServerConfig(osinConfig *osinv1.OsinServerConfig) (*oauthserver.OAu
 		// 3. Login
 		// 4. Logout
 		// 5. OAuth callbacks
-		WithAlwaysAllowPaths("/healthz", "/healthz/", "/oauth/", "/login", "/login/", "/logout", "/oauth2callback/").
+		WithAlwaysAllowPaths("/healthz", "/healthz/*", "/oauth/*", "/login", "/login/*", "/logout", "/oauth2callback/*").
 		WithAlwaysAllowGroups("system:masters")
 	authorizationOptions.RemoteKubeConfigFile = osinConfig.KubeClientConfig.KubeConfig
 	if err := authorizationOptions.ApplyTo(&genericConfig.Authorization); err != nil {
