@@ -61,8 +61,9 @@ func NewOAuthServerConfig(oauthConfig osinv1.OAuthConfig, userClientConfig *rest
 	// this leaves the embedded OAuth server code path alone
 	if genericConfig == nil {
 		genericConfig = genericapiserver.NewRecommendedConfig(codecs)
-		genericConfig.LoopbackClientConfig = userClientConfig
 	}
+
+	genericConfig.LoopbackClientConfig = userClientConfig
 
 	userClient, err := userclient.NewForConfig(userClientConfig)
 	if err != nil {

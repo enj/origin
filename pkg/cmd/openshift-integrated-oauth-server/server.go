@@ -3,6 +3,7 @@ package openshift_integrated_oauth_server
 import (
 	"errors"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -65,7 +66,7 @@ func newOAuthServerConfig(osinConfig *osinv1.OsinServerConfig) (*oauthserver.OAu
 		// 4. Logout
 		// 5. OAuth callbacks
 		WithAlwaysAllowPaths("/healthz", "/healthz/*", "/oauth/*", "/login", "/login/*", "/logout", "/oauth2callback/*").
-		WithAlwaysAllowGroups("system:masters")
+		WithAlwaysAllowGroups(user.SystemPrivilegedGroup)
 	authorizationOptions.RemoteKubeConfigFile = osinConfig.KubeClientConfig.KubeConfig
 	if err := authorizationOptions.ApplyTo(&genericConfig.Authorization); err != nil {
 		return nil, err
