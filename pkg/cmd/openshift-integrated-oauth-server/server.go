@@ -57,7 +57,7 @@ func newOAuthServerConfig(osinConfig *osinv1.OsinServerConfig) (*oauthserver.OAu
 	}
 
 	authorizationOptions := genericapiserveroptions.NewDelegatingAuthorizationOptions().
-		// TODO better formalize / generate this list as trailing slashes matter
+		// TODO better formalize / generate this list as trailing * matters
 		// The five sections are:
 		// 1. Health checks
 		// 2. OAuth
