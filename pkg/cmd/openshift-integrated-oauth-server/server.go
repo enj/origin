@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	osinv1 "github.com/openshift/api/osin/v1"
@@ -48,20 +49,41 @@ func newOAuthServerConfig(osinConfig *osinv1.OsinServerConfig) (*oauthserver.OAu
 	// the oauth-server must only run in http1 to avoid http2 connection re-use problems when improperly re-using a wildcard certificate
 	genericConfig.Config.SecureServing.HTTP1Only = true
 
+	authenticationOptions := genericapiserveroptions.NewDelegatingAuthenticationOptions()
+	authenticationOptions.ClientCert.ClientCA = osinConfig.ServingInfo.ClientCA
+	authenticationOptions.RemoteKubeConfigFile = osinConfig.KubeClientConfig.KubeConfig
+	if err := authenticationOptions.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.OpenAPIConfig); err != nil {
+		return nil, err
+	}
+
+	authorizationOptions := genericapiserveroptions.NewDelegatingAuthorizationOptions().
+		// TODO better formalize / generate this list as trailing slashes matter
+		// The five sections are:
+		// 1. Health checks
+		// 2. OAuth
+		// 3. Login
+		// 4. Logout
+		// 5. OAuth callbacks
+		WithAlwaysAllowPaths("/healthz", "/healthz/", "/oauth/", "/login", "/login/", "/logout", "/oauth2callback/").
+		WithAlwaysAllowGroups("system:masters")
+	authorizationOptions.RemoteKubeConfigFile = osinConfig.KubeClientConfig.KubeConfig
+	if err := authorizationOptions.ApplyTo(&genericConfig.Authorization); err != nil {
+		return nil, err
+	}
+
 	// TODO You need real overrides for rate limiting
 	kubeClientConfig, err := helpers.GetKubeConfigOrInClusterConfig(osinConfig.KubeClientConfig.KubeConfig, osinConfig.KubeClientConfig.ConnectionOverrides)
 	if err != nil {
 		return nil, err
 	}
 
-	oauthServerConfig, err := oauthserver.NewOAuthServerConfig(osinConfig.OAuthConfig, kubeClientConfig)
+	oauthServerConfig, err := oauthserver.NewOAuthServerConfig(osinConfig.OAuthConfig, kubeClientConfig, genericConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO you probably want to set this
 	oauthServerConfig.GenericConfig.CorsAllowedOriginList = osinConfig.CORSAllowedOrigins
-	oauthServerConfig.GenericConfig.SecureServing = genericConfig.SecureServing
 	//oauthServerConfig.GenericConfig.AuditBackend = genericConfig.AuditBackend
 	//oauthServerConfig.GenericConfig.AuditPolicyChecker = genericConfig.AuditPolicyChecker
 
