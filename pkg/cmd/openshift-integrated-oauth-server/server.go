@@ -11,7 +11,6 @@ import (
 	osinv1 "github.com/openshift/api/osin/v1"
 	"github.com/openshift/library-go/pkg/config/helpers"
 	"github.com/openshift/origin/pkg/cmd/openshift-apiserver/openshiftapiserver/configprocessing"
-	"github.com/openshift/origin/pkg/oauthserver/authenticator/request/oauthbasic"
 	"github.com/openshift/origin/pkg/oauthserver/oauthserver"
 
 	// for metrics
@@ -57,9 +56,6 @@ func newOAuthServerConfig(osinConfig *osinv1.OsinServerConfig) (*oauthserver.OAu
 	if err := authenticationOptions.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.OpenAPIConfig); err != nil {
 		return nil, err
 	}
-	// add back the Authorization header so that WithOAuth can use it even after WithAuthentication deletes it
-	// yay for multiple consumers of the same information...
-	genericConfig.Authentication.Authenticator = oauthbasic.PreserveAuthorizationHeaderForOAuth(genericConfig.Authentication.Authenticator)
 
 	authorizationOptions := genericapiserveroptions.NewDelegatingAuthorizationOptions().
 		// TODO better formalize / generate this list as trailing * matters

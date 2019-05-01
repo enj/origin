@@ -284,8 +284,14 @@ func (c *OAuthServerConfig) buildHandlerChainForOAuth(startingHandler http.Handl
 		panic(err)
 	}
 
+	// add back the Authorization header so that WithOAuth can use it even after WithAuthentication deletes it
+	handler = headers.WithRestoreAuthorizationHeader(handler)
+
 	// this is the normal kube handler chain
 	handler = genericapiserver.DefaultBuildHandlerChain(handler, genericConfig)
+
+	// store a copy of the Authorization header for later use
+	handler = headers.WithPreserveAuthorizationHeader(handler)
 
 	handler = headers.WithStandardHeaders(handler) // protected endpoints should not be cached
 
