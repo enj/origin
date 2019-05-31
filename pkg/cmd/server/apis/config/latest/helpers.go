@@ -17,14 +17,6 @@ import (
 	configapi "github.com/openshift/origin/pkg/cmd/server/apis/config"
 )
 
-func ReadSessionSecrets(filename string) (*configapi.SessionSecrets, error) {
-	config := &configapi.SessionSecrets{}
-	if err := ReadYAMLFileInto(filename, config); err != nil {
-		return nil, err
-	}
-	return config, nil
-}
-
 func ReadNodeConfig(filename string) (*configapi.NodeConfig, error) {
 	config := &configapi.NodeConfig{}
 	if err := ReadYAMLFileInto(filename, config); err != nil {

@@ -2,7 +2,9 @@ package oauthserver
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	kclientset "k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -24,7 +27,6 @@ import (
 	userclient "github.com/openshift/client-go/user/clientset/versioned/typed/user/v1"
 	bootstrap "github.com/openshift/library-go/pkg/authentication/bootstrapauthenticator"
 	"github.com/openshift/library-go/pkg/oauth/oauthdiscovery"
-	"github.com/openshift/origin/pkg/cmd/server/apis/config/latest"
 	"github.com/openshift/origin/pkg/oauthserver/config"
 	"github.com/openshift/origin/pkg/oauthserver/server/crypto"
 	"github.com/openshift/origin/pkg/oauthserver/server/headers"
@@ -170,7 +172,7 @@ func getSessionSecrets(filename string) ([][]byte, error) {
 	var secrets [][]byte
 
 	if len(filename) != 0 {
-		sessionSecrets, err := latest.ReadSessionSecrets(filename)
+		sessionSecrets, err := readSessionSecrets(filename)
 		if err != nil {
 			return nil, fmt.Errorf("error reading sessionSecretsFile %s: %v", filename, err)
 		}
@@ -195,6 +197,28 @@ func getSessionSecrets(filename string) ([][]byte, error) {
 	}
 
 	return secrets, nil
+}
+
+func readSessionSecrets(filename string) (*osinv1.SessionSecrets, error) {
+	sessionSecrets := &osinv1.SessionSecrets{}
+	if err := readYAMLFileInto(filename, sessionSecrets); err != nil {
+		return nil, err
+	}
+	return sessionSecrets, nil
+}
+
+func readYAMLFileInto(filename string, obj runtime.Object) error {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := kyaml.ToJSON(data)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(jsonData, obj)
 }
 
 // isHTTPS returns true if the given URL is a valid https URL

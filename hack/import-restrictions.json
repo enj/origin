@@ -421,13 +421,11 @@
     ],
     "allowedImportPackages": [
       "vendor/k8s.io/klog",
+      "vendor/sigs.k8s.io/yaml",
       "vendor/github.com/davecgh/go-spew/spew",
       "github.com/openshift/origin/pkg/authorization/authorizer/scope",
       "github.com/openshift/origin/pkg/oauth/apis/oauth/validation",
       "github.com/openshift/origin/pkg/oauth/scope",
-      "github.com/openshift/origin/pkg/cmd/server/apis/config",
-      "github.com/openshift/origin/pkg/cmd/server/apis/config/install",
-      "github.com/openshift/origin/pkg/cmd/server/apis/config/latest",
       "github.com/openshift/origin/pkg/serviceaccounts/oauthclient"
     ]
   },
