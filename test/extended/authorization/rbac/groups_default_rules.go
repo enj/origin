@@ -79,9 +79,6 @@ var (
 		rbacv1helpers.NewRule("get").URLs(
 			"/healthz/",
 			"/version/*",
-			"/oapi", "/oapi/*",
-			"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1",
-			"/osapi", "/osapi/",
 			"/.well-known", "/.well-known/*",
 			"/",
 		).RuleOrDie(),
@@ -93,9 +90,6 @@ var (
 		rbacv1helpers.NewRule("get").URLs(
 			"/healthz",
 			"/version",
-			"/openapi", "/openapi/*",
-			"/api", "/api/*",
-			"/apis", "/apis/*",
 		).RuleOrDie(),
 	}
 
@@ -111,6 +105,16 @@ var (
 			rbacv1helpers.NewRule(read...).Groups(rbacGroup).Resources("clusterroles").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch").Groups(projectGroup, legacyProjectGroup).Resources("projects").RuleOrDie(),
+
+			rbacv1helpers.NewRule("get").URLs(
+				"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1",
+			).RuleOrDie(),
+
+			rbacv1helpers.NewRule("get").URLs(
+				"/openapi", "/openapi/*",
+				"/api", "/api/*",
+				"/apis", "/apis/*",
+			).RuleOrDie(),
 		},
 		allUnauthenticatedRules...,
 	)
