@@ -102,10 +102,8 @@ var (
 			// API discovery/negotiation
 			"/api", "/api/*",
 			"/apis", "/apis/*",
-			"/oapi", "/oapi/*",
 			"/openapi/v2",
 			"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1",
-			"/osapi", "/osapi/", // these cannot be removed until we can drop support for pre 3.1 clients
 			"/.well-known", "/.well-known/*",
 
 			// we intentionally allow all to here
@@ -804,7 +802,7 @@ func GetOpenshiftBootstrapClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 			Groups(AuthenticatedGroup, UnauthenticatedGroup).
 			BindingOrDie(),
 		newOriginClusterBinding(StatusCheckerRoleBindingName, StatusCheckerRoleName).
-			Groups(AuthenticatedGroup, UnauthenticatedGroup).
+			Groups(AuthenticatedGroup).
 			BindingOrDie(),
 		newOriginClusterBinding(NodeProxierRoleBindingName, "system:node-proxier").
 			// Allow node identities to run node proxies
@@ -818,7 +816,7 @@ func GetOpenshiftBootstrapClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 			Groups(AuthenticatedGroup, UnauthenticatedGroup).
 			BindingOrDie(),
 		rbacv1helpers.NewClusterBinding(DiscoveryRoleName).
-			Groups(AuthenticatedGroup, UnauthenticatedGroup).
+			Groups(AuthenticatedGroup).
 			BindingOrDie(),
 		// Allow all build strategies by default.
 		// These are in separate bindings so that cluster admins can remove the subjects
