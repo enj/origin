@@ -156,6 +156,9 @@ func (c *AvailableConditionController) sync(key string) error {
 			KeyData:  c.proxyClientKey(),
 		},
 	}
+	if c.proxyTransport != nil && c.proxyTransport.DialContext != nil {
+		restConfig.Dial = c.proxyTransport.DialContext
+	}
 	restTransport, err := rest.TransportFor(restConfig)
 	if err != nil {
 		panic(err)
@@ -164,9 +167,6 @@ func (c *AvailableConditionController) sync(key string) error {
 		Transport: restTransport,
 		// the request should happen quickly.
 		Timeout: 5 * time.Second,
-	}
-	if c.proxyTransport != nil {
-		discoveryClient.Transport = c.proxyTransport
 	}
 
 	apiService := originalAPIService.DeepCopy()
