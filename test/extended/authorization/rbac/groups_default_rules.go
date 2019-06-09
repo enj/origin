@@ -76,17 +76,19 @@ var (
 
 		rbacv1helpers.NewRule("delete").Groups(oauthGroup, legacyOauthGroup).Resources("oauthaccesstokens", "oauthauthorizetokens").RuleOrDie(),
 
+		// this is openshift specific
 		rbacv1helpers.NewRule("get").URLs(
 			"/healthz/",
 			"/version/*",
 			"/.well-known", "/.well-known/*",
-			"/",
 		).RuleOrDie(),
 
+		// this needs to move upstream
 		rbacv1helpers.NewRule("get").URLs(
 			"/readyz",
 		).RuleOrDie(),
 
+		// this is from upstream kube
 		rbacv1helpers.NewRule("get").URLs(
 			"/healthz",
 			"/version",
@@ -106,10 +108,12 @@ var (
 			rbacv1helpers.NewRule("get", "list").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch").Groups(projectGroup, legacyProjectGroup).Resources("projects").RuleOrDie(),
 
+			// this is openshift specific
 			rbacv1helpers.NewRule("get").URLs(
-				"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1",
+				"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1", // TODO I think we can remove this
 			).RuleOrDie(),
 
+			// this is from upstream kube
 			rbacv1helpers.NewRule("get").URLs(
 				"/openapi", "/openapi/*",
 				"/api", "/api/*",
