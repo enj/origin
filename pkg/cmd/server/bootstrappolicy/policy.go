@@ -105,9 +105,6 @@ var (
 			"/openapi/v2",
 			"/swaggerapi", "/swaggerapi/*", "/swagger.json", "/swagger-2.0.0.pb-v1",
 			"/.well-known", "/.well-known/*",
-
-			// we intentionally allow all to here
-			"/",
 		},
 	}
 
