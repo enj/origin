@@ -24,10 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/klog"
 )
 
 var mutationDetectionEnabled = false
@@ -114,7 +115,7 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 	altered := false
 	for i, obj := range d.cachedObjs {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
-			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectGoPrintSideBySide(obj.cached, obj.copied))
+			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, structDiff(obj.cached, obj.copied))
 			altered = true
 		}
 	}
@@ -127,4 +128,16 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 		}
 		panic(msg)
 	}
+}
+
+func structDiff(a, b interface{}) string {
+	s := spew.ConfigState{
+		Indent:                  "\t",
+		DisableMethods:          true,
+		DisablePointerAddresses: true,
+		DisableCapacities:       true,
+		SortKeys:                true,
+		SpewKeys:                true,
+	}
+	return diff.StringDiff(s.Sdump(a), s.Sdump(b))
 }
