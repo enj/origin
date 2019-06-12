@@ -44,9 +44,9 @@ type CacheMutationDetector interface {
 
 func NewCacheMutationDetector(name string) CacheMutationDetector {
 	if !mutationDetectionEnabled {
-		return dummyMutationDetector{}
+		// return dummyMutationDetector{}
 	}
-	klog.Warningln("Mutation detector is enabled, this will result in memory leakage.")
+	klog.Warningln("MMK 000 Mutation detector is enabled, this will result in memory leakage.")
 	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second}
 }
 
@@ -115,7 +115,7 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 	altered := false
 	for i, obj := range d.cachedObjs {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
-			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, structDiff(obj.cached, obj.copied))
+			fmt.Printf("MMK 000 CACHE %s[%d] ALTERED!\n%v\n", d.name, i, structDiff(obj.cached, obj.copied))
 			altered = true
 		}
 	}
