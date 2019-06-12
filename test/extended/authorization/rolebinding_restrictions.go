@@ -1,7 +1,6 @@
 package authorization
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -11,11 +10,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
-	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 
 	authorizationapi "github.com/openshift/origin/pkg/authorization/apis/authorization"
@@ -39,12 +34,10 @@ var _ = g.Describe("[Feature: RoleBinding Restrictions] RoleBindingRestrictions 
 			g.It(fmt.Sprintf("should succeed"), func() {
 				ns := oc.Namespace()
 				user := "bob"
-				rbr, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user))
+				_, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				err = waitForRBR(ns, rbr, oc)
-				o.Expect(err).NotTo(o.HaveOccurred())
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user, "rb1"))
-				o.Expect(err).NotTo(o.HaveOccurred())
+
+				testRoleBindingCreate(oc, false, false, ns, user, "rb1")
 			})
 		})
 
@@ -54,12 +47,10 @@ var _ = g.Describe("[Feature: RoleBinding Restrictions] RoleBindingRestrictions 
 				ns := oc.Namespace()
 				_, err := oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user, "rb1"))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				rbr, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user))
+				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				err = waitForRBR(ns, rbr, oc)
-				o.Expect(err).NotTo(o.HaveOccurred())
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user, "rb2"))
-				o.Expect(err).NotTo(o.HaveOccurred())
+
+				testRoleBindingCreate(oc, false, false, ns, user, "rb2")
 			})
 		})
 
@@ -70,15 +61,10 @@ var _ = g.Describe("[Feature: RoleBinding Restrictions] RoleBindingRestrictions 
 				user2 := "eve"
 				_, err := oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user1, "rb1"))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				rbr, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user1))
+				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user1))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				err = waitForRBR(ns, rbr, oc)
-				o.Expect(err).NotTo(o.HaveOccurred())
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user2, "rb2"))
-				o.Expect(err).To(o.HaveOccurred())
-				o.Expect(kerrors.IsForbidden(err)).To(o.BeTrue())
-				expectedErrorString := fmt.Sprintf("rolebindings to User \"%s\" are not allowed in project", user2)
-				o.Expect(err.Error()).Should(o.ContainSubstring(expectedErrorString))
+
+				testRoleBindingCreate(oc, false, true, ns, user2, "rb2")
 			})
 		})
 
@@ -89,15 +75,10 @@ var _ = g.Describe("[Feature: RoleBinding Restrictions] RoleBindingRestrictions 
 				user2 := "george"
 				_, err := oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user1, "rb1"))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				rbr, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user1))
+				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user1))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				err = waitForRBR(ns, rbr, oc)
-				o.Expect(err).NotTo(o.HaveOccurred())
-				_, err = oc.AdminKubeClient().RbacV1().RoleBindings(ns).Create(generateRbacUserRolebinding(ns, user2, "rb2"))
-				o.Expect(err).To(o.HaveOccurred())
-				o.Expect(kerrors.IsForbidden(err)).To(o.BeTrue())
-				expectedErrorString := fmt.Sprintf("rolebindings to User \"%s\" are not allowed in project", user2)
-				o.Expect(err.Error()).Should(o.ContainSubstring(expectedErrorString))
+
+				testRoleBindingCreate(oc, true, true, ns, user2, "rb2")
 			})
 		})
 
@@ -105,12 +86,12 @@ var _ = g.Describe("[Feature: RoleBinding Restrictions] RoleBindingRestrictions 
 			g.It(fmt.Sprintf("should succeed"), func() {
 				ns := oc.Namespace()
 				user := "harry"
-				rbr, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateRBRnonExist(ns, user))
+				_, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateRBRnonExist(ns, user))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				err = waitForRBR(ns, rbr, oc)
-				o.Expect(err).NotTo(o.HaveOccurred())
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user, "rb1"))
-				o.Expect(err).NotTo(o.HaveOccurred())
+
+				testRoleBindingCreate(oc, false, false, ns, user, "rb1")
+
+				// we know the RBR cache is in sync now so this should never flake
 				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebindingNonExisting(ns, "rb2"))
 				o.Expect(err).NotTo(o.HaveOccurred())
 			})
@@ -126,29 +107,25 @@ var _ = g.Describe("[Feature: RoleBinding Restrictions] RoleBindingRestrictions 
 				_, err := oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user1, "rb1"))
 				o.Expect(err).NotTo(o.HaveOccurred())
 				// Subject bound, rolebinding restriction should succeed
-				rbr, err := oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user1))
+				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateAllowUserRolebindingRestriction(ns, user1))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				err = waitForRBR(ns, rbr, oc)
-				o.Expect(err).NotTo(o.HaveOccurred())
+
 				// Duplicate should succeed
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user1, "rb2"))
-				o.Expect(err).NotTo(o.HaveOccurred())
+				testRoleBindingCreate(oc, false, false, ns, user1, "rb2")
+
 				// Subject not bound, not permitted by any RBR, rolebinding should fail
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user2, "rb3"))
-				o.Expect(err).To(o.HaveOccurred())
-				o.Expect(kerrors.IsForbidden(err)).To(o.BeTrue())
-				expectedErrorString := fmt.Sprintf("rolebindings to User \"%s\" are not allowed in project", user2)
-				o.Expect(err.Error()).Should(o.ContainSubstring(expectedErrorString))
+				testRoleBindingCreate(oc, false, true, ns, user2, "rb3")
+
 				// Subject not bound, not permitted by any RBR, RBAC rolebinding should fail
-				_, err = oc.AdminKubeClient().RbacV1().RoleBindings(ns).Create(generateRbacUserRolebinding(ns, user2, "rb3"))
-				o.Expect(err).To(o.HaveOccurred())
-				o.Expect(kerrors.IsForbidden(err)).To(o.BeTrue())
-				o.Expect(err.Error()).Should(o.ContainSubstring(expectedErrorString))
+				testRoleBindingCreate(oc, true, true, ns, user2, "rb3")
+
 				// Create a rolebinding that also contains system:non-existing users should succeed
 				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Create(generateRBRnonExist(ns, user3))
 				o.Expect(err).NotTo(o.HaveOccurred())
-				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user3, "rb4"))
-				o.Expect(err).NotTo(o.HaveOccurred())
+
+				testRoleBindingCreate(oc, false, false, ns, user3, "rb4")
+
+				// we know the RBR cache is in sync now so this should never flake
 				_, err = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebindingNonExisting(ns, "rb5"))
 				o.Expect(err).NotTo(o.HaveOccurred())
 			})
@@ -235,34 +212,42 @@ func generateRolebindingNonExisting(ns, rb string) *authorizationapi.RoleBinding
 	}
 }
 
-func waitForRBR(ns string, rbr *authorizationapi.RoleBindingRestriction, oc *exutil.CLI) error {
-	var ctx context.Context
-	cancel := func() {}
-	defer cancel()
-	ctx, cancel = watchtools.ContextWithOptionalTimeout(context.Background(), 3*time.Minute)
+func testRoleBindingCreate(oc *exutil.CLI, useRBAC, shouldErr bool, ns, user, rb string) {
+	var (
+		counter int
+		rbrErr  error
+	)
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", rbr.Name).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fieldSelector
-			return oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).List(options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fieldSelector
-			return oc.AdminAuthorizationClient().Authorization().RoleBindingRestrictions(ns).Watch(options)
-		},
-	}
-	_, err := watchtools.UntilWithSync(ctx, lw, rbr, nil, func(event watch.Event) (b bool, e error) {
-		switch t := event.Type; t {
-		case watch.Added, watch.Modified:
-			return true, nil
-
-		case watch.Deleted:
-			return true, fmt.Errorf("object has been deleted")
-
-		default:
-			return true, fmt.Errorf("internal error: unexpected event %#v", e)
+	timeoutErr := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (done bool, _ error) {
+		cleanupErr := oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Delete(rb, nil)
+		if cleanupErr != nil && !kerrors.IsNotFound(cleanupErr) {
+			o.Expect(cleanupErr).NotTo(o.HaveOccurred())
 		}
+
+		counter++
+
+		if useRBAC {
+			_, rbrErr = oc.AdminKubeClient().RbacV1().RoleBindings(ns).Create(generateRbacUserRolebinding(ns, user, rb))
+		} else {
+			_, rbrErr = oc.AdminAuthorizationClient().Authorization().RoleBindings(ns).Create(generateRolebinding(ns, user, rb))
+		}
+
+		if !shouldErr {
+			return rbrErr == nil && counter > 5, nil
+		}
+
+		if rbrErr != nil {
+			o.Expect(kerrors.IsForbidden(rbrErr)).To(o.BeTrue())
+			expectedErrorString := fmt.Sprintf("rolebindings to User \"%s\" are not allowed in project", user)
+			o.Expect(rbrErr.Error()).Should(o.ContainSubstring(expectedErrorString))
+			return true, nil
+		}
+
+		return false, nil
 	})
-	return err
+
+	if !shouldErr {
+		o.Expect(rbrErr).NotTo(o.HaveOccurred())
+	}
+	o.Expect(timeoutErr).NotTo(o.HaveOccurred())
 }
