@@ -46,6 +46,7 @@ var (
 		"quota.openshift.io/ClusterResourceQuota",
 		"security.openshift.io/SecurityContextConstraint",
 		"security.openshift.io/SCCExecRestrictions",
+		//"authorization.openshift.io/RestrictSubjectBindings",
 	)
 
 	// AfterKubeAdmissionPlugins are the admission plugins to add after kube admission, before mutating webhooks
