@@ -86,7 +86,7 @@ var _ = g.Describe("API data in etcd", func() {
 		o.Expect(err).NotTo(o.HaveOccurred())
 
 		etcdClient3, err := clientv3.New(clientv3.Config{
-			Endpoints:   []string{"https://" + etcdHost},
+			Endpoints:   []string{"https://" + etcdHost + ":443"},
 			DialTimeout: 30 * time.Second,
 			TLS:         tlsConfig,
 		})
