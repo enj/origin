@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	g "github.com/onsi/ginkgo"
 	"golang.org/x/net/context"
 	runtime2 "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -208,6 +209,8 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Config, etcdClient3 etcdv3.KV) {
+	defer g.GinkgoRecover()
+
 	// hack to get a fully instantiated *testing.T
 	//tc := make(chan *testing.T)
 	//done := make(chan struct{})
@@ -699,21 +702,20 @@ func getFromEtcd(kv etcdv3.KV, path string) (*metaObject, error) {
 
 	switch {
 	case bytes.HasPrefix(value, protoEncodingPrefix):
-		data := bytes.TrimPrefix(value, protoEncodingPrefix)
-
-		tm := &metav1.TypeMeta{}
-		om := &metav1.ObjectMeta{}
-		if err := tm.Unmarshal(data); err != nil {
-			return nil, err
-		}
-		if err := om.Unmarshal(data); err != nil {
+		unknown := &runtime.Unknown{}
+		if err := unknown.Unmarshal(bytes.TrimPrefix(value, protoEncodingPrefix)); err != nil {
 			return nil, err
 		}
 
-		metaObj.Kind = tm.Kind
-		metaObj.APIVersion = tm.APIVersion
-		metaObj.Metadata.Name = om.Name
-		metaObj.Metadata.Namespace = om.Namespace
+		pm := &protoMeta{}
+		if err := pm.Unmarshal(unknown.Raw); err != nil {
+			return nil, err
+		}
+
+		metaObj.Kind = unknown.Kind
+		metaObj.APIVersion = unknown.APIVersion
+		metaObj.Metadata.Name = pm.Name
+		metaObj.Metadata.Namespace = pm.Namespace
 	case bytes.HasPrefix(value, []byte(`{`)):
 		if err := json.Unmarshal(value, metaObj); err != nil {
 			return nil, err
