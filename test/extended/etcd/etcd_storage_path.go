@@ -255,6 +255,11 @@ func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Conf
 	if _, err := kubeClient.Core().Namespaces().Create(&kapi.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatalf("error creating test namespace: %#v", err)
 	}
+	defer func() {
+		if err := kubeClient.Core().Namespaces().Delete(testNamespace, nil); err != nil {
+			t.Fatalf("error deleting test namespace: %#v", err)
+		}
+	}()
 
 	etcdStorageData := etcddata.GetEtcdStorageData()
 
