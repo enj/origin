@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"mime"
@@ -220,7 +221,7 @@ func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Conf
 					<-done      // make sure to block the test until we are done
 				},
 			},
-		})
+	})
 	tt := <-tc
 
 	install.InstallInternalOpenShift(legacyscheme.Scheme)
@@ -233,6 +234,9 @@ func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Conf
 
 	// create CRDs so we can make sure that custom resources do not get lost
 	etcddata.CreateTestCRDs(tt, apiextensionsclientset.NewForConfigOrDie(kubeConfig), false, etcddata.GetCustomResourceDefinitionData()...)
+	defer func() {
+		_ = apiextensionsclientset.NewForConfigOrDie(kubeConfig).ApiextensionsV1beta1().CustomResourceDefinitions().Delete
+	}()
 
 	// wait for cluster resource quota CRD to be available
 	if err := testutil.WaitForClusterResourceQuotaCRDAvailable(kubeConfig); err != nil {
@@ -674,6 +678,8 @@ func createSerializers(config restclient.ContentConfig) (*restclient.Serializers
 	return s, nil
 }
 
+var protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
+
 func getFromEtcd(kv etcdv3.KV, path string) (*metaObject, error) {
 	response, err := kv.Get(context.Background(), "/"+path, etcdv3.WithSerializable())
 	if err != nil {
@@ -685,26 +691,35 @@ func getFromEtcd(kv etcdv3.KV, path string) (*metaObject, error) {
 	}
 
 	value := response.Kvs[0].Value
-	tm := &metav1.TypeMeta{}
-	om := &metav1.ObjectMeta{}
-	if err := tm.Unmarshal(value); err != nil {
-		return nil, err
-	}
-	if err := om.Unmarshal(value); err != nil {
-		return nil, err
+	metaObj := &metaObject{}
+
+	switch {
+	case bytes.HasPrefix(value, protoEncodingPrefix):
+		data := bytes.TrimPrefix(value, protoEncodingPrefix)
+
+		tm := &metav1.TypeMeta{}
+		om := &metav1.ObjectMeta{}
+		if err := tm.Unmarshal(data); err != nil {
+			return nil, err
+		}
+		if err := om.Unmarshal(data); err != nil {
+			return nil, err
+		}
+
+		metaObj.Kind = tm.Kind
+		metaObj.APIVersion = tm.APIVersion
+		metaObj.Metadata.Name = om.Name
+		metaObj.Metadata.Namespace = om.Namespace
+	case bytes.HasPrefix(value, []byte(`{`)):
+		if err := json.Unmarshal(value, metaObj); err != nil {
+			return nil, err
+		}
+	default:
+		// TODO handle encrypted data
+		return nil, fmt.Errorf("unknown data format at path /%s: %s", path, string(value))
 	}
 
-	return &metaObject{
-		Kind:       tm.Kind,
-		APIVersion: tm.APIVersion,
-		Metadata: struct {
-			Name      string `json:"name,omitempty"`
-			Namespace string `json:"namespace,omitempty"`
-		}{
-			Name:      om.Name,
-			Namespace: om.Namespace,
-		},
-	}, nil
+	return metaObj, nil
 }
 
 func diffMaps(a, b interface{}) ([]string, []string) {
