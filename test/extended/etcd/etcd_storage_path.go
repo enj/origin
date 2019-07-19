@@ -13,6 +13,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"golang.org/x/net/context"
+	runtime2 "k8s.io/apimachinery/pkg/util/runtime"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -208,21 +209,24 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Config, etcdClient3 etcdv3.KV) {
 	// hack to get a fully instantiated *testing.T
-	tc := make(chan *testing.T)
-	done := make(chan struct{})
-	defer close(done)
-	go testing.RunTests(
-		func(_, _ string) (bool, error) { return true, nil },
-		[]testing.InternalTest{
-			{
-				Name: "TestEtcd3StoragePath",
-				F: func(realT *testing.T) {
-					tc <- realT // get a T that has private fields initialized
-					<-done      // make sure to block the test until we are done
-				},
-			},
+	//tc := make(chan *testing.T)
+	//done := make(chan struct{})
+	//defer close(done)
+	//go testing.RunTests(
+	//	func(_, _ string) (bool, error) { return true, nil },
+	//	[]testing.InternalTest{
+	//		{
+	//			Name: "TestEtcd3StoragePath",
+	//			F: func(realT *testing.T) {
+	//				tc <- realT // get a T that has private fields initialized
+	//				<-done      // make sure to block the test until we are done
+	//			},
+	//		},
+	//	})
+	defer runtime2.HandleCrash(func(i interface{}) {
+		t.Fatalf("saw panic: %v", i)
 	})
-	tt := <-tc
+	tt := &testing.T{} // will cause nil panics
 
 	install.InstallInternalOpenShift(legacyscheme.Scheme)
 	install.InstallInternalKube(legacyscheme.Scheme)
