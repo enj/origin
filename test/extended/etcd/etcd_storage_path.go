@@ -240,11 +240,12 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 	kubeConfig.QPS = 99999
 	kubeConfig.Burst = 9999
 	kubeClient := kclientset.NewForConfigOrDie(kubeConfig)
+	crdClient := apiextensionsclientset.NewForConfigOrDie(kubeConfig)
 
 	// create CRDs so we can make sure that custom resources do not get lost
-	etcddata.CreateTestCRDs(tt, apiextensionsclientset.NewForConfigOrDie(kubeConfig), false, etcddata.GetCustomResourceDefinitionData()...)
+	etcddata.CreateTestCRDs(tt, crdClient, false, etcddata.GetCustomResourceDefinitionData()...)
 	defer func() {
-		deleteCRD := apiextensionsclientset.NewForConfigOrDie(kubeConfig).ApiextensionsV1beta1().CustomResourceDefinitions().Delete
+		deleteCRD := crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete
 		if err := errors.NewAggregate([]error{
 			deleteCRD("foos.cr.bar.com", nil),
 			deleteCRD("pandas.awesome.bears.com", nil),
@@ -253,6 +254,8 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 			t.Fatal(err)
 		}
 	}()
+
+	crds := getCRDs(t, crdClient)
 
 	// wait for cluster resource quota CRD to be available
 	if err := testutil.WaitForClusterResourceQuotaCRDAvailable(kubeConfig); err != nil {
@@ -283,8 +286,22 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 
 	etcdStorageData := etcddata.GetEtcdStorageData()
 
-	// TODO storage is broken somehow.  failing on v1beta1 serialization
-	delete(etcdStorageData, gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"))
+	removeStorageData(t, etcdStorageData,
+		// TODO storage is broken somehow.  failing on v1beta1 serialization
+		gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"),
+
+		// these alphas resources are not enabled in a real cluster but worked fine in the integration test
+		gvr("auditregistration.k8s.io", "v1alpha1", "auditsinks"),
+		gvr("batch", "v2alpha1", "cronjobs"),
+		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"),
+		gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterrolebindings"),
+		gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterroles"),
+		gvr("rbac.authorization.k8s.io", "v1alpha1", "rolebindings"),
+		gvr("rbac.authorization.k8s.io", "v1alpha1", "roles"),
+		gvr("scheduling.k8s.io", "v1alpha1", "priorityclasses"),
+		gvr("settings.k8s.io", "v1alpha1", "podpresets"),
+		gvr("storage.k8s.io", "v1alpha1", "volumeattachments"),
+	)
 
 	// we use a different default path prefix for kube resources
 	for gvr := range etcdStorageData {
@@ -342,6 +359,12 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 		testData, hasTest := etcdStorageData[gvResource]
 
 		if !hasTest {
+			if _, isCRD := crds[gvResource]; isCRD {
+				// TODO this is likely unsafe once CRDs support moving versions
+				t.Logf("skipping CRD %v as it has no test data", gvk)
+				delete(etcdSeen, gvResource)
+				continue
+			}
 			t.Errorf("no test data for %v.  Please add a test for your new type to etcdStorageData.", gvk)
 			continue
 		}
@@ -434,6 +457,41 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 			}
 			t.Errorf("invalid test data, please ensure all expectedEtcdPath are unique, path %s has duplicate GVRs:\n%s", path, gvrStrings)
 		}
+	}
+}
+
+func getCRDs(t g.GinkgoTInterface, crdClient *apiextensionsclientset.Clientset) map[schema.GroupVersionResource]empty {
+	crdList, err := crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crds := map[schema.GroupVersionResource]empty{}
+	for _, crd := range crdList.Items {
+		if !etcddata.CrdExistsInDiscovery(crdClient, &crd) {
+			continue
+		}
+		group := crd.Spec.Group
+		resource := crd.Spec.Names.Plural
+		if len(crd.Spec.Version) != 0 {
+			crds[gvr(group, crd.Spec.Version, resource)] = empty{}
+		}
+		for _, version := range crd.Spec.Versions {
+			if !version.Served {
+				continue
+			}
+			crds[gvr(group, version.Name, resource)] = empty{}
+		}
+	}
+	return crds
+}
+
+func removeStorageData(t g.GinkgoTInterface, etcdStorageData map[schema.GroupVersionResource]etcddata.StorageData, gvrs ...schema.GroupVersionResource) {
+	for _, gvResource := range gvrs {
+		if _, hasGVR := etcdStorageData[gvResource]; !hasGVR {
+			t.Fatalf("attempt to remove unknown resource %s", gvResource)
+		}
+		delete(etcdStorageData, gvResource)
 	}
 }
 
