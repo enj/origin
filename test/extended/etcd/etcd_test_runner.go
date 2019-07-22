@@ -30,7 +30,7 @@ var _ = g.Describe("API data in etcd", func() {
 
 		defer func() {
 			cancel()
-			o.Expect(cmd.Wait()).NotTo(o.HaveOccurred())
+			_ = cmd.Wait() // wait to clean up resources but ignore returned error since cancel kills the process
 		}()
 
 		stdOut, err := cmd.StdoutPipe()

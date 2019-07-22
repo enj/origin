@@ -227,6 +227,7 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 	defer g.GinkgoRecover()
 
 	// make Errorf fail the test as expected but continue until the end so we can see all failures
+	// we lose line numbers but that does not really matter for this test
 	ht := &helperT{GinkgoTInterface: t}
 	defer ht.done()
 	t = ht
@@ -287,9 +288,6 @@ func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, e
 	etcdStorageData := etcddata.GetEtcdStorageData()
 
 	removeStorageData(t, etcdStorageData,
-		// TODO storage is broken somehow.  failing on v1beta1 serialization
-		gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"),
-
 		// these alphas resources are not enabled in a real cluster but worked fine in the integration test
 		gvr("auditregistration.k8s.io", "v1alpha1", "auditsinks"),
 		gvr("batch", "v2alpha1", "cronjobs"),
