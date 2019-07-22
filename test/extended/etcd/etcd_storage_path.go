@@ -11,10 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo"
 	g "github.com/onsi/ginkgo"
 	"golang.org/x/net/context"
-	runtime2 "k8s.io/apimachinery/pkg/util/runtime"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	discocache "k8s.io/client-go/discovery/cached"
 	restclient "k8s.io/client-go/rest"
@@ -204,32 +203,35 @@ var kindWhiteList = sets.NewString(
 // namespace used for all tests, do not change this
 const testNamespace = "etcdstoragepathtestnamespace"
 
+type helperT struct {
+	g.GinkgoTInterface
+	errs []string
+}
+
+func (t *helperT) Errorf(format string, args ...interface{}) {
+	t.errs = append(t.errs, fmt.Sprintf(format, args...))
+}
+
+func (t *helperT) done() {
+	if len(t.errs) == 0 {
+		return
+	}
+	t.GinkgoTInterface.Errorf("test failed:\n%s", strings.Join(t.errs, "\n"))
+}
+
 // testEtcd3StoragePath tests to make sure that all objects are stored in an expected location in etcd.
 // It will start failing when a new type is added to ensure that all future types are added to this test.
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
-func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Config, etcdClient3 etcdv3.KV) {
+func testEtcd3StoragePath(t g.GinkgoTInterface, kubeConfig *restclient.Config, etcdClient3 etcdv3.KV) {
 	defer g.GinkgoRecover()
 
-	// hack to get a fully instantiated *testing.T
-	//tc := make(chan *testing.T)
-	//done := make(chan struct{})
-	//defer close(done)
-	//go testing.RunTests(
-	//	func(_, _ string) (bool, error) { return true, nil },
-	//	[]testing.InternalTest{
-	//		{
-	//			Name: "TestEtcd3StoragePath",
-	//			F: func(realT *testing.T) {
-	//				tc <- realT // get a T that has private fields initialized
-	//				<-done      // make sure to block the test until we are done
-	//			},
-	//		},
-	//	})
-	defer runtime2.HandleCrash(func(i interface{}) {
-		t.Fatalf("saw panic: %v", i)
-	})
-	tt := &testing.T{} // will cause nil panics
+	// make Errorf fail the test as expected but continue until the end so we can see all failures
+	ht := &helperT{GinkgoTInterface: t}
+	defer ht.done()
+	t = ht
+
+	var tt *testing.T // will cause nil panics that make it easy enough to find where things went wrong
 
 	install.InstallInternalOpenShift(legacyscheme.Scheme)
 	install.InstallInternalKube(legacyscheme.Scheme)
@@ -242,7 +244,14 @@ func testEtcd3StoragePath(t ginkgo.GinkgoTInterface, kubeConfig *restclient.Conf
 	// create CRDs so we can make sure that custom resources do not get lost
 	etcddata.CreateTestCRDs(tt, apiextensionsclientset.NewForConfigOrDie(kubeConfig), false, etcddata.GetCustomResourceDefinitionData()...)
 	defer func() {
-		_ = apiextensionsclientset.NewForConfigOrDie(kubeConfig).ApiextensionsV1beta1().CustomResourceDefinitions().Delete
+		deleteCRD := apiextensionsclientset.NewForConfigOrDie(kubeConfig).ApiextensionsV1beta1().CustomResourceDefinitions().Delete
+		if err := errors.NewAggregate([]error{
+			deleteCRD("foos.cr.bar.com", nil),
+			deleteCRD("pandas.awesome.bears.com", nil),
+			deleteCRD("pants.custom.fancy.com", nil),
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	// wait for cluster resource quota CRD to be available
